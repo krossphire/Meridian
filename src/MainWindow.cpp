@@ -10,6 +10,7 @@
 #include "SettingsDialog.h"
 #include "core/Coordinates.h"
 #include "rotor/Rt21Driver.h"
+#include "rotor/TrafficLog.h"
 
 #include <QFile>
 #include <QKeyEvent>
@@ -21,7 +22,8 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
     , config(std::move(initial))
     , settings(store)
 {
-    setWindowTitle(QStringLiteral("Meridian"));
+    setWindowTitle(QStringLiteral("Meridian 0.1.0-alpha1"));
+    TrafficLog::instance().setEnabled(config.trafficLog);
     globe = new GlobeWidget;
     setCentralWidget(globe);
     resize(880, 920);
@@ -119,6 +121,7 @@ void MainWindow::openSettings()
         settingsUi = new SettingsDialog(config, &zips, link, this);
         connect(settingsUi, &SettingsDialog::configSaved, this, [this](const AppConfig &saved) {
             config = saved;
+            TrafficLog::instance().setEnabled(config.trafficLog);
             if (settings)
                 config.save(*settings);
             applyHome();

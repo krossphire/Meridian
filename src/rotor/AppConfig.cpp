@@ -21,12 +21,14 @@ AppConfig AppConfig::defaults()
     config.rotors = {rotor};
     config.homeText = QStringLiteral("EM26");
     config.active = 0;
+    config.trafficLog = true;
     return config;
 }
 
 AppConfig AppConfig::load(QSettings &settings)
 {
     AppConfig config;
+    const bool traffic = settings.value(QStringLiteral("log/traffic"), true).toBool();
     config.homeText = settings.value(QStringLiteral("home/text"), QStringLiteral("EM26")).toString();
     const int count = settings.beginReadArray(QStringLiteral("rotors"));
     for (int i = 0; i < count; ++i) {
@@ -46,8 +48,12 @@ AppConfig AppConfig::load(QSettings &settings)
         config.rotors.append(rotor);
     }
     settings.endArray();
-    if (config.rotors.isEmpty())
-        return defaults();
+    if (config.rotors.isEmpty()) {
+        config = defaults();
+        config.trafficLog = traffic;
+        return config;
+    }
+    config.trafficLog = traffic;
     config.active = settings.value(QStringLiteral("rotors/active"), 0).toInt();
     if (config.active < 0 || config.active >= config.rotors.size())
         config.active = 0;
@@ -73,6 +79,7 @@ void AppConfig::save(QSettings &settings) const
     }
     settings.endArray();
     settings.setValue(QStringLiteral("rotors/active"), active);
+    settings.setValue(QStringLiteral("log/traffic"), trafficLog);
 }
 
 const RotorEndpoint *AppConfig::activeRotor() const

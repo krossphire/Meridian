@@ -24,6 +24,7 @@ struct AppConfig {
     QString homeText = QStringLiteral("EM26");
     QVector<RotorEndpoint> rotors;
     int active = 0;
+    bool trafficLog = true;
 
     static AppConfig defaults();
     static AppConfig load(QSettings &settings);

@@ -6,7 +6,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets Network SerialPort Svg Test)
+option(MERIDIAN_ALPHA_READONLY "Disable EEPROM and calibration writes" ON)
+
+find_package(Qt6 REQUIRED COMPONENTS Widgets Network SerialPort Svg)
+if(NOT CMAKE_CROSSCOMPILING)
+    find_package(Qt6 REQUIRED COMPONENTS Test)
+endif()
 
 add_library(meridian-core STATIC
     src/core/Gridsquare.cpp
@@ -18,9 +23,13 @@ add_library(meridian-core STATIC
     src/rotor/Rt21Protocol.cpp
     src/rotor/AppConfig.cpp
     src/rotor/Rt21Driver.cpp
+    src/rotor/TrafficLog.cpp
 )
 target_include_directories(meridian-core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(meridian-core PUBLIC Qt6::Widgets Qt6::Network Qt6::SerialPort)
+if(MERIDIAN_ALPHA_READONLY)
+    target_compile_definitions(meridian-core PUBLIC MERIDIAN_ALPHA_READONLY=1)
+endif()
 
 add_library(meridian-mocklib STATIC
     src/mock/Rt21Simulator.cpp
@@ -41,6 +50,10 @@ add_executable(meridian
     resources.qrc
 )
 target_link_libraries(meridian PRIVATE meridian-core meridian-mocklib Qt6::Svg)
+if(WIN32)
+    # Desktop app: no extra console window on Windows.
+    target_link_options(meridian PRIVATE -mwindows)
+endif()
 if(APPLE)
     set_target_properties(meridian PROPERTIES
         MACOSX_BUNDLE TRUE
@@ -56,6 +69,7 @@ endif()
 add_executable(meridian-mock src/mock/main.cpp)
 target_link_libraries(meridian-mock PRIVATE meridian-mocklib)
 
+if(NOT CMAKE_CROSSCOMPILING)
 enable_testing()
 function(meridian_test name)
     add_executable(${name} tests/${name}.cpp)
@@ -69,6 +83,7 @@ meridian_test(tst_globe)
 target_sources(tst_globe PRIVATE src/GlobeWidget.cpp)
 target_link_libraries(tst_globe PRIVATE Qt6::Svg)
 set_tests_properties(tst_globe PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endif()
 
 install(TARGETS meridian meridian-mock
     BUNDLE DESTINATION .

@@ -4,7 +4,7 @@ Meridian is a small, fast rotator controller for the Green Heron RT-21 (Traditio
 
 The window is the azimuthal map. The heading is a number over the globe. Click the number to type a heading, or click the map to turn to that bearing. Esc or Space stops the rotor. A gear in the corner opens settings. Nothing else sits on the map.
 
-Written for Andrew, K5PO. Licensed under GPL-3.0-or-later.
+Written for Andrew, K5PO. Licensed under GPL-3.0-or-later. The 0.1.0-alpha1 build keeps controller writes off and, by default, records raw rotor traffic in `%APPDATA%\Meridian\logs` (a `Record rotor traffic` checkbox turns that off). Rebuild with `-DMERIDIAN_ALPHA_READONLY=OFF` to allow Apply.
 
 ![Main window](docs/screenshots/main-large.png)
 

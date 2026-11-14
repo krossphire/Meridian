@@ -60,6 +60,7 @@ private:
     QLineEdit *homeEdit = nullptr;
     QLabel *summary = nullptr;
     QLabel *detail = nullptr;
+    class QCheckBox *trafficBox = nullptr;
     QListWidget *rotorList = nullptr;
     QLineEdit *nameEdit = nullptr;
     QComboBox *transport = nullptr;

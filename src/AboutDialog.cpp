@@ -6,6 +6,7 @@
 
 #include "AboutDialog.h"
 
+#include <QCoreApplication>
 #include <QDialogButtonBox>
 #include <QLabel>
 #include <QVBoxLayout>
@@ -19,7 +20,9 @@ AboutDialog::AboutDialog(QWidget *parent)
     layout->setSpacing(12);
     auto *title = new QLabel(QStringLiteral("<span style='font-size:22px;'>Meridian</span>"));
     auto *body = new QLabel(QStringLiteral(
-        "<p>A rotator controller for the Green Heron RT-21, written for Andrew, K5PO.</p>"
+        "<p>A rotator controller for the Green Heron RT-21, written for Andrew, K5PO. "
+        "This build is %1.</p>")
+        .arg(QCoreApplication::applicationVersion()) + QStringLiteral(
         "<p>Meridian is free software under the GNU General Public License, "
         "version 3 or any later version.</p>"
         "<p>The click-to-bearing azimuth and Maidenhead conversion are derived from "

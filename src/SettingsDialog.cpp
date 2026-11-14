@@ -9,6 +9,7 @@
 #include "AboutDialog.h"
 #include "core/Coordinates.h"
 #include "rotor/Rt21Driver.h"
+#include "rotor/TrafficLog.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -119,6 +120,8 @@ SettingsDialog::SettingsDialog(const AppConfig &config, const ZipDatabase *zipDb
             return;
         }
         draft.homeText = homeEdit->text().trimmed();
+        if (trafficBox)
+            draft.trafficLog = trafficBox->isChecked();
         emit configSaved(draft);
     });
     auto *row = new QHBoxLayout;
@@ -136,14 +139,21 @@ SettingsDialog::SettingsDialog(const AppConfig &config, const ZipDatabase *zipDb
                         field.raw->setText(raw);
                         field.numeric = numeric;
                         if (numeric && field.spin) {
+#if MERIDIAN_ALPHA_READONLY
+                            field.spin->setReadOnly(true);
+                            field.spin->setEnabled(false);
+#else
                             field.spin->setEnabled(field.writable);
+#endif
                             const QSignalBlocker blocker(field.spin);
                             field.spin->setValue(std::clamp(value, field.spin->minimum(), field.spin->maximum()));
                             field.original = field.spin->value();
                             if (field.id == QLatin1Char('T')) {
                                 fillingBits = true;
                                 for (int bit = 0; bit < 12; ++bit) {
+#if !MERIDIAN_ALPHA_READONLY
                                     bits[bit]->setEnabled(true);
+#endif
                                     bits[bit]->setChecked(field.spin->value() & (1 << bit));
                                 }
                                 fillingBits = false;
@@ -175,6 +185,8 @@ void SettingsDialog::setConfig(const AppConfig &config)
 {
     draft = config;
     homeEdit->setText(draft.homeText);
+    if (trafficBox)
+        trafficBox->setChecked(draft.trafficLog);
     rotorList->clear();
     for (const RotorEndpoint &rotor : draft.rotors)
         rotorList->addItem(rotor.name.isEmpty() ? QStringLiteral("RT-21") : rotor.name);
@@ -210,6 +222,14 @@ void SettingsDialog::buildStation()
     layout->addWidget(homeEdit);
     layout->addWidget(summary);
     layout->addWidget(detail);
+    trafficBox = new QCheckBox(QStringLiteral("Record rotor traffic"));
+    trafficBox->setChecked(draft.trafficLog);
+    auto *logPath = new QLabel(QStringLiteral("Log folder: %1").arg(TrafficLog::instance().directory()));
+    logPath->setWordWrap(true);
+    logPath->setObjectName(QStringLiteral("hint"));
+    layout->addSpacing(16);
+    layout->addWidget(trafficBox);
+    layout->addWidget(logPath);
     layout->addStretch();
     connect(homeEdit, &QLineEdit::textChanged, this, [this]() { refreshLocation(); });
     tabs->addTab(page, QStringLiteral("Station"));
@@ -383,11 +403,19 @@ void SettingsDialog::buildController()
 {
     auto *page = new QWidget;
     auto *layout = new QVBoxLayout(page);
-    auto *banner = new QLabel(QStringLiteral(
-        "Reads use the commands in the RT-21 manual, Appendix F, and the version 4 addendum. "
-        "Writes use the documented WXn form with n = 1 (store, do not reboot). "
-        "The exact digits on the wire have not been checked against a real controller. "
-        "Apply saves a backup first and will not send a factory reset."));
+    auto *banner = new QLabel(
+#if MERIDIAN_ALPHA_READONLY
+        QStringLiteral(
+            "Read-only in this alpha. Reads and backups work. Apply, EEPROM writes, and calibration "
+            "commands stay off until they have been checked against a real RT-21.")
+#else
+        QStringLiteral(
+            "Reads use the commands in the RT-21 manual, Appendix F, and the version 4 addendum. "
+            "Writes use the documented WXn form with n = 1 (store, do not reboot). "
+            "The exact digits on the wire have not been checked against a real controller. "
+            "Apply saves a backup first and will not send a factory reset.")
+#endif
+    );
     banner->setWordWrap(true);
     versionLabel = new QLabel(QStringLiteral("Not read yet."));
     versionLabel->setObjectName(QStringLiteral("versionLabel"));
@@ -486,6 +514,14 @@ void SettingsDialog::buildController()
     layout->addWidget(banner);
     layout->addWidget(versionLabel);
     layout->addLayout(actions);
+#if MERIDIAN_ALPHA_READONLY
+    apply->setEnabled(false);
+    apply->setToolTip(QStringLiteral("Read-only in this alpha"));
+    ccw->setEnabled(false);
+    cw->setEnabled(false);
+    pulse->setEnabled(false);
+    pulseValue->setReadOnly(true);
+#endif
     layout->addWidget(scroll, 1);
     layout->addLayout(calRow);
     tabs->addTab(page, QStringLiteral("Controller"));

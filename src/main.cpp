@@ -7,6 +7,7 @@
 #include "MainWindow.h"
 #include "mock/Rt21Simulator.h"
 #include "rotor/AppConfig.h"
+#include "rotor/TrafficLog.h"
 
 #include <QApplication>
 #include <QCommandLineParser>
@@ -94,7 +95,7 @@ int main(int argc, char *argv[])
     QApplication::setOrganizationName(QStringLiteral("K5PO"));
     QApplication::setOrganizationDomain(QStringLiteral("k5po.example"));
     QApplication::setApplicationName(QStringLiteral("Meridian"));
-    QApplication::setApplicationVersion(QStringLiteral("0.1.0"));
+    QApplication::setApplicationVersion(QStringLiteral("0.1.0-alpha1"));
     QApplication::setWindowIcon(appIcon());
     installFonts();
     installPalette(app);
@@ -113,11 +114,13 @@ int main(int argc, char *argv[])
                                 QStringLiteral("dir"));
     QCommandLineOption dprOpt(QStringLiteral("dpr"), QStringLiteral("Device pixel ratio for the sharp screenshot."),
                               QStringLiteral("scale"), QStringLiteral("2"));
+    QCommandLineOption logOpt(QStringLiteral("log"), QStringLiteral("Record raw rotor TX/RX for this session."));
     parser.addOption(configOpt);
     parser.addOption(connectOpt);
     parser.addOption(mockOpt);
     parser.addOption(shotsOpt);
     parser.addOption(dprOpt);
+    parser.addOption(logOpt);
     parser.process(app);
 
     if (parser.isSet(shotsOpt))
@@ -134,6 +137,9 @@ int main(int argc, char *argv[])
     }
 
     AppConfig config = AppConfig::load(*settings);
+    if (parser.isSet(logOpt))
+        config.trafficLog = true;
+    TrafficLog::instance().setEnabled(config.trafficLog);
     MockRt21Server mock;
     if (parser.isSet(mockOpt)) {
         mock.sim()->setHeading(52);

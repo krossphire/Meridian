@@ -6,6 +6,7 @@
 
 #include "Rt21Driver.h"
 
+#include "TrafficLog.h"
 #include "core/Bearing.h"
 
 #include <QSerialPort>
@@ -179,9 +180,11 @@ void Rt21Driver::disconnectLink()
 void Rt21Driver::onConnected()
 {
     failures = 0;
-    setLink(Link::On, endpoint.transport == RotorEndpoint::Transport::Tcp
-                          ? QStringLiteral("Connected to %1:%2").arg(endpoint.host).arg(endpoint.tcpPort)
-                          : QStringLiteral("Connected on %1").arg(endpoint.serialPort));
+    const QString where = endpoint.transport == RotorEndpoint::Transport::Tcp
+                              ? QStringLiteral("Connected to %1:%2").arg(endpoint.host).arg(endpoint.tcpPort)
+                              : QStringLiteral("Connected on %1").arg(endpoint.serialPort);
+    TrafficLog::instance().note(where);
+    setLink(Link::On, where);
     if (pendingGoto) {
         Job job;
         job.kind = Kind::Motion;
@@ -209,6 +212,7 @@ void Rt21Driver::onSocketError()
     }
     if (message.isEmpty())
         message = QStringLiteral("Connection failed.");
+    TrafficLog::instance().note(message);
     tearDownSocket();
     failLink(message);
 }
@@ -238,7 +242,9 @@ void Rt21Driver::onReadyRead()
 {
     if (!io)
         return;
-    framer.append(io->readAll());
+    const QByteArray received = io->readAll();
+    TrafficLog::instance().record("RX", received);
+    framer.append(received);
     const QList<QByteArray> frames = framer.take();
     for (const QByteArray &frame : frames)
         handleFrame(frame);
@@ -376,6 +382,7 @@ void Rt21Driver::pump()
     if (inflight || queue.isEmpty() || !io)
         return;
     inflight = queue.dequeue();
+    TrafficLog::instance().record("TX", inflight->bytes);
     io->write(inflight->bytes);
     const int wait = (inflight->kind == Kind::Motion || inflight->kind == Kind::Write) ? 60 : 1200;
     replyTimer->start(wait);
@@ -414,7 +421,9 @@ void Rt21Driver::stopMotion()
     moving = false;
     queue.clear();
     if (io) {
-        io->write(Rt21::stopCommand());
+        const QByteArray stop = Rt21::stopCommand();
+        TrafficLog::instance().record("TX", stop);
+        io->write(stop);
         framer.clear();
         inflight.reset();
         replyTimer->stop();
@@ -465,6 +474,11 @@ void Rt21Driver::readConfiguration()
 
 void Rt21Driver::writeConfiguration(const QList<QPair<QChar, int>> &changes)
 {
+#if MERIDIAN_ALPHA_READONLY
+    Q_UNUSED(changes);
+    emit writeFinished(false, QStringLiteral("EEPROM writes are off in this alpha."));
+    return;
+#else
     if (!io) {
         emit writeFinished(false, QStringLiteral("Not connected."));
         return;
@@ -483,24 +497,37 @@ void Rt21Driver::writeConfiguration(const QList<QPair<QChar, int>> &changes)
         queue.enqueue(job);
     }
     pump();
+#endif
 }
 
 void Rt21Driver::sendCalibrate(bool clockwise)
 {
+#if MERIDIAN_ALPHA_READONLY
+    Q_UNUSED(clockwise);
+    TrafficLog::instance().note(QStringLiteral("ignored calibration write (alpha read-only)"));
+    return;
+#else
     if (!io)
         return;
     Job job;
     job.kind = Kind::Motion;
     job.bytes = Rt21::calibrateEndpoint(clockwise);
     enqueue(job);
+#endif
 }
 
 void Rt21Driver::sendPulseHeading(double azimuth)
 {
+#if MERIDIAN_ALPHA_READONLY
+    Q_UNUSED(azimuth);
+    TrafficLog::instance().note(QStringLiteral("ignored pulse-heading write (alpha read-only)"));
+    return;
+#else
     if (!io)
         return;
     Job job;
     job.kind = Kind::Motion;
     job.bytes = Rt21::setPulseHeading(azimuth);
     enqueue(job);
+#endif
 }
