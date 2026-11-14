@@ -52,12 +52,12 @@ void TestSettings::transportFlickKeepsOneConnection()
     SettingsDialog *dialog = window.settingsDialog();
     auto *transport = dialog->findChild<QComboBox *>(QStringLiteral("transportPick"));
     QVERIFY(transport);
-    QCOMPARE(transport->currentIndex(), 0);
+    QCOMPARE(transport->currentIndex(), 1);
 
     for (int i = 0; i < 3; ++i) {
-        transport->setCurrentIndex(1);
+        transport->setCurrentIndex(2);
         QCoreApplication::processEvents();
-        transport->setCurrentIndex(0);
+        transport->setCurrentIndex(1);
         QCoreApplication::processEvents();
     }
     QCOMPARE(server.accepts(), 1);
@@ -83,7 +83,7 @@ void TestSettings::transportFlickKeepsOneConnection()
     dialog = window.settingsDialog();
     transport = dialog->findChild<QComboBox *>(QStringLiteral("transportPick"));
     QVERIFY(transport);
-    transport->setCurrentIndex(1);
+    transport->setCurrentIndex(2);
     for (QComboBox *box : dialog->findChildren<QComboBox *>()) {
         if (box->isEditable())
             box->setCurrentText(QStringLiteral("meridian-no-such-port"));
@@ -113,7 +113,7 @@ void TestSettings::transportFlickKeepsOneConnection()
 
     dialog = window.settingsDialog();
     transport = dialog->findChild<QComboBox *>(QStringLiteral("transportPick"));
-    transport->setCurrentIndex(0);
+    transport->setCurrentIndex(1);
     auto *buttons = dialog->findChild<QDialogButtonBox *>();
     QVERIFY(buttons);
     QPushButton *save = buttons->button(QDialogButtonBox::Save);

@@ -7,8 +7,10 @@
 #pragma once
 
 #include "rotor/AppConfig.h"
+#include "rotor/Rt21Finder.h"
 
 #include <QDialog>
+#include <QList>
 
 class QCloseEvent;
 
@@ -31,6 +33,7 @@ public:
     void setDriver(Rt21Driver *driver);
     AppConfig config() const { return draft; }
     void showPage(int index);
+    void presentFound(const FoundRotor &found);
 
 signals:
     void configSaved(const AppConfig &config);
@@ -53,6 +56,10 @@ private:
     void loadRotor(int index);
     void storeRotor(int index);
     void refreshPorts();
+    void startFind(bool network);
+    void finishFind(const QList<FoundRotor> &found, bool network);
+    void applyFound(const FoundRotor &found);
+    void styleFindButton();
     QString backupConfig(const QString &path) const;
 
     AppConfig draft;
@@ -75,6 +82,11 @@ private:
     QSpinBox *portSpin = nullptr;
     QComboBox *portCombo = nullptr;
     QComboBox *baudCombo = nullptr;
+    class QPushButton *findButton = nullptr;
+    class QPushButton *networkButton = nullptr;
+    QLabel *findNote = nullptr;
+    class QVBoxLayout *findResults = nullptr;
+    class QThread *findThread = nullptr;
     QLabel *versionLabel = nullptr;
     QVector<FieldRow> fields;
     class QCheckBox *bits[12] = {};

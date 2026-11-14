@@ -13,11 +13,14 @@
 struct RotorEndpoint {
     QString id;
     QString name;
-    enum class Transport { Tcp, Serial } transport = Transport::Tcp;
-    QString host = QStringLiteral("192.168.1.106");
-    int tcpPort = 6555;
+    enum class Transport { Unset, Tcp, Serial } transport = Transport::Unset;
+    QString host;
+    int tcpPort = 0;
     QString serialPort;
     int baud = 4800;
+
+    // True only when this rotor has a transport and the fields that transport needs.
+    bool configured() const;
 };
 
 struct AppConfig {

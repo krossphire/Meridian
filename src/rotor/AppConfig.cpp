@@ -16,9 +16,10 @@ AppConfig AppConfig::defaults()
     RotorEndpoint rotor;
     rotor.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
     rotor.name = QStringLiteral("RT-21");
-    rotor.transport = RotorEndpoint::Transport::Tcp;
-    rotor.host = QStringLiteral("192.168.1.106");
-    rotor.tcpPort = 6555;
+    rotor.transport = RotorEndpoint::Transport::Unset;
+    rotor.host.clear();
+    rotor.tcpPort = 0;
+    rotor.serialPort.clear();
     rotor.baud = 4800;
     config.rotors = {rotor};
     config.homeText = QStringLiteral("EM26");
@@ -42,11 +43,15 @@ AppConfig AppConfig::load(QSettings &settings)
         RotorEndpoint rotor;
         rotor.id = settings.value(QStringLiteral("id")).toString();
         rotor.name = settings.value(QStringLiteral("name"), QStringLiteral("RT-21")).toString();
-        rotor.transport = settings.value(QStringLiteral("transport")).toString() == QLatin1String("serial")
-                              ? RotorEndpoint::Transport::Serial
-                              : RotorEndpoint::Transport::Tcp;
-        rotor.host = settings.value(QStringLiteral("host"), QStringLiteral("192.168.1.106")).toString();
-        rotor.tcpPort = settings.value(QStringLiteral("tcpPort"), 6555).toInt();
+        const QString kind = settings.value(QStringLiteral("transport")).toString();
+        if (kind == QLatin1String("serial"))
+            rotor.transport = RotorEndpoint::Transport::Serial;
+        else if (kind == QLatin1String("tcp"))
+            rotor.transport = RotorEndpoint::Transport::Tcp;
+        else
+            rotor.transport = RotorEndpoint::Transport::Unset;
+        rotor.host = settings.value(QStringLiteral("host")).toString();
+        rotor.tcpPort = settings.value(QStringLiteral("tcpPort"), 0).toInt();
         rotor.serialPort = settings.value(QStringLiteral("serialPort")).toString();
         rotor.baud = settings.value(QStringLiteral("baud"), 4800).toInt();
         if (rotor.id.isEmpty())
@@ -79,9 +84,12 @@ void AppConfig::save(QSettings &settings) const
         const RotorEndpoint &rotor = rotors.at(i);
         settings.setValue(QStringLiteral("id"), rotor.id);
         settings.setValue(QStringLiteral("name"), rotor.name);
-        settings.setValue(QStringLiteral("transport"),
-                          rotor.transport == RotorEndpoint::Transport::Serial ? QStringLiteral("serial")
-                                                                              : QStringLiteral("tcp"));
+        QString kind;
+        if (rotor.transport == RotorEndpoint::Transport::Serial)
+            kind = QStringLiteral("serial");
+        else if (rotor.transport == RotorEndpoint::Transport::Tcp)
+            kind = QStringLiteral("tcp");
+        settings.setValue(QStringLiteral("transport"), kind);
         settings.setValue(QStringLiteral("host"), rotor.host);
         settings.setValue(QStringLiteral("tcpPort"), rotor.tcpPort);
         settings.setValue(QStringLiteral("serialPort"), rotor.serialPort);
@@ -92,6 +100,15 @@ void AppConfig::save(QSettings &settings) const
     settings.setValue(QStringLiteral("log/traffic"), trafficLog);
     settings.setValue(QStringLiteral("view/sun"), showSun);
     settings.setValue(QStringLiteral("link/idlePoll"), idlePollSeconds);
+}
+
+bool RotorEndpoint::configured() const
+{
+    if (transport == Transport::Tcp)
+        return !host.trimmed().isEmpty() && tcpPort > 0 && tcpPort <= 65535;
+    if (transport == Transport::Serial)
+        return !serialPort.trimmed().isEmpty();
+    return false;
 }
 
 const RotorEndpoint *AppConfig::activeRotor() const

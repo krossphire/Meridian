@@ -73,7 +73,9 @@ bool Rt21Driver::serves(const RotorEndpoint &next) const
         return false;
     if (endpoint.transport == RotorEndpoint::Transport::Tcp)
         return endpoint.host == next.host && endpoint.tcpPort == next.tcpPort;
-    return endpoint.serialPort == next.serialPort && endpoint.baud == next.baud;
+    if (endpoint.transport == RotorEndpoint::Transport::Serial)
+        return endpoint.serialPort == next.serialPort && endpoint.baud == next.baud;
+    return false;
 }
 
 Rt21Driver::Rt21Driver(QObject *parent)
@@ -399,6 +401,13 @@ void Rt21Driver::connectEndpoint(const RotorEndpoint &next)
 {
     if (retired)
         return;
+    if (!next.configured()) {
+        wantLink = false;
+        reconnectTimer->stop();
+        closeIo(QStringLiteral("not configured"));
+        setLink(Link::Off, QStringLiteral("Set up your RT-21 in settings"));
+        return;
+    }
     reconnectTimer->stop();
     endpoint = next;
     bound = true;
@@ -778,6 +787,13 @@ void Rt21Driver::goTo(double azimuth)
     if (link_ == Link::On || link_ == Link::Moving)
         setLink(Link::Moving, detail_);
     if (!transportOpen()) {
+        if (!endpoint.configured()) {
+            showNote(QStringLiteral("Set up your RT-21 in settings"));
+            pendingGoto.reset();
+            target_.reset();
+            emit targetChanged(0, false);
+            return;
+        }
         showNote(QStringLiteral("RT-21 not connected — check settings and connections"));
         commandArmed = true;
         awaitPrePoll = false;

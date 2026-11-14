@@ -27,7 +27,9 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMessageBox>
+#include <QPointer>
 #include <QPushButton>
+#include <QThread>
 #include <QScrollArea>
 #include <QSerialPortInfo>
 #include <QSpinBox>
@@ -320,10 +322,13 @@ void SettingsDialog::buildRotors()
     nameEdit = new QLineEdit;
     transport = new QComboBox;
     transport->setObjectName(QStringLiteral("transportPick"));
-    transport->addItems({QStringLiteral("IP / TCP"), QStringLiteral("Serial")});
+    transport->addItems({QStringLiteral("Choose connection"), QStringLiteral("IP / TCP"), QStringLiteral("Serial")});
     hostEdit = new QLineEdit;
+    hostEdit->setPlaceholderText(QStringLiteral("Host name or IP"));
     portSpin = new QSpinBox;
-    portSpin->setRange(1, 65535);
+    portSpin->setRange(0, 65535);
+    portSpin->setSpecialValueText(QStringLiteral(" "));
+    portSpin->setValue(0);
     portCombo = new QComboBox;
     portCombo->setEditable(true);
     baudCombo = new QComboBox;
@@ -340,9 +345,33 @@ void SettingsDialog::buildRotors()
     auto *note = new QLabel(QStringLiteral("8 data bits, no parity, 1 stop bit. The RT-21 default is 4800."));
     note->setWordWrap(true);
     serialForm->addRow(QString(), note);
+    auto *blank = new QLabel(QStringLiteral("Pick IP or serial. Nothing is filled in until you do."));
+    blank->setWordWrap(true);
+    blank->setObjectName(QStringLiteral("hint"));
     transportPages = new QStackedWidget;
+    transportPages->addWidget(blank);
     transportPages->addWidget(tcp);
     transportPages->addWidget(serial);
+
+    findButton = new QPushButton(QStringLiteral("Find RT-21"));
+    findButton->setObjectName(QStringLiteral("findRt21"));
+    findButton->setCursor(Qt::PointingHandCursor);
+    findNote = new QLabel;
+    findNote->setObjectName(QStringLiteral("findNote"));
+    findNote->setWordWrap(true);
+    auto *resultsHost = new QWidget;
+    findResults = new QVBoxLayout(resultsHost);
+    findResults->setContentsMargins(0, 0, 0, 0);
+    networkButton = new QPushButton(QStringLiteral("Scan the network"));
+    networkButton->setObjectName(QStringLiteral("scanNetwork"));
+    networkButton->setFlat(true);
+    networkButton->setCursor(Qt::PointingHandCursor);
+    layout->addWidget(findButton);
+    layout->addWidget(findNote);
+    layout->addWidget(resultsHost);
+    layout->addWidget(networkButton);
+    connect(findButton, &QPushButton::clicked, this, [this]() { startFind(false); });
+    connect(networkButton, &QPushButton::clicked, this, [this]() { startFind(true); });
 
     auto *form = new QFormLayout;
     form->addRow(QStringLiteral("Name"), nameEdit);
@@ -393,7 +422,7 @@ void SettingsDialog::buildRotors()
     auto *ports = new QTimer(this);
     ports->setInterval(1500);
     connect(ports, &QTimer::timeout, this, [this]() {
-        if (isVisible() && transport->currentIndex() == 1)
+        if (isVisible() && transport->currentIndex() == 2)
             refreshPorts();
     });
     ports->start();
@@ -408,13 +437,115 @@ void SettingsDialog::loadRotor(int index)
     rotorIndex = index;
     const RotorEndpoint &rotor = draft.rotors.at(index);
     nameEdit->setText(rotor.name);
-    transport->setCurrentIndex(rotor.transport == RotorEndpoint::Transport::Serial ? 1 : 0);
+    int transportIndex = 0;
+    if (rotor.transport == RotorEndpoint::Transport::Tcp)
+        transportIndex = 1;
+    else if (rotor.transport == RotorEndpoint::Transport::Serial)
+        transportIndex = 2;
+    transport->setCurrentIndex(transportIndex);
     hostEdit->setText(rotor.host);
     portSpin->setValue(rotor.tcpPort);
     if (!rotor.serialPort.isEmpty() && portCombo->findText(rotor.serialPort) < 0)
         portCombo->addItem(rotor.serialPort);
     portCombo->setCurrentText(rotor.serialPort);
     baudCombo->setCurrentText(QString::number(rotor.baud == 9600 ? 9600 : 4800));
+    styleFindButton();
+}
+
+void SettingsDialog::styleFindButton()
+{
+    if (!findButton)
+        return;
+    const bool fresh = rotorIndex < 0 || rotorIndex >= draft.rotors.size() || !draft.rotors.at(rotorIndex).configured();
+    findButton->setMinimumHeight(fresh ? 46 : 32);
+    findButton->setStyleSheet(fresh
+                                  ? QStringLiteral("QPushButton#findRt21 { font-size: 16px; padding: 8px 18px;"
+                                                   " background: #3d5a4c; }")
+                                  : QStringLiteral("QPushButton#findRt21 { padding: 6px 12px; }"));
+}
+
+void SettingsDialog::presentFound(const FoundRotor &found)
+{
+    if (!findResults)
+        return;
+    auto *button = new QPushButton(found.label);
+    button->setObjectName(QStringLiteral("findResult"));
+    button->setCursor(Qt::PointingHandCursor);
+    findResults->addWidget(button);
+    connect(button, &QPushButton::clicked, this, [this, found]() { applyFound(found); });
+    if (findNote)
+        findNote->setText(QStringLiteral("Pick the RT-21 to use."));
+}
+
+void SettingsDialog::applyFound(const FoundRotor &found)
+{
+    if (rotorIndex < 0 || rotorIndex >= draft.rotors.size())
+        return;
+    RotorEndpoint &rotor = draft.rotors[rotorIndex];
+    rotor.transport = found.endpoint.transport;
+    rotor.host = found.endpoint.host;
+    rotor.tcpPort = found.endpoint.tcpPort;
+    rotor.serialPort = found.endpoint.serialPort;
+    if (found.endpoint.baud > 0)
+        rotor.baud = found.endpoint.baud;
+    loadRotor(rotorIndex);
+    commitDraft(false);
+    if (findNote)
+        findNote->setText(found.label);
+}
+
+void SettingsDialog::startFind(bool network)
+{
+    if (findThread)
+        return;
+    findButton->setEnabled(false);
+    networkButton->setEnabled(false);
+    if (!network) {
+        while (QLayoutItem *item = findResults->takeAt(0)) {
+            delete item->widget();
+            delete item;
+        }
+        findNote->setText(QStringLiteral("Checking USB and COM ports…"));
+    } else {
+        findNote->setText(QStringLiteral("Scanning the local network for port 6555…"));
+    }
+    QPointer<SettingsDialog> self(this);
+    auto *thread = QThread::create([self, network]() {
+        const QList<FoundRotor> found = network ? Rt21Finder::scanHosts(Rt21Finder::localSubnetHosts(), 6555, 400)
+                                                : Rt21Finder::scanSerialPorts(650);
+        if (!self)
+            return;
+        QMetaObject::invokeMethod(
+            self.data(), [self, found, network]() {
+                if (self)
+                    self->finishFind(found, network);
+            },
+            Qt::QueuedConnection);
+    });
+    findThread = thread;
+    connect(thread, &QThread::finished, this, [this, thread]() {
+        if (findThread == thread)
+            findThread = nullptr;
+        thread->deleteLater();
+    });
+    thread->start();
+}
+
+void SettingsDialog::finishFind(const QList<FoundRotor> &found, bool network)
+{
+    findButton->setEnabled(true);
+    networkButton->setEnabled(true);
+    for (const FoundRotor &hit : found)
+        presentFound(hit);
+    const bool any = findResults && findResults->count() > 0;
+    if (!any) {
+        findNote->setText(network
+                              ? QStringLiteral("No RT-21 answered on the network.")
+                              : QStringLiteral(
+                                    "Nothing found. Check the USB cable or driver, power, and close other apps using the port."));
+    } else if (!found.isEmpty()) {
+        findNote->setText(QStringLiteral("Pick the RT-21 to use."));
+    }
 }
 
 void SettingsDialog::storeRotor(int index)
@@ -423,8 +554,12 @@ void SettingsDialog::storeRotor(int index)
         return;
     RotorEndpoint &rotor = draft.rotors[index];
     rotor.name = nameEdit->text().trimmed().isEmpty() ? QStringLiteral("RT-21") : nameEdit->text().trimmed();
-    rotor.transport = transport->currentIndex() == 1 ? RotorEndpoint::Transport::Serial
-                                                     : RotorEndpoint::Transport::Tcp;
+    if (transport->currentIndex() == 1)
+        rotor.transport = RotorEndpoint::Transport::Tcp;
+    else if (transport->currentIndex() == 2)
+        rotor.transport = RotorEndpoint::Transport::Serial;
+    else
+        rotor.transport = RotorEndpoint::Transport::Unset;
     rotor.host = hostEdit->text().trimmed();
     rotor.tcpPort = portSpin->value();
     QString serialName = portCombo->currentData().toString();
@@ -440,6 +575,7 @@ void SettingsDialog::refreshPorts()
     const QString selected = portCombo->currentText();
     portCombo->blockSignals(true);
     portCombo->clear();
+    portCombo->addItem(QString());
     const auto ports = QSerialPortInfo::availablePorts();
     for (const QSerialPortInfo &info : ports) {
         const QString label = info.description().isEmpty()

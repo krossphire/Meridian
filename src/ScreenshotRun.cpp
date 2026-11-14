@@ -7,6 +7,7 @@
 #include "GlobeWidget.h"
 #include "MainWindow.h"
 #include "SettingsDialog.h"
+#include "rotor/Rt21Finder.h"
 #include "mock/Rt21Simulator.h"
 #include "rotor/Rt21Driver.h"
 
@@ -54,11 +55,13 @@ int runScreenshots(const QString &directory, qreal dpr)
     AppConfig config = AppConfig::defaults();
     config.homeText = QStringLiteral("EM26");
     config.rotors[0].name = QStringLiteral("Station");
+    config.rotors[0].transport = RotorEndpoint::Transport::Tcp;
     config.rotors[0].host = QStringLiteral("127.0.0.1");
     config.rotors[0].tcpPort = 17621;
     RotorEndpoint tower;
     tower.id = QStringLiteral("tower");
     tower.name = QStringLiteral("Tower");
+    tower.transport = RotorEndpoint::Transport::Tcp;
     tower.host = QStringLiteral("127.0.0.1");
     tower.tcpPort = 17621;
     config.rotors.append(tower);
@@ -108,6 +111,31 @@ int runScreenshots(const QString &directory, qreal dpr)
         return 14;
     if (!shoot(QSize(1100, 1100), QStringLiteral("sun-large.png")))
         return 15;
+
+    MainWindow fresh(AppConfig::defaults(), nullptr);
+    fresh.resize(900, 940);
+    fresh.show();
+    QApplication::processEvents();
+    if (!fresh.grab().save(directory + QStringLiteral("/first-run.png")))
+        return 16;
+    SettingsDialog *setup = fresh.settingsDialog();
+    setup->showPage(1);
+    setup->resize(680, 780);
+    QApplication::processEvents();
+    if (!setup->grab().save(directory + QStringLiteral("/find-rt21.png")))
+        return 17;
+    FoundRotor sample;
+    sample.endpoint.transport = RotorEndpoint::Transport::Serial;
+    sample.endpoint.serialPort = QStringLiteral("COM6");
+    sample.endpoint.baud = 4800;
+    sample.heading = 132;
+    sample.label = foundRotorLabel(QStringLiteral("COM6"), QStringLiteral("USB"), 4800, 132);
+    setup->presentFound(sample);
+    QApplication::processEvents();
+    if (!setup->grab().save(directory + QStringLiteral("/find-result.png")))
+        return 18;
+    setup->close();
+    fresh.close();
 
     const qreal sharpDpr = dpr > 0 ? dpr : 2.0;
     window.resize(760, 760);

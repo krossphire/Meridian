@@ -26,7 +26,7 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
     , config(std::move(initial))
     , settings(store)
 {
-    setWindowTitle(QStringLiteral("Meridian 0.1.0-alpha3"));
+    setWindowTitle(QStringLiteral("Meridian 0.1.0-alpha4"));
     TrafficLog::instance().setEnabled(config.trafficLog);
     globe = new GlobeWidget;
     setCentralWidget(globe);
@@ -71,6 +71,7 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
     statusTimer->setInterval(1000);
     connect(statusTimer, &QTimer::timeout, this, [this]() { refreshStatus(); });
     statusTimer->start();
+    refreshStatus();
 }
 
 MainWindow::~MainWindow()
@@ -132,6 +133,12 @@ void MainWindow::refreshStatus()
 {
     if (!globe)
         return;
+    const RotorEndpoint *active = config.activeRotor();
+    if (!active || !active->configured()) {
+        globe->setStatusLine(QStringLiteral("Set up your RT-21 in settings"));
+        globe->setHeadingStale(false);
+        return;
+    }
     QString line;
     if (link && !link->transientNote().isEmpty()) {
         line = link->transientNote();
@@ -238,6 +245,8 @@ void MainWindow::syncDrivers()
             want = driver;
         else if (driver->link() != Rt21Driver::Link::Off)
             driver->disconnectLink();
+        if (isActive && !rotor.configured() && driver->link() != Rt21Driver::Link::Off)
+            driver->disconnectLink();
     }
     const QStringList ids = drivers.keys();
     for (const QString &id : ids) {
@@ -247,10 +256,13 @@ void MainWindow::syncDrivers()
     if (want) {
         adopt(want);
         const RotorEndpoint *rotor = config.activeRotor();
-        if (rotor && !want->serves(*rotor))
+        if (rotor && rotor->configured() && !want->serves(*rotor))
             want->connectEndpoint(*rotor);
-        else if (want->link() == Rt21Driver::Link::Off || want->link() == Rt21Driver::Link::Failed)
+        else if (rotor && rotor->configured()
+                 && (want->link() == Rt21Driver::Link::Off || want->link() == Rt21Driver::Link::Failed))
             want->connectEndpoint(*rotor);
+        else if (rotor && !rotor->configured() && want->link() != Rt21Driver::Link::Off)
+            want->disconnectLink();
     } else {
         adopt(nullptr);
         globe->setHeading(std::nullopt);
