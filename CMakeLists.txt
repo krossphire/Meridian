@@ -1,0 +1,76 @@
+cmake_minimum_required(VERSION 3.16)
+project(Meridian VERSION 0.1.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+
+find_package(Qt6 REQUIRED COMPONENTS Widgets Network SerialPort Svg Test)
+
+add_library(meridian-core STATIC
+    src/core/Gridsquare.cpp
+    src/core/Bearing.cpp
+    src/core/Projection.cpp
+    src/core/ZipCodes.cpp
+    src/core/Coordinates.cpp
+    src/map/GeoMap.cpp
+    src/rotor/Rt21Protocol.cpp
+    src/rotor/AppConfig.cpp
+    src/rotor/Rt21Driver.cpp
+)
+target_include_directories(meridian-core PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(meridian-core PUBLIC Qt6::Widgets Qt6::Network Qt6::SerialPort)
+
+add_library(meridian-mocklib STATIC
+    src/mock/Rt21Simulator.cpp
+)
+target_include_directories(meridian-mocklib PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(meridian-mocklib PUBLIC meridian-core Qt6::Network)
+if(UNIX AND NOT APPLE)
+    target_link_libraries(meridian-mocklib PUBLIC util)
+endif()
+
+add_executable(meridian
+    src/main.cpp
+    src/ScreenshotRun.cpp
+    src/GlobeWidget.cpp
+    src/MainWindow.cpp
+    src/SettingsDialog.cpp
+    src/AboutDialog.cpp
+    resources.qrc
+)
+target_link_libraries(meridian PRIVATE meridian-core meridian-mocklib Qt6::Svg)
+if(APPLE)
+    set_target_properties(meridian PROPERTIES
+        MACOSX_BUNDLE TRUE
+        OUTPUT_NAME Meridian
+        MACOSX_BUNDLE_BUNDLE_NAME "Meridian"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "net.k5po.meridian"
+        MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
+        MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
+        MACOSX_BUNDLE_INFO_STRING "RT-21 rotator controller"
+    )
+endif()
+
+add_executable(meridian-mock src/mock/main.cpp)
+target_link_libraries(meridian-mock PRIVATE meridian-mocklib)
+
+enable_testing()
+function(meridian_test name)
+    add_executable(${name} tests/${name}.cpp)
+    target_link_libraries(${name} PRIVATE meridian-core meridian-mocklib Qt6::Test)
+    target_compile_definitions(${name} PRIVATE MERIDIAN_DATA_DIR="${CMAKE_SOURCE_DIR}/data")
+    add_test(NAME ${name} COMMAND ${name})
+endfunction()
+meridian_test(tst_core)
+meridian_test(tst_driver)
+meridian_test(tst_globe)
+target_sources(tst_globe PRIVATE src/GlobeWidget.cpp)
+target_link_libraries(tst_globe PRIVATE Qt6::Svg)
+set_tests_properties(tst_globe PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+install(TARGETS meridian meridian-mock
+    BUNDLE DESTINATION .
+    RUNTIME DESTINATION .
+)

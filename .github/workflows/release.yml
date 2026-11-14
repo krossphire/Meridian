@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.3"
+          modules: "qtserialport qtsvg qttools"
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release --parallel
+      - name: Stage and deploy
+        shell: pwsh
+        run: |
+          cmake --install build --config Release --prefix dist
+          windeployqt --release --compiler-runtime --no-translations dist/meridian.exe
+          Compress-Archive -Path dist/* -DestinationPath Meridian-Windows-x64.zip
+      - name: Installer
+        shell: pwsh
+        run: |
+          choco install innosetup -y
+          iscc /DSourceDir="$pwd\dist" /DAppVersion="${{ github.ref_name }}" packaging/windows/meridian.iss
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            Meridian-Windows-x64.zip
+            Meridian-Setup.exe
+
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.3"
+          modules: "qtserialport qtsvg qttools"
+      - name: Build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel
+      - name: Disk image
+        run: |
+          cmake --install build --prefix "$PWD/dist"
+          macdeployqt dist/Meridian.app -dmg
+          dmg=$(find dist . -maxdepth 2 -name '*.dmg' -print -quit)
+          mv "$dmg" Meridian-macOS.dmg
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: Meridian-macOS.dmg

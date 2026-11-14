@@ -1,0 +1,50 @@
+/*
+ * Meridian — rotator controller for the Green Heron RT-21.
+ * Copyright (C) 2026 Andrew, K5PO
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+#pragma once
+
+#include "map/GeoMap.h"
+#include "rotor/AppConfig.h"
+#include "core/ZipCodes.h"
+
+#include <QMainWindow>
+
+class GlobeWidget;
+class Rt21Driver;
+class SettingsDialog;
+class QSettings;
+
+class MainWindow : public QMainWindow
+{
+    Q_OBJECT
+public:
+    MainWindow(AppConfig config, QSettings *settings, QWidget *parent = nullptr);
+    ~MainWindow() override;
+
+    GlobeWidget *globeWidget() const { return globe; }
+    Rt21Driver *driver() const { return link; }
+    SettingsDialog *settingsDialog();
+    bool mapsLoaded() const { return mapsOk; }
+
+protected:
+    void keyPressEvent(QKeyEvent *event) override;
+
+private:
+    void loadMaps();
+    void applyHome();
+    void connectActive();
+    void openSettings();
+
+    AppConfig config;
+    QSettings *settings = nullptr;
+    GeoLayer low;
+    GeoLayer high;
+    ZipDatabase zips;
+    bool mapsOk = false;
+    GlobeWidget *globe = nullptr;
+    Rt21Driver *link = nullptr;
+    SettingsDialog *settingsUi = nullptr;
+};

@@ -1,0 +1,11 @@
+build/
+cmake-build-*/
+CMakeUserPresets.json
+*.user
+.cache/
+.qt/
+*.dmg
+*.zip
+*.AppImage
+dist/
+docs/screenshots/shot.ini

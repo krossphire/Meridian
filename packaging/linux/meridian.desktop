@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Meridian
+GenericName=RT-21 rotator controller
+Comment=Point a Green Heron RT-21
+Exec=meridian
+Icon=meridian
+Terminal=false
+Categories=HamRadio;Network;
+Keywords=rotator;azimuth;RT-21;amateur radio;

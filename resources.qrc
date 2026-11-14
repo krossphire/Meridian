@@ -1,0 +1,10 @@
+<RCC>
+    <qresource prefix="/">
+        <file alias="data/map110.bin">data/map110.bin</file>
+        <file alias="data/map50.bin">data/map50.bin</file>
+        <file alias="data/zcta.bin">data/zcta.bin</file>
+        <file alias="fonts/Inter-Regular.ttf">third_party/inter/Inter-Regular.ttf</file>
+        <file alias="fonts/Inter-Medium.ttf">third_party/inter/Inter-Medium.ttf</file>
+        <file alias="icons/gear.svg">src/icons/gear.svg</file>
+    </qresource>
+</RCC>
