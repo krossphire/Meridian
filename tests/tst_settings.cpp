@@ -13,6 +13,7 @@
 #include "mock/Rt21Simulator.h"
 #include "rotor/AppConfig.h"
 #include "rotor/Rt21Driver.h"
+#include "rotor/UserFiles.h"
 
 #include <QComboBox>
 #include <QCoreApplication>
@@ -20,6 +21,7 @@
 #include <QPushButton>
 #include <QSerialPort>
 #include <QTcpSocket>
+#include <QTemporaryDir>
 #include <QTest>
 #include <QTimer>
 
@@ -32,6 +34,10 @@ private slots:
 
 void TestSettings::transportFlickKeepsOneConnection()
 {
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+
     MockRt21Server server;
     QVERIFY(server.listenTcp(0));
 

@@ -7,7 +7,13 @@
 #include "mock/Rt21Simulator.h"
 #include "rotor/AppConfig.h"
 #include "rotor/Rt21Finder.h"
+#include "rotor/UserFiles.h"
 
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QSettings>
+#include <QTemporaryDir>
 #include <QTest>
 
 #include <cmath>
@@ -24,6 +30,8 @@ private slots:
     void serialProbe();
 #endif
     void missingPortIsQuiet();
+    void settingsFileBesideExe();
+    void settingsRoundTrip();
 };
 
 void TestFinder::chipNames()
@@ -92,6 +100,52 @@ void TestFinder::serialProbe()
 void TestFinder::missingPortIsQuiet()
 {
     QVERIFY(!Rt21Finder::probeSerial(QStringLiteral("meridian-no-such-port"), QStringLiteral("USB"), 4800, 200));
+}
+
+void TestFinder::settingsFileBesideExe()
+{
+    QCOMPARE(UserFiles::chooseRoot(QStringLiteral("/opt/Meridian"), QStringLiteral("/tmp/appdata"), true),
+             QStringLiteral("/opt/Meridian"));
+    QCOMPARE(UserFiles::chooseRoot(QStringLiteral("/Program Files/Meridian"), QStringLiteral("C:/Users/a/AppData/Roaming/Meridian"),
+                                   false),
+             QStringLiteral("C:/Users/a/AppData/Roaming/Meridian"));
+}
+
+void TestFinder::settingsRoundTrip()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    UserFiles::setRoot(dir.path());
+    QCOMPARE(UserFiles::root(), dir.path());
+    QCOMPARE(UserFiles::settingsPath(), QDir(dir.path()).filePath(QStringLiteral("meridian.ini")));
+    QCOMPARE(UserFiles::logDirectory(), QDir(dir.path()).filePath(QStringLiteral("logs")));
+    QCOMPARE(UserFiles::backupDirectory(), QDir(dir.path()).filePath(QStringLiteral("backups")));
+
+    AppConfig config = AppConfig::defaults();
+    config.homeText = QStringLiteral("EM26ul");
+    config.rotors[0].transport = RotorEndpoint::Transport::Tcp;
+    config.rotors[0].host = QStringLiteral("10.0.0.8");
+    config.rotors[0].tcpPort = 6555;
+    config.showSun = false;
+    UserFiles::save(config);
+    QVERIFY(QFileInfo::exists(UserFiles::settingsPath()));
+    QVERIFY(!QFileInfo::exists(UserFiles::settingsPath() + QStringLiteral(".tmp")));
+
+    const AppConfig loaded = UserFiles::load();
+    QCOMPARE(loaded.homeText, QStringLiteral("EM26ul"));
+    QCOMPARE(loaded.rotors.at(0).host, QStringLiteral("10.0.0.8"));
+    QCOMPARE(loaded.rotors.at(0).tcpPort, 6555);
+    QVERIFY(!loaded.showSun);
+
+    config.homeText = QStringLiteral("FN42");
+    UserFiles::save(config);
+    QVERIFY(QFileInfo::exists(UserFiles::settingsPath() + QStringLiteral(".bak")));
+    QFile ini(UserFiles::settingsPath());
+    QVERIFY(ini.open(QIODevice::ReadOnly));
+    const QString text = QString::fromUtf8(ini.readAll());
+    QVERIFY(text.startsWith(QStringLiteral("; Meridian settings")));
+    QVERIFY(text.contains(QStringLiteral("FN42")));
+    QVERIFY(!text.contains(QStringLiteral("\npassword="), Qt::CaseInsensitive));
 }
 
 QTEST_GUILESS_MAIN(TestFinder)

@@ -6,21 +6,13 @@
 
 #include "TrafficLog.h"
 
+#include "UserFiles.h"
+
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
-#include <QStandardPaths>
-#include <QTextStream>
 
 namespace {
-
-QString logDirectory()
-{
-    QString base = qEnvironmentVariable("APPDATA");
-    if (base.isEmpty())
-        base = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
-    return QDir(base).filePath(QStringLiteral("Meridian/logs"));
-}
 
 QString stamp()
 {
@@ -73,7 +65,7 @@ TrafficLog &TrafficLog::instance()
 
 QString TrafficLog::directory() const
 {
-    return logDirectory();
+    return UserFiles::logDirectory();
 }
 
 void TrafficLog::setEnabled(bool on)
@@ -87,7 +79,7 @@ void TrafficLog::ensureOpen()
 {
     if (opened)
         return;
-    const QString dir = logDirectory();
+    const QString dir = UserFiles::logDirectory();
     QDir().mkpath(dir);
     path = QDir(dir).filePath(QStringLiteral("meridian-%1.log")
                                   .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss"))));

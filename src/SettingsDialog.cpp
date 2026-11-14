@@ -10,14 +10,19 @@
 #include "core/Coordinates.h"
 #include "rotor/Rt21Driver.h"
 #include "rotor/TrafficLog.h"
+#include "rotor/UserFiles.h"
 
 #include <QCheckBox>
+#include <QDateTime>
+#include <QDesktopServices>
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
+#include <QFileInfo>
+#include <QUrl>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QSignalBlocker>
@@ -264,12 +269,26 @@ void SettingsDialog::buildStation()
     layout->addWidget(detail);
     trafficBox = new QCheckBox(QStringLiteral("Record rotor traffic"));
     trafficBox->setChecked(draft.trafficLog);
-    auto *logPath = new QLabel(QStringLiteral("Log folder: %1").arg(TrafficLog::instance().directory()));
-    logPath->setWordWrap(true);
-    logPath->setObjectName(QStringLiteral("hint"));
+    auto *filePath = new QLabel(UserFiles::settingsPath());
+    filePath->setObjectName(QStringLiteral("settingsPath"));
+    filePath->setWordWrap(true);
+    filePath->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    auto *openFolder = new QPushButton(QStringLiteral("Open folder"));
+    openFolder->setObjectName(QStringLiteral("openSettingsFolder"));
+    openFolder->setFlat(true);
+    openFolder->setCursor(Qt::PointingHandCursor);
+    connect(openFolder, &QPushButton::clicked, this, []() {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(UserFiles::root()));
+    });
+    auto *where = new QLabel(QStringLiteral(
+        "Settings, logs, and controller backups are in this folder. Copy meridian.ini to back it up or move it."));
+    where->setWordWrap(true);
+    where->setObjectName(QStringLiteral("hint"));
     layout->addSpacing(16);
     layout->addWidget(trafficBox);
-    layout->addWidget(logPath);
+    layout->addWidget(where);
+    layout->addWidget(filePath);
+    layout->addWidget(openFolder, 0, Qt::AlignLeft);
     sunBox = new QCheckBox(QStringLiteral("Show sun & day/night"));
     sunBox->setChecked(draft.showSun);
     sunBox->setObjectName(QStringLiteral("showSun"));
@@ -731,14 +750,14 @@ void SettingsDialog::buildController()
         driver->readConfiguration();
     });
     connect(backup, &QPushButton::clicked, this, [this]() {
-        const QString path = QFileDialog::getSaveFileName(this, QStringLiteral("Backup RT-21 setup"),
-                                                          QStringLiteral("meridian-rt21-backup.json"),
-                                                          QStringLiteral("JSON (*.json)"));
-        if (path.isEmpty())
-            return;
+        const QString path = QDir(UserFiles::backupDirectory())
+                                 .filePath(QStringLiteral("meridian-rt21-%1.json")
+                                               .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss"))));
         const QString error = backupConfig(path);
         if (!error.isEmpty())
             QMessageBox::warning(this, QStringLiteral("Backup"), error);
+        else
+            versionLabel->setText(QStringLiteral("Backup saved: %1").arg(path));
     });
     connect(apply, &QPushButton::clicked, this, [this]() {
         if (!driver)
@@ -763,9 +782,9 @@ void SettingsDialog::buildController()
             QMessageBox::Apply | QMessageBox::Cancel, QMessageBox::Cancel);
         if (answer != QMessageBox::Apply)
             return;
-        const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-        QDir().mkpath(dir);
-        const QString path = dir + QStringLiteral("/meridian-rt21-backup.json");
+        const QString path = QDir(UserFiles::backupDirectory())
+                                 .filePath(QStringLiteral("meridian-rt21-%1.json")
+                                               .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss"))));
         const QString error = backupConfig(path);
         if (!error.isEmpty()) {
             QMessageBox::warning(this, QStringLiteral("Backup"), error);
@@ -814,9 +833,15 @@ QString SettingsDialog::backupConfig(const QString &path) const
     QJsonObject root;
     root.insert(QStringLiteral("versionNote"), versionLabel->text());
     root.insert(QStringLiteral("fields"), fieldsJson);
-    QFile file(path);
+    QDir().mkpath(QFileInfo(path).absolutePath());
+    const QString tmp = path + QStringLiteral(".tmp");
+    QFile file(tmp);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
         return QStringLiteral("Couldn't write %1.").arg(path);
     file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
+    file.close();
+    QFile::remove(path);
+    if (!QFile::rename(tmp, path))
+        return QStringLiteral("Couldn't write %1.").arg(path);
     return {};
 }

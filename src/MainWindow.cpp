@@ -12,6 +12,7 @@
 #include "rotor/Reconnect.h"
 #include "rotor/Rt21Driver.h"
 #include "rotor/TrafficLog.h"
+#include "rotor/UserFiles.h"
 
 #include <QDateTime>
 #include <QFile>
@@ -51,8 +52,7 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
         if (index < 0 || index >= config.rotors.size() || index == config.active)
             return;
         config.active = index;
-        if (settings)
-            config.save(*settings);
+        UserFiles::save(config);
         connectActive();
     });
 
@@ -118,8 +118,7 @@ void MainWindow::applyConfig(const AppConfig &saved)
 {
     config = saved;
     TrafficLog::instance().setEnabled(config.trafficLog);
-    if (settings)
-        config.save(*settings);
+    UserFiles::save(config);
     applyHome();
     QStringList names;
     for (const RotorEndpoint &rotor : config.rotors)

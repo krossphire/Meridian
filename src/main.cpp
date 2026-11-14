@@ -8,6 +8,7 @@
 #include "mock/Rt21Simulator.h"
 #include "rotor/AppConfig.h"
 #include "rotor/TrafficLog.h"
+#include "rotor/UserFiles.h"
 
 #include <QApplication>
 #include <QCommandLineParser>
@@ -106,7 +107,8 @@ int main(int argc, char *argv[])
     parser.addHelpOption();
     parser.addVersionOption();
     QCommandLineOption configOpt(QStringList{QStringLiteral("config")},
-                                 QStringLiteral("Use this QSettings ini file."), QStringLiteral("path"));
+                                 QStringLiteral("Folder for meridian.ini, logs, and backups."),
+                                 QStringLiteral("dir"));
     QCommandLineOption connectOpt(QStringList{QStringLiteral("connect")},
                                   QStringLiteral("Session override, tcp://host:port."), QStringLiteral("url"));
     QCommandLineOption mockOpt(QStringLiteral("mock"), QStringLiteral("Talk to a built-in mock RT-21 on 127.0.0.1."));
@@ -126,17 +128,9 @@ int main(int argc, char *argv[])
     if (parser.isSet(shotsOpt))
         return runScreenshots(parser.value(shotsOpt), parser.value(dprOpt).toDouble());
 
-    std::unique_ptr<QSettings> owned;
-    QSettings *settings = nullptr;
-    if (parser.isSet(configOpt)) {
-        owned = std::make_unique<QSettings>(parser.value(configOpt), QSettings::IniFormat);
-        settings = owned.get();
-    } else {
-        static QSettings user;
-        settings = &user;
-    }
-
-    AppConfig config = AppConfig::load(*settings);
+    if (parser.isSet(configOpt))
+        UserFiles::setRoot(parser.value(configOpt));
+    AppConfig config = UserFiles::load();
     if (parser.isSet(logOpt))
         config.trafficLog = true;
     TrafficLog::instance().setEnabled(config.trafficLog);
@@ -164,7 +158,7 @@ int main(int argc, char *argv[])
     }
 
     QObject::connect(&app, &QCoreApplication::aboutToQuit, []() { TrafficLog::instance().flush(); });
-    MainWindow window(config, settings);
+    MainWindow window(config, nullptr);
     window.show();
     return app.exec();
 }

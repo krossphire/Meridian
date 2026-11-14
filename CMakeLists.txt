@@ -26,6 +26,7 @@ add_library(meridian-core STATIC
     src/rotor/Rt21Driver.cpp
     src/rotor/TrafficLog.cpp
     src/rotor/Rt21Finder.cpp
+    src/rotor/UserFiles.cpp
 )
 target_include_directories(meridian-core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(meridian-core PUBLIC Qt6::Widgets Qt6::Network Qt6::SerialPort)

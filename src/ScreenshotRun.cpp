@@ -8,6 +8,7 @@
 #include "MainWindow.h"
 #include "SettingsDialog.h"
 #include "rotor/Rt21Finder.h"
+#include "rotor/UserFiles.h"
 #include "mock/Rt21Simulator.h"
 #include "rotor/Rt21Driver.h"
 
@@ -51,6 +52,7 @@ void save(const QImage &image, const QString &path)
 int runScreenshots(const QString &directory, qreal dpr)
 {
     QDir().mkpath(directory);
+    UserFiles::setRoot(directory);
     QSettings settings(directory + QStringLiteral("/shot.ini"), QSettings::IniFormat);
     AppConfig config = AppConfig::defaults();
     config.homeText = QStringLiteral("EM26");

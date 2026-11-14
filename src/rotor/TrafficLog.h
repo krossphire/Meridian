@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * Raw TX/RX log so a bench session can be compared with the manual.
- * On Windows the files land in %APPDATA%\Meridian\logs.
+ * Logs sit in logs/ next to meridian.exe, or under the per-user Meridian
+ * folder when the program folder cannot be written.
  */
 
 #pragma once
