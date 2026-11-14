@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * Reconnect timing is pure so it can be tested without a socket.
- * The RT-21 network module wedges if we redial immediately, so the first
- * retries are 20 s apart. After five minutes down the gap grows and stops at 5 min.
+ * Link down (nothing answered): every 15 s for the first two minutes, then
+ * a backoff that stops at 5 min. A session the rotor closed, or one that
+ * stopped answering, waits 20 s the first time and then uses that backoff.
  */
 
 #pragma once
@@ -14,16 +15,19 @@
 
 #include <algorithm>
 
-inline int reconnectDelayMs(qint64 downForMs, int postGraceAttempt)
+// linkDown: the host never accepted the TCP handshake.
+// backoffStep: how many backoff delays have already been used. The first
+// wedged wait is 20 s and does not count as a backoff step.
+inline int reconnectDelayMs(qint64 downForMs, int backoffStep, bool linkDown)
 {
-    constexpr qint64 kGraceMs = 5LL * 60 * 1000;
-    constexpr int kInitialMs = 20000;
+    constexpr qint64 kFastWindowMs = 2LL * 60 * 1000;
     constexpr int kCapMs = 5 * 60 * 1000;
-    if (downForMs < kGraceMs)
-        return kInitialMs;
-    const int shift = std::clamp(postGraceAttempt, 0, 4);
-    const int raw = 30000 * (1 << shift);
-    return std::min(raw, kCapMs);
+    if (linkDown && downForMs < kFastWindowMs)
+        return 15000;
+    if (!linkDown && backoffStep <= 0)
+        return 20000;
+    const int step = std::clamp(linkDown ? backoffStep : backoffStep - 1, 0, 4);
+    return std::min(30000 * (1 << step), kCapMs);
 }
 
 inline QString lastSeenPhrase(qint64 elapsedSecs)

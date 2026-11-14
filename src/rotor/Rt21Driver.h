@@ -91,11 +91,14 @@ private:
     void onReadyRead();
     void onConnected();
     void onSocketError();
+    void onConnectTimeout();
     void scheduleReconnect();
+    void beginAttempt();
+    void endAttempt(const QString &why);
     void pump();
     void finishInflight();
     void handleFrame(const QByteArray &frame);
-    void failLink(const QString &message);
+    void failLink(const QString &message, bool linkDown = false);
     void startPoll();
     void pollTick();
     void enqueue(Job job);
@@ -125,6 +128,7 @@ private:
     QTimer *gapTimer = nullptr;
     QTimer *commandTimer = nullptr;
     QTimer *noteTimer = nullptr;
+    QTimer *connectTimer = nullptr;
     int failures = 0;
     int idlePollMs = 30000;
     int fastPollMs = 400;
@@ -153,5 +157,7 @@ private:
     bool bound = false;
     int suppress = 0;
     qint64 downSinceMs = -1;
-    int postGrace = 0;
+    qint64 attemptStartedMs = 0;
+    int backoffStep = 0;
+    bool linkDownOutage = false;
 };

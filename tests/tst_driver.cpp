@@ -7,6 +7,7 @@
 #include "mock/Rt21Simulator.h"
 #include "rotor/Rt21Driver.h"
 
+#include <QElapsedTimer>
 #include <QSignalSpy>
 #include <QTcpSocket>
 #include <QTest>
@@ -27,6 +28,7 @@ private slots:
     void hardwareReplyBytes();
     void prePollThenOneGoto();
     void dropCommandWithoutReplay();
+    void unreachableConnectIsQuick();
 #ifdef Q_OS_UNIX
     void serialPty();
 #endif
@@ -163,6 +165,27 @@ void TestDriver::dropCommandWithoutReplay()
             ++goCount;
     }
     QCOMPARE(goCount, 0);
+}
+
+void TestDriver::unreachableConnectIsQuick()
+{
+    Rt21Driver driver;
+    RotorEndpoint endpoint;
+    endpoint.transport = RotorEndpoint::Transport::Tcp;
+    endpoint.host = QStringLiteral("192.0.2.1");
+    endpoint.tcpPort = 9;
+    QElapsedTimer timer;
+    timer.start();
+    driver.connectEndpoint(endpoint);
+    QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::Failed, 4000);
+    QVERIFY2(timer.elapsed() <= 4000, qPrintable(QString::number(timer.elapsed())));
+    QTimer *backoff = nullptr;
+    for (QTimer *candidate : driver.findChildren<QTimer *>()) {
+        if (candidate->isActive() && candidate->isSingleShot() && candidate->interval() >= 10000)
+            backoff = candidate;
+    }
+    QVERIFY(backoff);
+    QCOMPARE(backoff->interval(), 15000);
 }
 
 void TestDriver::secondClientRefused()

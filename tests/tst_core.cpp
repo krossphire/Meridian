@@ -326,11 +326,13 @@ void TestCore::solarPosition()
 
 void TestCore::reconnectTiming()
 {
-    QCOMPARE(reconnectDelayMs(0, 0), 20000);
-    QCOMPARE(reconnectDelayMs(4LL * 60 * 1000, 2), 20000);
-    QCOMPARE(reconnectDelayMs(6LL * 60 * 1000, 0), 30000);
-    QCOMPARE(reconnectDelayMs(6LL * 60 * 1000, 1), 60000);
-    QCOMPARE(reconnectDelayMs(6LL * 60 * 1000, 4), 5 * 60 * 1000);
+    QCOMPARE(reconnectDelayMs(0, 0, false), 20000);
+    QCOMPARE(reconnectDelayMs(20000, 1, false), 30000);
+    QCOMPARE(reconnectDelayMs(90000, 2, false), 60000);
+    QCOMPARE(reconnectDelayMs(0, 0, true), 15000);
+    QCOMPARE(reconnectDelayMs(90LL * 1000, 0, true), 15000);
+    QCOMPARE(reconnectDelayMs(3LL * 60 * 1000, 0, true), 30000);
+    QCOMPARE(reconnectDelayMs(3LL * 60 * 1000, 4, true), 5 * 60 * 1000);
     QCOMPARE(lastSeenPhrase(2), QStringLiteral("Last seen just now"));
     QCOMPARE(lastSeenPhrase(90), QStringLiteral("Last seen 1 min ago"));
     QCOMPARE(lastSeenPhrase(7200), QStringLiteral("Last seen 2 h ago"));
