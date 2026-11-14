@@ -17,6 +17,7 @@ class GlobeWidget;
 class Rt21Driver;
 class SettingsDialog;
 class QSettings;
+class QTimer;
 
 class MainWindow : public QMainWindow
 {
@@ -43,6 +44,7 @@ private:
     void syncDrivers();
     void retireDriver(const QString &id);
     void adopt(Rt21Driver *driver);
+    void refreshStatus();
 
     AppConfig config;
     QSettings *settings = nullptr;
@@ -54,4 +56,5 @@ private:
     QHash<QString, Rt21Driver *> drivers;
     Rt21Driver *link = nullptr;
     SettingsDialog *settingsUi = nullptr;
+    QTimer *statusTimer = nullptr;
 };

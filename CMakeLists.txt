@@ -19,6 +19,7 @@ add_library(meridian-core STATIC
     src/core/Projection.cpp
     src/core/ZipCodes.cpp
     src/core/Coordinates.cpp
+    src/core/Solar.cpp
     src/map/GeoMap.cpp
     src/rotor/Rt21Protocol.cpp
     src/rotor/AppConfig.cpp

@@ -9,21 +9,24 @@
 #include "GlobeWidget.h"
 #include "SettingsDialog.h"
 #include "core/Coordinates.h"
+#include "rotor/Reconnect.h"
 #include "rotor/Rt21Driver.h"
 #include "rotor/TrafficLog.h"
 
+#include <QDateTime>
 #include <QFile>
 #include <QKeyEvent>
 #include <QSet>
 #include <QSettings>
 #include <QShortcut>
+#include <QTimer>
 
 MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
     : QMainWindow(parent)
     , config(std::move(initial))
     , settings(store)
 {
-    setWindowTitle(QStringLiteral("Meridian 0.1.0-alpha1"));
+    setWindowTitle(QStringLiteral("Meridian 0.1.0-alpha2"));
     TrafficLog::instance().setEnabled(config.trafficLog);
     globe = new GlobeWidget;
     setCentralWidget(globe);
@@ -61,7 +64,13 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
     for (const RotorEndpoint &rotor : config.rotors)
         names.append(rotor.name);
     globe->setRotors(names, config.active);
+    globe->setShowSun(config.showSun);
     connectActive();
+
+    statusTimer = new QTimer(this);
+    statusTimer->setInterval(1000);
+    connect(statusTimer, &QTimer::timeout, this, [this]() { refreshStatus(); });
+    statusTimer->start();
 }
 
 MainWindow::~MainWindow()
@@ -115,7 +124,39 @@ void MainWindow::applyConfig(const AppConfig &saved)
     for (const RotorEndpoint &rotor : config.rotors)
         names.append(rotor.name);
     globe->setRotors(names, config.active);
+    globe->setShowSun(config.showSun);
     syncDrivers();
+}
+
+void MainWindow::refreshStatus()
+{
+    if (!globe)
+        return;
+    QString line;
+    if (link && !link->transientNote().isEmpty()) {
+        line = link->transientNote();
+    } else if (link) {
+        const auto state = link->link();
+        if (state == Rt21Driver::Link::Failed || state == Rt21Driver::Link::Off
+            || state == Rt21Driver::Link::Connecting) {
+            if (link->lastSeenMs() >= 0) {
+                const qint64 secs = std::max<qint64>(0, (QDateTime::currentMSecsSinceEpoch() - link->lastSeenMs()) / 1000);
+                line = lastSeenPhrase(secs);
+            } else if (state == Rt21Driver::Link::Connecting) {
+                line = link->detail();
+            } else {
+                line = QStringLiteral("RT-21 not connected");
+            }
+        }
+    }
+    globe->setStatusLine(line);
+    bool stale = false;
+    if (link && link->lastSeenMs() >= 0
+        && (link->link() == Rt21Driver::Link::On || link->link() == Rt21Driver::Link::Moving)) {
+        const qint64 age = QDateTime::currentMSecsSinceEpoch() - link->lastSeenMs();
+        stale = age > qint64(link->currentPollMs()) * 2;
+    }
+    globe->setHeadingStale(stale);
 }
 
 void MainWindow::retireDriver(const QString &id)
@@ -164,7 +205,11 @@ void MainWindow::adopt(Rt21Driver *driver)
             break;
         }
         globe->setLink(shown, detail);
+        refreshStatus();
     });
+    connect(link, &Rt21Driver::statusNote, this, [this](const QString &) { refreshStatus(); });
+    connect(link, &Rt21Driver::headingChanged, this, [this](double) { refreshStatus(); });
+    link->setIdlePollSeconds(config.idlePollSeconds);
 }
 
 void MainWindow::syncDrivers()
@@ -188,6 +233,7 @@ void MainWindow::syncDrivers()
             driver = new Rt21Driver(this);
             drivers.insert(rotor.id, driver);
         }
+        driver->setIdlePollSeconds(config.idlePollSeconds);
         if (isActive)
             want = driver;
         else if (driver->link() != Rt21Driver::Link::Off)

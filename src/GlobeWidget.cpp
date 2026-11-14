@@ -8,6 +8,7 @@
 
 #include "core/Bearing.h"
 #include "core/Projection.h"
+#include "core/Solar.h"
 
 #include <QAbstractButton>
 #include <QComboBox>
@@ -17,6 +18,7 @@
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QMouseEvent>
+#include <QDateTime>
 #include <QPainter>
 #include <QPainterPath>
 #include <QSvgRenderer>
@@ -46,6 +48,7 @@ const QColor kInk(244, 246, 244);
 struct Published {
     QMutex mutex;
     QImage image;
+    QImage lines;
     QSize size;
     qreal dpr = 1;
     int lod = -1;
@@ -172,57 +175,65 @@ QPen cosmeticPen(const QColor &color, qreal dip, qreal dpr)
     return pen;
 }
 
-QImage renderProjected(const ProjectedLayer &layer, QSize logical, qreal dpr, int lod)
-{
-    QImage image(qRound(logical.width() * dpr), qRound(logical.height() * dpr), QImage::Format_ARGB32_Premultiplied);
-    image.setDevicePixelRatio(dpr);
-    image.fill(kWindow);
-    if (logical.isEmpty())
-        return image;
+struct MapFrames {
+    QImage base;
+    QImage lines;
+};
 
-    QPainter painter(&image);
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setRenderHint(QPainter::TextAntialiasing, true);
+MapFrames renderProjected(const ProjectedLayer &layer, QSize logical, qreal dpr, int lod)
+{
+    MapFrames frames;
+    frames.base = QImage(qRound(logical.width() * dpr), qRound(logical.height() * dpr), QImage::Format_ARGB32_Premultiplied);
+    frames.base.setDevicePixelRatio(dpr);
+    frames.base.fill(kWindow);
+    frames.lines = QImage(frames.base.size(), QImage::Format_ARGB32_Premultiplied);
+    frames.lines.setDevicePixelRatio(dpr);
+    frames.lines.fill(Qt::transparent);
+    if (logical.isEmpty())
+        return frames;
 
     const qreal side = std::max(2.0, qMin(logical.width(), logical.height()) - 2.0);
     const qreal radius = side / 2.0;
     const qreal cx = logical.width() / 2.0;
     const qreal cy = logical.height() / 2.0;
-
     QPainterPath disk;
     disk.addEllipse(QRectF(cx - radius, cy - radius, side, side));
-    painter.setClipPath(disk);
-    painter.fillPath(disk, kOcean);
-
     QTransform transform;
     transform.translate(cx, cy);
     transform.scale(radius, -radius);
 
-    painter.save();
-    painter.setTransform(transform);
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(kLand);
+    QPainter base(&frames.base);
+    base.setRenderHint(QPainter::Antialiasing, true);
+    base.setClipPath(disk);
+    base.fillPath(disk, kOcean);
+    base.save();
+    base.setTransform(transform);
+    base.setPen(Qt::NoPen);
+    base.setBrush(kLand);
     for (const QPainterPath &land : layer.land)
-        painter.drawPath(land);
+        base.drawPath(land);
+    base.restore();
 
+    QPainter lines(&frames.lines);
+    lines.setRenderHint(QPainter::Antialiasing, true);
+    lines.setClipPath(disk);
+    lines.save();
+    lines.setTransform(transform);
+    lines.setBrush(Qt::NoBrush);
     if (lod >= 1) {
-        painter.setBrush(Qt::NoBrush);
-        painter.setPen(cosmeticPen(kBorder, 0.75, dpr));
+        lines.setPen(cosmeticPen(kBorder, 0.75, dpr));
         for (const ProjectedCountry &country : layer.countries)
-            painter.drawPath(country.path);
+            lines.drawPath(country.path);
     }
-
-    painter.setBrush(Qt::NoBrush);
-    painter.setPen(cosmeticPen(kCoast, lod == 0 ? 1.2 : 1.15, dpr));
+    lines.setPen(cosmeticPen(kCoast, lod == 0 ? 1.2 : 1.15, dpr));
     for (const QPainterPath &land : layer.land)
-        painter.drawPath(land);
-    painter.restore();
-
-    painter.setClipping(false);
-    painter.setBrush(Qt::NoBrush);
-    painter.setPen(QPen(QColor(255, 255, 255, 40), 1.0));
-    painter.drawEllipse(QRectF(cx - radius, cy - radius, side, side));
-    return image;
+        lines.drawPath(land);
+    lines.restore();
+    lines.setClipping(false);
+    lines.setBrush(Qt::NoBrush);
+    lines.setPen(QPen(QColor(255, 255, 255, 40), 1.0));
+    lines.drawEllipse(QRectF(cx - radius, cy - radius, side, side));
+    return frames;
 }
 
 void drawCountryLabels(QPainter &painter, const ProjectedLayer &layer, const QRectF &globe)
@@ -297,10 +308,11 @@ public slots:
             projectedLon = lon;
         }
         const ProjectedLayer &layer = lod == 0 ? projected->first : projected->second;
-        QImage image = renderProjected(layer, size, dpr, lod);
+        MapFrames frames = renderProjected(layer, size, dpr, lod);
         {
             QMutexLocker lock(&box->mutex);
-            box->image = std::move(image);
+            box->image = std::move(frames.base);
+            box->lines = std::move(frames.lines);
             box->size = size;
             box->dpr = dpr;
             box->lod = lod;
@@ -370,6 +382,7 @@ GlobeWidget::GlobeWidget(QWidget *parent)
     worker->moveToThread(thread);
     connect(worker, &GlobeMapWorker::ready, this, [this, box]() {
         QImage image;
+        QImage lines;
         QSize size;
         qreal dpr = 1;
         int lod = -1;
@@ -379,6 +392,7 @@ GlobeWidget::GlobeWidget(QWidget *parent)
         {
             QMutexLocker lock(&box->mutex);
             image = box->image;
+            lines = box->lines;
             size = box->size;
             dpr = box->dpr;
             lod = box->lod;
@@ -388,6 +402,7 @@ GlobeWidget::GlobeWidget(QWidget *parent)
         }
         Published snap;
         snap.image = image;
+        snap.lines = lines;
         snap.size = size;
         snap.dpr = dpr;
         snap.lod = lod;
@@ -397,6 +412,7 @@ GlobeWidget::GlobeWidget(QWidget *parent)
         if (snap.gen != requestGen)
             return;
         cache = snap.image;
+        cacheLines = snap.lines;
         cacheSize = snap.size;
         cacheDpr = snap.dpr;
         cacheLod = snap.lod;
@@ -409,6 +425,14 @@ GlobeWidget::GlobeWidget(QWidget *parent)
     });
     thread->start();
     placeChrome();
+
+    sunTimer = new QTimer(this);
+    sunTimer->setInterval(60000);
+    connect(sunTimer, &QTimer::timeout, this, [this]() {
+        sunDirty = true;
+        update();
+    });
+    sunTimer->start();
 }
 
 GlobeWidget::~GlobeWidget()
@@ -433,6 +457,7 @@ void GlobeWidget::setHome(double lat, double lon)
     homeLon_ = lon;
     haveHome = true;
     hoverIndex = -1;
+    sunDirty = true;
     requestMap(true);
 }
 
@@ -445,6 +470,38 @@ void GlobeWidget::setHeading(std::optional<double> azimuth)
 void GlobeWidget::setTarget(std::optional<double> azimuth)
 {
     target = azimuth;
+    update();
+}
+
+void GlobeWidget::setStatusLine(const QString &text)
+{
+    if (statusLine == text)
+        return;
+    statusLine = text;
+    update();
+}
+
+void GlobeWidget::setHeadingStale(bool stale)
+{
+    if (headingStale == stale)
+        return;
+    headingStale = stale;
+    update();
+}
+
+void GlobeWidget::setShowSun(bool show)
+{
+    if (showSun == show)
+        return;
+    showSun = show;
+    sunDirty = true;
+    update();
+}
+
+void GlobeWidget::setSolarPreview(const QDateTime &utc)
+{
+    solarPreview = utc;
+    sunDirty = true;
     update();
 }
 
@@ -499,7 +556,7 @@ void GlobeWidget::setForcedDevicePixelRatio(qreal dpr)
     requestMap(true);
 }
 
-QImage GlobeWidget::renderSharp() const
+QImage GlobeWidget::renderSharp()
 {
     const qreal dpr = activeDpr();
     QImage image(qRound(width() * dpr), qRound(height() * dpr), QImage::Format_ARGB32_Premultiplied);
@@ -624,8 +681,91 @@ void GlobeWidget::placeChrome()
     }
 }
 
-void GlobeWidget::paintScene(QPainter &painter) const
+void GlobeWidget::ensureSun()
 {
+    if (!showSun || !haveHome) {
+        sunOverlay = QImage();
+        return;
+    }
+    const QDateTime utc = solarPreview.isValid() ? solarPreview : QDateTime::currentDateTimeUtc();
+    const qint64 minute = utc.toSecsSinceEpoch() / 60;
+    if (!sunDirty && minute == sunMinute && sunSize == size())
+        return;
+    sunDirty = false;
+    sunMinute = minute;
+    sunSize = size();
+    const double utcMinutes = utc.time().hour() * 60.0 + utc.time().minute() + utc.time().second() / 60.0;
+    sunNow = solarAt(homeLat_, homeLon_, utc);
+    if (detailLevel() < 1) {
+        sunOverlay = QImage();
+        return;
+    }
+
+    // Night keeps the map as it is. Twilight is a faint band. Day is a little
+    // more opaque than that band. Tunable, and soft enough to scale.
+    constexpr double kNight = -6.0;
+    constexpr double kDay = 6.0;
+    constexpr int kTwilightAlpha = 28;
+    constexpr int kDayAlpha = 46;
+
+    const int sidePx = std::min(width(), height());
+    const qreal dpr = activeDpr();
+    const int limit = 720;
+    const qreal drawScale = std::min(1.0, limit / std::max(1.0, sidePx * dpr));
+    const int iw = std::max(1, qRound(width() * dpr * drawScale));
+    const int ih = std::max(1, qRound(height() * dpr * drawScale));
+    QImage overlay(iw, ih, QImage::Format_ARGB32_Premultiplied);
+    overlay.fill(Qt::transparent);
+    const qreal side = std::max(2.0, qreal(std::min(width(), height())) - 2.0);
+    const qreal radius = side / 2.0;
+    const qreal cx = width() / 2.0;
+    const qreal cy = height() / 2.0;
+    const qreal sample = 1.0 / (dpr * drawScale);
+    for (int y = 0; y < ih; ++y) {
+        auto *row = reinterpret_cast<QRgb *>(overlay.scanLine(y));
+        const double ly = (y + 0.5) * sample;
+        for (int x = 0; x < iw; ++x) {
+            const double lx = (x + 0.5) * sample;
+            const double ux = (lx - cx) / radius;
+            const double uy = -(ly - cy) / radius;
+            if (ux * ux + uy * uy > 1.0)
+                continue;
+            double lat = 0;
+            double lon = 0;
+            if (!unprojectAzimuthal(homeLat_, homeLon_, ux, uy, lat, lon))
+                continue;
+            const double elevation = solarElevation(lat, lon, sunNow, utcMinutes);
+            if (elevation <= kNight)
+                continue;
+            int alpha = kDayAlpha;
+            int red = 196;
+            int green = 186;
+            int blue = 156;
+            if (elevation < 0.0) {
+                const double t = (elevation - kNight) / (0.0 - kNight);
+                alpha = int(kTwilightAlpha * t);
+                red = 158;
+                green = 166;
+                blue = 170;
+            } else if (elevation < kDay) {
+                const double t = elevation / kDay;
+                alpha = int(kTwilightAlpha + (kDayAlpha - kTwilightAlpha) * t);
+                red = int(158 + (196 - 158) * t);
+                green = int(166 + (186 - 166) * t);
+                blue = int(170 + (156 - 170) * t);
+            }
+            if (alpha <= 0)
+                continue;
+            row[x] = qPremultiply(qRgba(red, green, blue, alpha));
+        }
+    }
+    overlay.setDevicePixelRatio(dpr * drawScale);
+    sunOverlay = overlay;
+}
+
+void GlobeWidget::paintScene(QPainter &painter)
+{
+    ensureSun();
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setRenderHint(QPainter::TextAntialiasing, true);
     painter.fillRect(rect(), kWindow);
@@ -642,6 +782,19 @@ void GlobeWidget::paintScene(QPainter &painter) const
         painter.setPen(QPen(QColor(255, 255, 255, 40), 1));
         painter.setBrush(kOcean);
         painter.drawEllipse(disk());
+    }
+
+    if (showSun && detailLevel() >= 1 && !sunOverlay.isNull()) {
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+        painter.drawImage(QPointF(0, 0), sunOverlay);
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+    }
+    if (!cacheLines.isNull() && cacheMatches)
+        painter.drawImage(QPointF(0, 0), cacheLines);
+    else if (!cacheLines.isNull()) {
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+        painter.drawImage(rect(), cacheLines);
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
     }
 
     const QRectF globe = disk();
@@ -695,6 +848,19 @@ void GlobeWidget::paintScene(QPainter &painter) const
         }
     }
 
+    if (lod >= 2 && highProjected)
+        drawCountryLabels(painter, *highProjected, globe);
+
+    if (showSun && haveHome) {
+        const UnitPoint spot = projectAzimuthal(homeLat_, homeLon_, sunNow.subsolarLatitude, sunNow.subsolarLongitude);
+        const QPointF at(center.x() + spot.x * radius, center.y() - spot.y * radius);
+        const qreal mark = std::clamp(radius * 0.028, 3.5, 7.0);
+        const bool below = sunNow.elevation < 0.0;
+        painter.setBrush(below ? Qt::NoBrush : QColor(232, 196, 120, 210));
+        painter.setPen(QPen(QColor(232, 196, 120, below ? 90 : 220), below ? 1.2 : 1.0));
+        painter.drawEllipse(at, mark, mark);
+    }
+
     auto pointOn = [&](double azimuth, qreal rho) {
         const double radians = azimuth * M_PI / 180.0;
         return QPointF(center.x() + std::sin(radians) * radius * rho,
@@ -718,26 +884,27 @@ void GlobeWidget::paintScene(QPainter &painter) const
         painter.drawEllipse(center, std::max(2.4, beamWidth() * 0.85), std::max(2.4, beamWidth() * 0.85));
     }
 
-    if (lod >= 2 && highProjected)
-        drawCountryLabels(painter, *highProjected, globe);
-
     if (!editor->isVisible()) {
         const QString text = heading ? QString::number(*heading, 'f', 1) + QStringLiteral("°") : QStringLiteral("—");
         painter.setFont(headingFont());
         const QRectF box = headingBounds();
-        painter.setPen(QColor(0, 0, 0, 150));
+        const int inkAlpha = headingStale ? 110 : 255;
+        painter.setPen(QColor(0, 0, 0, headingStale ? 70 : 150));
         painter.drawText(box.translated(0, 1.4), Qt::AlignCenter, text);
-        painter.setPen(kInk);
+        painter.setPen(QColor(kInk.red(), kInk.green(), kInk.blue(), inkAlpha));
         painter.drawText(box, Qt::AlignCenter, text);
     }
 
-    if (lod > 0 && (link == Link::Failed || link == Link::Off || link == Link::Connecting) && !linkDetail.isEmpty()) {
+    const QString lineText = !statusLine.isEmpty() ? statusLine : linkDetail;
+    const bool showState = !statusLine.isEmpty()
+                           || ((link == Link::Failed || link == Link::Off || link == Link::Connecting) && !linkDetail.isEmpty());
+    if (showState && !lineText.isEmpty()) {
         QFont font(QStringLiteral("Inter"));
         font.setPixelSize(11);
         painter.setFont(font);
         const QFontMetrics metrics(font);
-        const QString line = metrics.elidedText(linkDetail, Qt::ElideRight, int(globe.width() * 0.7));
-        const QRectF box(globe.left() + 26, globe.bottom() - 24, globe.width() * 0.7, 16);
+        const QString line = metrics.elidedText(lineText, Qt::ElideRight, int(globe.width() * 0.72));
+        const QRectF box(globe.left() + 18, globe.bottom() - 22, globe.width() * 0.72, 16);
         painter.setPen(QColor(210, 196, 184, 210));
         painter.drawText(box, Qt::AlignLeft | Qt::AlignVCenter, line);
     }
@@ -751,6 +918,7 @@ void GlobeWidget::paintEvent(QPaintEvent *)
 
 void GlobeWidget::resizeEvent(QResizeEvent *)
 {
+    sunDirty = true;
     placeChrome();
     requestMap(false);
 }

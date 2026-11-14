@@ -11,6 +11,7 @@
 #pragma once
 
 #include <QHash>
+#include <QList>
 #include <QObject>
 #include <QString>
 
@@ -27,6 +28,9 @@ public:
     void setHeading(double azimuth);
     void setSpeed(double degreesPerSecond);
     void setFrozen(bool frozen);
+    void setIgnoreQueries(bool ignore);
+    void clearTrace();
+    QList<QByteArray> trace() const { return trace_; }
     double heading() const { return heading_; }
     double target() const { return target_; }
     bool moving() const { return moving_; }
@@ -54,6 +58,8 @@ private:
     QHash<QChar, int> ee;
     int pot = 512;
     int biReplies = 0;
+    bool ignoreQueries = false;
+    QList<QByteArray> trace_;
 };
 
 class MockRt21Server : public QObject

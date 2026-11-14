@@ -65,6 +65,8 @@ private:
     QLabel *summary = nullptr;
     QLabel *detail = nullptr;
     class QCheckBox *trafficBox = nullptr;
+    class QCheckBox *sunBox = nullptr;
+    class QSpinBox *idleSpin = nullptr;
     QListWidget *rotorList = nullptr;
     QLineEdit *nameEdit = nullptr;
     QComboBox *transport = nullptr;

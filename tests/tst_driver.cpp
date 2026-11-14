@@ -10,6 +10,7 @@
 #include <QSignalSpy>
 #include <QTcpSocket>
 #include <QTest>
+#include <QTimer>
 
 #include <cmath>
 
@@ -24,6 +25,8 @@ private slots:
     void tcpMoveAndStop();
     void secondClientRefused();
     void hardwareReplyBytes();
+    void prePollThenOneGoto();
+    void dropCommandWithoutReplay();
 #ifdef Q_OS_UNIX
     void serialPty();
 #endif
@@ -86,6 +89,80 @@ void TestDriver::hardwareReplyBytes()
     got.clear();
     moving.feed("BI1;");
     QCOMPARE(got, QByteArray::fromHex("0130013E3132322E363B"));
+}
+
+void TestDriver::prePollThenOneGoto()
+{
+    MockRt21Server server;
+    server.sim()->setHeading(10);
+    server.sim()->setSpeed(400);
+    QVERIFY(server.listenTcp(0));
+    Rt21Driver driver;
+    RotorEndpoint endpoint;
+    endpoint.transport = RotorEndpoint::Transport::Tcp;
+    endpoint.host = QStringLiteral("127.0.0.1");
+    endpoint.tcpPort = server.port();
+    driver.connectEndpoint(endpoint);
+    QTRY_VERIFY_WITH_TIMEOUT(driver.heading().has_value(), 3000);
+    server.sim()->clearTrace();
+    driver.goTo(80);
+    QTRY_VERIFY_WITH_TIMEOUT(driver.heading() && std::abs(*driver.heading() - 80.0) < 1.5, 4000);
+    const QList<QByteArray> trace = server.sim()->trace();
+    int query = -1;
+    int go = -1;
+    int goCount = 0;
+    for (int i = 0; i < trace.size(); ++i) {
+        if (query < 0 && (trace.at(i).startsWith("BI") || trace.at(i).startsWith("AI")))
+            query = i;
+        if (trace.at(i).startsWith("AP")) {
+            if (go < 0)
+                go = i;
+            ++goCount;
+        }
+    }
+    QVERIFY(query >= 0);
+    QVERIFY(go > query);
+    QCOMPARE(goCount, 1);
+}
+
+void TestDriver::dropCommandWithoutReplay()
+{
+    MockRt21Server server;
+    server.sim()->setHeading(20);
+    QVERIFY(server.listenTcp(0));
+    Rt21Driver driver;
+    RotorEndpoint endpoint;
+    endpoint.transport = RotorEndpoint::Transport::Tcp;
+    endpoint.host = QStringLiteral("127.0.0.1");
+    endpoint.tcpPort = server.port();
+    driver.connectEndpoint(endpoint);
+    QTRY_VERIFY_WITH_TIMEOUT(driver.heading().has_value(), 3000);
+    server.sim()->setIgnoreQueries(true);
+    server.sim()->clearTrace();
+    driver.goTo(40);
+    QTRY_VERIFY_WITH_TIMEOUT(driver.transientNote().contains(QStringLiteral("not connected")), 4000);
+    QVERIFY(!driver.target().has_value());
+    int goCount = 0;
+    for (const QByteArray &command : server.sim()->trace()) {
+        if (command.startsWith("AP"))
+            ++goCount;
+    }
+    QCOMPARE(goCount, 0);
+    QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::Failed, 8000);
+    QTimer *backoff = nullptr;
+    const auto timers = driver.findChildren<QTimer *>();
+    for (QTimer *timer : timers) {
+        if (timer->isActive() && timer->isSingleShot() && timer->interval() >= 15000)
+            backoff = timer;
+    }
+    QVERIFY(backoff);
+    QCOMPARE(backoff->interval(), 20000);
+    goCount = 0;
+    for (const QByteArray &command : server.sim()->trace()) {
+        if (command.startsWith("AP"))
+            ++goCount;
+    }
+    QCOMPARE(goCount, 0);
 }
 
 void TestDriver::secondClientRefused()

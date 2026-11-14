@@ -23,7 +23,10 @@
 #    define WIN32_LEAN_AND_MEAN
 #  endif
 #  include <winsock2.h>
+#  include <mstcpip.h>
 #else
+#  include <netinet/in.h>
+#  include <netinet/tcp.h>
 #  include <sys/socket.h>
 #endif
 
@@ -116,10 +119,24 @@ Rt21Driver::Rt21Driver(QObject *parent)
             return;
         }
         ++failures;
-        if (failures >= 3)
+        TrafficLog::instance().note(QStringLiteral("query timeout consecutive=%1").arg(failures));
+        if (!lastQueryWasAi)
+            useAiNext = true;
+        if (failures >= 3) {
             failLink(QStringLiteral("No reply from the RT-21."));
-        else
-            pump();
+            return;
+        }
+        if (awaitPrePoll) {
+            if (QDateTime::currentMSecsSinceEpoch() >= commandDeadlineMs)
+                dropCommand(QStringLiteral("RT-21 not connected — check settings and connections"));
+            else
+                sendQuery();
+            return;
+        }
+        if (fastPace)
+            sendQuery();
+        else if (pollTimer)
+            pollTimer->start(idlePollMs);
     });
 
     pollTimer = new QTimer(this);
@@ -130,8 +147,149 @@ Rt21Driver::Rt21Driver(QObject *parent)
     connect(reconnectTimer, &QTimer::timeout, this, [this]() {
         if (retired || !wantLink)
             return;
+        commandArmed = false;
         connectEndpoint(endpoint);
     });
+
+    gapTimer = new QTimer(this);
+    gapTimer->setSingleShot(true);
+    connect(gapTimer, &QTimer::timeout, this, [this]() { sendArmedGoto(); });
+
+    commandTimer = new QTimer(this);
+    commandTimer->setSingleShot(true);
+    connect(commandTimer, &QTimer::timeout, this, [this]() {
+        if (pendingGoto && (awaitPrePoll || commandArmed || !transportOpen()))
+            dropCommand(QStringLiteral("RT-21 not connected — check settings and connections"));
+    });
+
+    noteTimer = new QTimer(this);
+    noteTimer->setSingleShot(true);
+    connect(noteTimer, &QTimer::timeout, this, [this]() {
+        note_.clear();
+        emit statusNote(QString());
+    });
+}
+
+int Rt21Driver::currentPollMs() const
+{
+    return fastPace ? fastPollMs : idlePollMs;
+}
+
+void Rt21Driver::setIdlePollSeconds(int seconds)
+{
+    idlePollMs = std::clamp(seconds, 30, 60) * 1000;
+    if (!fastPace && pollTimer && pollTimer->isActive())
+        pollTimer->start(idlePollMs);
+}
+
+void Rt21Driver::showNote(const QString &note)
+{
+    note_ = note;
+    emit statusNote(note);
+    noteTimer->start(4000);
+}
+
+void Rt21Driver::dropCommand(const QString &note)
+{
+    pendingGoto.reset();
+    awaitPrePoll = false;
+    commandArmed = false;
+    gapTimer->stop();
+    commandTimer->stop();
+    if (target_) {
+        target_.reset();
+        emit targetChanged(0, false);
+    }
+    if (!note.isEmpty())
+        showNote(note);
+    TrafficLog::instance().note(QStringLiteral("dropped goto (%1)").arg(note));
+}
+
+bool Rt21Driver::transportOpen() const
+{
+    return (tcp && tcp->state() == QAbstractSocket::ConnectedState) || (serial && serial->isOpen());
+}
+
+void Rt21Driver::enableKeepAlive()
+{
+    if (!tcp)
+        return;
+    tcp->setSocketOption(QAbstractSocket::KeepAliveOption, 1);
+    const qintptr fd = tcp->socketDescriptor();
+    if (fd < 0)
+        return;
+#if defined(Q_OS_WIN)
+    tcp_keepalive alive{};
+    alive.onoff = 1;
+    alive.keepalivetime = 5000;
+    alive.keepaliveinterval = 2000;
+    DWORD returned = 0;
+    WSAIoctl(static_cast<SOCKET>(fd), SIO_KEEPALIVE_VALS, &alive, sizeof alive, nullptr, 0, &returned, nullptr,
+             nullptr);
+#else
+    const int idle = 5;
+    const int interval = 2;
+    const int count = 3;
+    ::setsockopt(static_cast<int>(fd), IPPROTO_TCP, TCP_KEEPIDLE, &idle, sizeof idle);
+    ::setsockopt(static_cast<int>(fd), IPPROTO_TCP, TCP_KEEPINTVL, &interval, sizeof interval);
+    ::setsockopt(static_cast<int>(fd), IPPROTO_TCP, TCP_KEEPCNT, &count, sizeof count);
+#endif
+}
+
+void Rt21Driver::sendQuery()
+{
+    if (!io || inflight || configMode || retired)
+        return;
+    Job job;
+    job.kind = Kind::Heading;
+    lastQueryWasAi = useAiNext;
+    job.bytes = useAiNext ? Rt21::queryInteger() : Rt21::queryTenths();
+    useAiNext = false;
+    enqueue(job);
+}
+
+void Rt21Driver::sendArmedGoto()
+{
+    if (!pendingGoto || !transportOpen() || retired)
+        return;
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (now >= commandDeadlineMs) {
+        dropCommand(QStringLiteral("RT-21 not connected — check settings and connections"));
+        return;
+    }
+    const qint64 wait = 500 - (now - lastApMs);
+    if (lastApMs > 0 && wait > 0) {
+        gapTimer->start(int(wait));
+        return;
+    }
+    const double azimuth = *pendingGoto;
+    pendingGoto.reset();
+    awaitPrePoll = false;
+    commandArmed = false;
+    lastApMs = now;
+    Job job;
+    job.kind = Kind::Motion;
+    job.bytes = Rt21::gotoImmediate(azimuth);
+    enqueue(job);
+    startFastPoll();
+}
+
+void Rt21Driver::startFastPoll()
+{
+    fastPace = true;
+    fastSinceMs = QDateTime::currentMSecsSinceEpoch();
+    stablePolls = 0;
+    stableHeading = heading_.value_or(-999);
+    if (pollTimer && !configMode)
+        pollTimer->start(fastPollMs);
+}
+
+void Rt21Driver::startIdlePoll()
+{
+    fastPace = false;
+    fastSinceMs = -1;
+    if (pollTimer && io && !configMode)
+        pollTimer->start(idlePollMs);
 }
 
 Rt21Driver::~Rt21Driver()
@@ -159,6 +317,10 @@ void Rt21Driver::closeIo(const QString &reason)
     ++suppress;
     replyTimer->stop();
     pollTimer->stop();
+    if (gapTimer)
+        gapTimer->stop();
+    if (commandTimer)
+        commandTimer->stop();
     inflight.reset();
     queue.clear();
     framer.clear();
@@ -211,6 +373,8 @@ void Rt21Driver::retire()
     retired = true;
     wantLink = false;
     pendingGoto.reset();
+    awaitPrePoll = false;
+    commandArmed = false;
     reconnectTimer->stop();
     closeIo(QStringLiteral("driver retired"));
     setLink(Link::Off, QStringLiteral("Disconnected"));
@@ -302,16 +466,18 @@ void Rt21Driver::onConnected()
                               ? QStringLiteral("Connected to %1:%2").arg(endpoint.host).arg(endpoint.tcpPort)
                               : QStringLiteral("Connected on %1").arg(endpoint.serialPort);
     TrafficLog::instance().note(where);
+    enableKeepAlive();
     setLink(Link::On, where);
-    if (pendingGoto) {
-        // One shot, for a turn the user asked for while this connect was
-        // already in progress. Cleared here so a later reconnect cannot
-        // send the same AP again.
-        Job job;
-        job.kind = Kind::Motion;
-        job.bytes = Rt21::gotoImmediate(*pendingGoto);
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (commandArmed && pendingGoto && now < commandDeadlineMs) {
+        // This is the attempt the click started. Ask for a heading first,
+        // then send the goto once. A later reconnect will not find it armed.
+        commandArmed = false;
+        awaitPrePoll = true;
+    } else {
         pendingGoto.reset();
-        queue.prepend(job);
+        commandArmed = false;
+        awaitPrePoll = false;
     }
     startPoll();
     pump();
@@ -346,6 +512,13 @@ void Rt21Driver::failLink(const QString &message)
     inflight.reset();
     queue.clear();
     pendingGoto.reset();
+    awaitPrePoll = false;
+    commandArmed = false;
+    if (gapTimer)
+        gapTimer->stop();
+    if (commandTimer)
+        commandTimer->stop();
+    fastPace = false;
     moving = false;
     if (link_ != Link::Failed || detail_ != message)
         setLink(Link::Failed, message);
@@ -403,6 +576,7 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
         }
         if (Rt21::isCommandEcho(frame))
             return;
+        TrafficLog::instance().note(QStringLiteral("unparsed %1").arg(QString::fromLatin1(frame.toHex(' '))));
         return;
     }
 
@@ -431,8 +605,10 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
 
     if (const auto status = Rt21::parseStatusFrame(frame))
         noteArrival(status->azimuth, status->haveStatus, status->status);
-    else if (const auto heading = Rt21::parseHeading(frame))
+    else if (const auto heading = Rt21::parseHeadingFrame(frame))
         noteArrival(*heading, false, -1);
+    else if (!Rt21::isCommandEcho(frame) && !frame.trimmed().isEmpty())
+        TrafficLog::instance().note(QStringLiteral("unparsed %1").arg(QString::fromLatin1(frame.toHex(' '))));
 }
 
 void Rt21Driver::finishInflight()
@@ -444,22 +620,24 @@ void Rt21Driver::finishInflight()
 
 void Rt21Driver::noteArrival(double azimuth, bool haveStatus, int status)
 {
+    failures = 0;
+    lastReplyMs = QDateTime::currentMSecsSinceEpoch();
     const bool changed = !heading_ || std::abs(*heading_ - azimuth) > 0.05;
     const bool delta = heading_ && std::abs(*heading_ - azimuth) > 0.15;
     heading_ = azimuth;
     if (changed)
         emit headingChanged(azimuth);
 
-    bool nowMoving = delta;
-    if (haveStatus)
-        nowMoving = status == 1;
+    const bool turning = haveStatus && status == 1;
+    const bool stopped = haveStatus && status == 0;
+    bool nowMoving = haveStatus ? turning : delta;
     if (target_) {
         const double gap = std::abs(std::remainder(azimuth - *target_, 360.0));
-        if (gap <= 0.8 && !delta && !(haveStatus && status == 1)) {
+        if (gap <= 0.8 && !turning) {
             target_.reset();
             emit targetChanged(0, false);
             nowMoving = false;
-        } else if (gap > 0.8) {
+        } else if (!stopped) {
             nowMoving = true;
         }
     }
@@ -468,9 +646,24 @@ void Rt21Driver::noteArrival(double azimuth, bool haveStatus, int status)
         setLink(moving ? Link::Moving : Link::On, detail_);
     lastHeading = azimuth;
 
-    const int interval = moving ? 250 : 2000;
-    if (pollTimer->interval() != interval && pollTimer->isActive())
-        pollTimer->start(interval);
+    const bool launching = awaitPrePoll && pendingGoto;
+    if (launching)
+        sendArmedGoto();
+    if (launching || !fastPace)
+        return;
+    if (turning) {
+        stablePolls = 0;
+        stableHeading = azimuth;
+    } else if (std::abs(azimuth - stableHeading) <= 0.5) {
+        ++stablePolls;
+    } else {
+        stablePolls = 1;
+        stableHeading = azimuth;
+    }
+    const bool stable = stablePolls >= 3;
+    const bool expired = fastSinceMs >= 0 && lastReplyMs - fastSinceMs > 120000;
+    if (stopped || stable || expired)
+        startIdlePoll();
 }
 
 void Rt21Driver::startPoll()
@@ -478,7 +671,7 @@ void Rt21Driver::startPoll()
     if (!io || configMode)
         return;
     pollsSinceStatus = 0;
-    pollTimer->start(moving || target_ ? 250 : 2000);
+    pollTimer->start(fastPace ? fastPollMs : idlePollMs);
     pollTick();
 }
 
@@ -486,16 +679,7 @@ void Rt21Driver::pollTick()
 {
     if (!io || inflight || configMode)
         return;
-    Job job;
-    if (!statusDisabled && ++pollsSinceStatus >= 4) {
-        pollsSinceStatus = 0;
-        job.kind = Kind::Status;
-        job.bytes = Rt21::queryStatus();
-    } else {
-        job.kind = Kind::Heading;
-        job.bytes = Rt21::queryTenths();
-    }
-    enqueue(job);
+    sendQuery();
 }
 
 void Rt21Driver::enqueue(Job job)
@@ -528,28 +712,31 @@ void Rt21Driver::goTo(double azimuth)
     target_ = clamped;
     emit targetChanged(clamped, true);
     moving = true;
-    if (link_ == Link::On || link_ == Link::Moving) {
+    commandDeadlineMs = QDateTime::currentMSecsSinceEpoch() + 3000;
+    commandTimer->start(3000);
+    if (link_ == Link::On || link_ == Link::Moving)
         setLink(Link::Moving, detail_);
-        if (pollTimer->isActive())
-            pollTimer->start(250);
-    }
-    const bool transportOpen = (tcp && tcp->state() == QAbstractSocket::ConnectedState)
-                               || (serial && serial->isOpen());
-    if (!transportOpen) {
-        if (wantLink && link_ != Link::Connecting && link_ != Link::On && link_ != Link::Moving)
+    if (!transportOpen()) {
+        showNote(QStringLiteral("RT-21 not connected — check settings and connections"));
+        commandArmed = true;
+        awaitPrePoll = false;
+        if (wantLink && link_ != Link::Connecting)
             connectEndpoint(endpoint);
         return;
     }
-    pendingGoto.reset();
-    Job job;
-    job.kind = Kind::Motion;
-    job.bytes = Rt21::gotoImmediate(clamped);
-    enqueue(job);
+    commandArmed = false;
+    awaitPrePoll = true;
+    if (!inflight)
+        sendQuery();
 }
 
 void Rt21Driver::stopMotion()
 {
     pendingGoto.reset();
+    awaitPrePoll = false;
+    commandArmed = false;
+    gapTimer->stop();
+    commandTimer->stop();
     target_.reset();
     emit targetChanged(0, false);
     moving = false;
@@ -562,8 +749,10 @@ void Rt21Driver::stopMotion()
         inflight.reset();
         replyTimer->stop();
     }
-    if (link_ == Link::Moving)
+    if (link_ == Link::Moving || link_ == Link::On)
         setLink(Link::On, detail_);
+    if (transportOpen())
+        startFastPoll();
 }
 
 void Rt21Driver::readConfiguration()

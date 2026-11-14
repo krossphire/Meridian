@@ -46,6 +46,11 @@ public:
     std::optional<double> heading() const { return heading_; }
     std::optional<double> target() const { return target_; }
     QString detail() const { return detail_; }
+    QString transientNote() const { return note_; }
+    qint64 lastSeenMs() const { return lastReplyMs; }
+    int currentPollMs() const;
+
+    void setIdlePollSeconds(int seconds);
 
     // True once this driver has been bound to this exact transport.
     // A name-only edit does not count as a different connection.
@@ -68,6 +73,7 @@ signals:
     void configNote(const QString &text);
     void configFinished(bool ok, const QString &message);
     void writeFinished(bool ok, const QString &message);
+    void statusNote(const QString &text);
 
 private:
     enum class Kind { Motion, Heading, Status, Read, Write, Note };
@@ -94,6 +100,14 @@ private:
     void pollTick();
     void enqueue(Job job);
     void noteArrival(double azimuth, bool haveStatus, int status);
+    void sendQuery();
+    void sendArmedGoto();
+    void dropCommand(const QString &note);
+    void showNote(const QString &note);
+    void startFastPoll();
+    void startIdlePoll();
+    void enableKeepAlive();
+    bool transportOpen() const;
 
     RotorEndpoint endpoint;
     bool wantLink = false;
@@ -108,7 +122,24 @@ private:
     QTimer *replyTimer = nullptr;
     QTimer *pollTimer = nullptr;
     QTimer *reconnectTimer = nullptr;
+    QTimer *gapTimer = nullptr;
+    QTimer *commandTimer = nullptr;
+    QTimer *noteTimer = nullptr;
     int failures = 0;
+    int idlePollMs = 30000;
+    int fastPollMs = 400;
+    bool fastPace = false;
+    bool awaitPrePoll = false;
+    bool commandArmed = false;
+    bool useAiNext = false;
+    bool lastQueryWasAi = false;
+    qint64 commandDeadlineMs = 0;
+    qint64 lastApMs = 0;
+    qint64 lastReplyMs = -1;
+    qint64 fastSinceMs = -1;
+    int stablePolls = 0;
+    double stableHeading = -999;
+    QString note_;
     int configTimeouts = 0;
     bool configMode = false;
     int pollsSinceStatus = 0;

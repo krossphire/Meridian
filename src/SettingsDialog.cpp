@@ -170,7 +170,7 @@ void SettingsDialog::setDriver(Rt21Driver *next)
                 versionLabel->setText(current + QStringLiteral("   ·   ") + text);
         });
         connect(driver, &Rt21Driver::configFinished, this, [this](bool ok, const QString &message) {
-            if (!ok && !message.isEmpty())
+            if (!ok && !message.isEmpty() && !message.contains(QStringLiteral("Connect")))
                 QMessageBox::warning(this, QStringLiteral("Read setup"), message);
         });
         connect(driver, &Rt21Driver::writeFinished, this, [this](bool ok, const QString &message) {
@@ -206,6 +206,10 @@ bool SettingsDialog::commitDraft(bool interactive)
     }
     if (trafficBox)
         draft.trafficLog = trafficBox->isChecked();
+    if (sunBox)
+        draft.showSun = sunBox->isChecked();
+    if (idleSpin)
+        draft.idlePollSeconds = idleSpin->value();
     emit configSaved(draft);
     committing = false;
     return true;
@@ -217,6 +221,10 @@ void SettingsDialog::setConfig(const AppConfig &config)
     homeEdit->setText(draft.homeText);
     if (trafficBox)
         trafficBox->setChecked(draft.trafficLog);
+    if (sunBox)
+        sunBox->setChecked(draft.showSun);
+    if (idleSpin)
+        idleSpin->setValue(draft.idlePollSeconds);
     rotorList->clear();
     for (const RotorEndpoint &rotor : draft.rotors)
         rotorList->addItem(rotor.name.isEmpty() ? QStringLiteral("RT-21") : rotor.name);
@@ -260,6 +268,22 @@ void SettingsDialog::buildStation()
     layout->addSpacing(16);
     layout->addWidget(trafficBox);
     layout->addWidget(logPath);
+    sunBox = new QCheckBox(QStringLiteral("Show sun & day/night"));
+    sunBox->setChecked(draft.showSun);
+    sunBox->setObjectName(QStringLiteral("showSun"));
+    idleSpin = new QSpinBox;
+    idleSpin->setRange(30, 60);
+    idleSpin->setValue(std::clamp(draft.idlePollSeconds, 30, 60));
+    idleSpin->setSuffix(QStringLiteral(" s"));
+    idleSpin->setObjectName(QStringLiteral("idlePoll"));
+    auto *idleLabel = new QLabel(QStringLiteral("Idle poll"));
+    auto *idleRow = new QHBoxLayout;
+    idleRow->addWidget(idleLabel);
+    idleRow->addWidget(idleSpin);
+    idleRow->addStretch();
+    layout->addSpacing(8);
+    layout->addWidget(sunBox);
+    layout->addLayout(idleRow);
     layout->addStretch();
     connect(homeEdit, &QLineEdit::textChanged, this, [this]() { refreshLocation(); });
     tabs->addTab(page, QStringLiteral("Station"));

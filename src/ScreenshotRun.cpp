@@ -11,6 +11,7 @@
 #include "rotor/Rt21Driver.h"
 
 #include <QApplication>
+#include <QDateTime>
 #include <QDir>
 #include <QEvent>
 #include <QEventLoop>
@@ -98,6 +99,15 @@ int runScreenshots(const QString &directory, qreal dpr)
         return 5;
     if (!shoot(QSize(1100, 1100), QStringLiteral("main-large.png")))
         return 6;
+
+    window.globeWidget()->setShowSun(true);
+    window.globeWidget()->setSolarPreview(QDateTime(QDate(2024, 6, 21), QTime(1, 30), Qt::UTC));
+    if (!shoot(QSize(180, 180), QStringLiteral("sun-180.png")))
+        return 13;
+    if (!shoot(QSize(400, 400), QStringLiteral("sun-400.png")))
+        return 14;
+    if (!shoot(QSize(1100, 1100), QStringLiteral("sun-large.png")))
+        return 15;
 
     const qreal sharpDpr = dpr > 0 ? dpr : 2.0;
     window.resize(760, 760);

@@ -10,8 +10,10 @@
 
 #pragma once
 
+#include "core/Solar.h"
 #include "map/GeoMap.h"
 
+#include <QDateTime>
 #include <QImage>
 #include <QWidget>
 
@@ -37,12 +39,16 @@ public:
     void setHeading(std::optional<double> azimuth);
     void setTarget(std::optional<double> azimuth);
     void setLink(Link state, const QString &detail);
+    void setStatusLine(const QString &text);
+    void setHeadingStale(bool stale);
+    void setShowSun(bool show);
+    void setSolarPreview(const QDateTime &utc);
     void setRotors(const QStringList &names, int active);
 
     void openHeadingEditor();
     bool mapReady() const;
     void setForcedDevicePixelRatio(qreal dpr);
-    QImage renderSharp() const;
+    QImage renderSharp();
 
     double homeLat() const { return homeLat_; }
     double homeLon() const { return homeLon_; }
@@ -74,7 +80,8 @@ private:
     void requestMap(bool immediate);
     void publishMail();
     void placeChrome();
-    void paintScene(QPainter &painter) const;
+    void paintScene(QPainter &painter);
+    void ensureSun();
     void hoverAt(QPointF pos);
     void commitHeading();
     void cancelHeading();
@@ -94,6 +101,7 @@ private:
     qreal forcedDpr = 0;
 
     QImage cache;
+    QImage cacheLines;
     QSize cacheSize;
     qreal cacheDpr = 0;
     int cacheLod = -1;
@@ -105,6 +113,16 @@ private:
     QThread *thread = nullptr;
     class GlobeMapWorker *worker = nullptr;
     QTimer *debounce = nullptr;
+    QTimer *sunTimer = nullptr;
+    bool showSun = true;
+    bool headingStale = false;
+    bool sunDirty = true;
+    QString statusLine;
+    QDateTime solarPreview;
+    QImage sunOverlay;
+    QSize sunSize;
+    qint64 sunMinute = -1;
+    SolarPosition sunNow;
 
     QWidget *gear = nullptr;
     QWidget *dot = nullptr;

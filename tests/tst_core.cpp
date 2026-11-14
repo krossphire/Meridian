@@ -10,8 +10,11 @@
 #include "core/Projection.h"
 #include "core/ZipCodes.h"
 #include "map/GeoMap.h"
+#include "core/Solar.h"
+#include "rotor/Reconnect.h"
 #include "rotor/Rt21Protocol.h"
 
+#include <QDateTime>
 #include <QFile>
 #include <QTest>
 
@@ -35,6 +38,8 @@ private slots:
     void commands();
     void headingParse();
     void hardwareRx();
+    void solarPosition();
+    void reconnectTiming();
 };
 
 void TestCore::gridCenters()
@@ -296,6 +301,39 @@ void TestCore::hardwareRx()
     QVERIFY(moving->haveStatus);
     QCOMPARE(moving->status, 1);
     QVERIFY(std::abs(moving->azimuth - 122.6) < 1e-9);
+}
+
+void TestCore::solarPosition()
+{
+    auto closeTo = [](double value, double expected) {
+        return std::abs(value - expected) <= 0.5;
+    };
+    const QDateTime denver = QDateTime(QDate(2003, 10, 17), QTime(19, 30, 30), Qt::UTC);
+    const SolarPosition denverSun = solarAt(39.742476, -105.1786, denver);
+    QVERIFY2(closeTo(denverSun.azimuth, 194.34024), qPrintable(QString::number(denverSun.azimuth, 'f', 3)));
+    QVERIFY2(closeTo(denverSun.elevation, 39.888), qPrintable(QString::number(denverSun.elevation, 'f', 3)));
+
+    const auto june = solarAt(36.4, -94.2, QDateTime(QDate(2024, 6, 21), QTime(18, 0), Qt::UTC));
+    QVERIFY2(closeTo(june.azimuth, 161.351), qPrintable(QString::number(june.azimuth, 'f', 3)));
+    QVERIFY2(closeTo(june.elevation, 76.422), qPrintable(QString::number(june.elevation, 'f', 3)));
+    const auto december = solarAt(36.4, -94.2, QDateTime(QDate(2024, 12, 21), QTime(18, 0), Qt::UTC));
+    QVERIFY2(closeTo(december.azimuth, 175.959), qPrintable(QString::number(december.azimuth, 'f', 3)));
+    QVERIFY2(closeTo(december.elevation, 30.082), qPrintable(QString::number(december.elevation, 'f', 3)));
+    const auto march = solarAt(36.4, -94.2, QDateTime(QDate(2024, 3, 20), QTime(14, 30), Qt::UTC));
+    QVERIFY2(closeTo(march.azimuth, 109.816), qPrintable(QString::number(march.azimuth, 'f', 3)));
+    QVERIFY2(closeTo(march.elevation, 25.016), qPrintable(QString::number(march.elevation, 'f', 3)));
+}
+
+void TestCore::reconnectTiming()
+{
+    QCOMPARE(reconnectDelayMs(0, 0), 20000);
+    QCOMPARE(reconnectDelayMs(4LL * 60 * 1000, 2), 20000);
+    QCOMPARE(reconnectDelayMs(6LL * 60 * 1000, 0), 30000);
+    QCOMPARE(reconnectDelayMs(6LL * 60 * 1000, 1), 60000);
+    QCOMPARE(reconnectDelayMs(6LL * 60 * 1000, 4), 5 * 60 * 1000);
+    QCOMPARE(lastSeenPhrase(2), QStringLiteral("Last seen just now"));
+    QCOMPARE(lastSeenPhrase(90), QStringLiteral("Last seen 1 min ago"));
+    QCOMPARE(lastSeenPhrase(7200), QStringLiteral("Last seen 2 h ago"));
 }
 
 QTEST_GUILESS_MAIN(TestCore)

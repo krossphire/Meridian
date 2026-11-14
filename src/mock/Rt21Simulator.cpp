@@ -59,6 +59,16 @@ void Rt21Simulator::setFrozen(bool frozen)
         moving_ = false;
 }
 
+void Rt21Simulator::setIgnoreQueries(bool ignore)
+{
+    ignoreQueries = ignore;
+}
+
+void Rt21Simulator::clearTrace()
+{
+    trace_.clear();
+}
+
 void Rt21Simulator::reply(const QByteArray &payload, bool soh)
 {
     QByteArray out;
@@ -100,6 +110,10 @@ void Rt21Simulator::feed(const QByteArray &bytes)
 void Rt21Simulator::handle(const QByteArray &command, bool immediate)
 {
     const QByteArray cmd = command.toUpper().trimmed();
+    if (!cmd.isEmpty())
+        trace_.append(immediate ? cmd + QByteArray("\r") : cmd);
+    if ((cmd.startsWith("BI") || cmd.startsWith("AI")) && ignoreQueries)
+        return;
     if (cmd.isEmpty() || cmd.startsWith("ST")) {
         moving_ = false;
         return;
