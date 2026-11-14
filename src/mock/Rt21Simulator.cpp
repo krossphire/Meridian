@@ -105,7 +105,23 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
         return;
     }
     if (cmd.startsWith("BI")) {
-        reply(QString::asprintf("%5.1f", heading_).toLatin1(), false);
+        // Healthy hardware replies are plain "NNN.N;" with no padding.
+        // About every fifth frame the LAN module prefixes 01 30 xx 3E,
+        // xx = 0x00 stopped, 0x01 rotating.
+        const QByteArray heading = QString::number(heading_, 'f', 1).toLatin1();
+        ++biReplies;
+        if (biReplies % 5 == 0) {
+            QByteArray frame;
+            frame.append(char(0x01));
+            frame.append(char(0x30));
+            frame.append(char(moving_ ? 0x01 : 0x00));
+            frame.append(char(0x3E));
+            frame.append(heading);
+            frame.append(';');
+            emit output(frame);
+            return;
+        }
+        reply(heading, false);
         return;
     }
     if (cmd.startsWith("AI")) {
@@ -249,6 +265,11 @@ quint16 MockRt21Server::port() const
     return tcpPort;
 }
 
+bool MockRt21Server::hasClient() const
+{
+    return client && client->state() == QAbstractSocket::ConnectedState;
+}
+
 void MockRt21Server::acceptOne()
 {
     if (client) {
@@ -260,6 +281,7 @@ void MockRt21Server::acceptOne()
         return;
     }
     client = server->nextPendingConnection();
+    ++accepts_;
     server->close();
     connect(client, &QTcpSocket::readyRead, this, [this]() {
         if (client)

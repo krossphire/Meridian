@@ -10,6 +10,7 @@
 #include "rotor/AppConfig.h"
 #include "core/ZipCodes.h"
 
+#include <QHash>
 #include <QMainWindow>
 
 class GlobeWidget;
@@ -26,6 +27,7 @@ public:
 
     GlobeWidget *globeWidget() const { return globe; }
     Rt21Driver *driver() const { return link; }
+    int driverCount() const { return drivers.size(); }
     SettingsDialog *settingsDialog();
     bool mapsLoaded() const { return mapsOk; }
 
@@ -37,6 +39,10 @@ private:
     void applyHome();
     void connectActive();
     void openSettings();
+    void applyConfig(const AppConfig &saved);
+    void syncDrivers();
+    void retireDriver(const QString &id);
+    void adopt(Rt21Driver *driver);
 
     AppConfig config;
     QSettings *settings = nullptr;
@@ -45,6 +51,7 @@ private:
     ZipDatabase zips;
     bool mapsOk = false;
     GlobeWidget *globe = nullptr;
+    QHash<QString, Rt21Driver *> drivers;
     Rt21Driver *link = nullptr;
     SettingsDialog *settingsUi = nullptr;
 };

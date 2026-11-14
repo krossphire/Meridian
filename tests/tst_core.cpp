@@ -34,6 +34,7 @@ private slots:
     void framing();
     void commands();
     void headingParse();
+    void hardwareRx();
 };
 
 void TestCore::gridCenters()
@@ -257,6 +258,44 @@ void TestCore::headingParse()
     QVERIFY(pot && *pot == 512);
     QVERIFY(!Rt21::parseIntegerPayload("Pot"));
     QCOMPARE(Rt21::payloadAfterSoh(QByteArray("\x01RT-21 Version 4.13")), QStringLiteral("RT-21 Version 4.13"));
+}
+
+void TestCore::hardwareRx()
+{
+    // Captured from a healthy RT-21 session, 14:06–14:12, one TCP connection.
+    const QByteArray plain = QByteArray::fromHex("3133312E393B");
+    QCOMPARE(plain, QByteArray("131.9;"));
+    Rt21::Framer framer;
+    framer.append(plain);
+    QList<QByteArray> frames = framer.take();
+    QCOMPARE(frames.size(), 1);
+    QCOMPARE(frames.at(0), QByteArray("131.9"));
+    const auto heading = Rt21::parseHeadingFrame(frames.at(0));
+    QVERIFY(heading);
+    QVERIFY(std::abs(*heading - 131.9) < 1e-9);
+
+    const QByteArray idle = QByteArray::fromHex("0130003E3133322E343B");
+    framer.append(idle);
+    frames = framer.take();
+    QCOMPARE(frames.size(), 1);
+    const auto stopped = Rt21::parseStatusFrame(frames.at(0));
+    QVERIFY(stopped);
+    QVERIFY(stopped->haveStatus);
+    QCOMPARE(stopped->status, 0);
+    QVERIFY(std::abs(stopped->azimuth - 132.4) < 1e-9);
+    const auto stoppedHeading = Rt21::parseHeadingFrame(frames.at(0));
+    QVERIFY(stoppedHeading);
+    QVERIFY(std::abs(*stoppedHeading - 132.4) < 1e-9);
+
+    const QByteArray turning = QByteArray::fromHex("0130013E3132322E363B");
+    framer.append(turning);
+    frames = framer.take();
+    QCOMPARE(frames.size(), 1);
+    const auto moving = Rt21::parseStatusFrame(frames.at(0));
+    QVERIFY(moving);
+    QVERIFY(moving->haveStatus);
+    QCOMPARE(moving->status, 1);
+    QVERIFY(std::abs(moving->azimuth - 122.6) < 1e-9);
 }
 
 QTEST_GUILESS_MAIN(TestCore)

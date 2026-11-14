@@ -14,6 +14,7 @@
 
 #include <QFile>
 #include <QKeyEvent>
+#include <QSet>
 #include <QSettings>
 #include <QShortcut>
 
@@ -28,37 +29,20 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
     setCentralWidget(globe);
     resize(880, 920);
 
-    link = new Rt21Driver(this);
     loadMaps();
 
-    connect(link, &Rt21Driver::headingChanged, this, [this](double azimuth) { globe->setHeading(azimuth); });
-    connect(link, &Rt21Driver::targetChanged, this, [this](double azimuth, bool active) {
-        globe->setTarget(active ? std::optional<double>(azimuth) : std::nullopt);
+    connect(globe, &GlobeWidget::bearingRequested, this, [this](double azimuth) {
+        if (link)
+            link->goTo(azimuth);
     });
-    connect(link, &Rt21Driver::linkChanged, this, [this](Rt21Driver::Link state, const QString &detail) {
-        GlobeWidget::Link shown = GlobeWidget::Link::Off;
-        switch (state) {
-        case Rt21Driver::Link::Connecting:
-            shown = GlobeWidget::Link::Connecting;
-            break;
-        case Rt21Driver::Link::On:
-            shown = GlobeWidget::Link::On;
-            break;
-        case Rt21Driver::Link::Moving:
-            shown = GlobeWidget::Link::Moving;
-            break;
-        case Rt21Driver::Link::Failed:
-            shown = GlobeWidget::Link::Failed;
-            break;
-        case Rt21Driver::Link::Off:
-            shown = GlobeWidget::Link::Off;
-            break;
-        }
-        globe->setLink(shown, detail);
+    connect(globe, &GlobeWidget::headingEdited, this, [this](double azimuth) {
+        if (link)
+            link->goTo(azimuth);
     });
-    connect(globe, &GlobeWidget::bearingRequested, link, &Rt21Driver::goTo);
-    connect(globe, &GlobeWidget::headingEdited, link, &Rt21Driver::goTo);
-    connect(globe, &GlobeWidget::stopRequested, link, &Rt21Driver::stopMotion);
+    connect(globe, &GlobeWidget::stopRequested, this, [this]() {
+        if (link)
+            link->stopMotion();
+    });
     connect(globe, &GlobeWidget::settingsRequested, this, &MainWindow::openSettings);
     connect(globe, &GlobeWidget::rotorSelected, this, [this](int index) {
         if (index < 0 || index >= config.rotors.size() || index == config.active)
@@ -80,7 +64,15 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
     connectActive();
 }
 
-MainWindow::~MainWindow() = default;
+MainWindow::~MainWindow()
+{
+    if (settingsUi)
+        settingsUi->setDriver(nullptr);
+    const auto owned = drivers.values();
+    for (Rt21Driver *driver : owned)
+        disconnect(driver, nullptr, this, nullptr);
+    link = nullptr;
+}
 
 void MainWindow::loadMaps()
 {
@@ -109,10 +101,118 @@ void MainWindow::applyHome()
 
 void MainWindow::connectActive()
 {
-    if (const RotorEndpoint *rotor = config.activeRotor())
-        link->connectEndpoint(*rotor);
-    else
-        link->disconnectLink();
+    syncDrivers();
+}
+
+void MainWindow::applyConfig(const AppConfig &saved)
+{
+    config = saved;
+    TrafficLog::instance().setEnabled(config.trafficLog);
+    if (settings)
+        config.save(*settings);
+    applyHome();
+    QStringList names;
+    for (const RotorEndpoint &rotor : config.rotors)
+        names.append(rotor.name);
+    globe->setRotors(names, config.active);
+    syncDrivers();
+}
+
+void MainWindow::retireDriver(const QString &id)
+{
+    Rt21Driver *old = drivers.take(id);
+    if (!old)
+        return;
+    if (link == old) {
+        disconnect(old, nullptr, this, nullptr);
+        link = nullptr;
+    }
+    old->retire();
+    old->deleteLater();
+}
+
+void MainWindow::adopt(Rt21Driver *driver)
+{
+    if (link == driver)
+        return;
+    if (link)
+        disconnect(link, nullptr, this, nullptr);
+    link = driver;
+    if (!link)
+        return;
+    connect(link, &Rt21Driver::headingChanged, this, [this](double azimuth) { globe->setHeading(azimuth); });
+    connect(link, &Rt21Driver::targetChanged, this, [this](double azimuth, bool active) {
+        globe->setTarget(active ? std::optional<double>(azimuth) : std::nullopt);
+    });
+    connect(link, &Rt21Driver::linkChanged, this, [this](Rt21Driver::Link state, const QString &detail) {
+        GlobeWidget::Link shown = GlobeWidget::Link::Off;
+        switch (state) {
+        case Rt21Driver::Link::Connecting:
+            shown = GlobeWidget::Link::Connecting;
+            break;
+        case Rt21Driver::Link::On:
+            shown = GlobeWidget::Link::On;
+            break;
+        case Rt21Driver::Link::Moving:
+            shown = GlobeWidget::Link::Moving;
+            break;
+        case Rt21Driver::Link::Failed:
+            shown = GlobeWidget::Link::Failed;
+            break;
+        case Rt21Driver::Link::Off:
+            shown = GlobeWidget::Link::Off;
+            break;
+        }
+        globe->setLink(shown, detail);
+    });
+}
+
+void MainWindow::syncDrivers()
+{
+    QSet<QString> keep;
+    Rt21Driver *want = nullptr;
+    const RotorEndpoint *active = config.activeRotor();
+    for (const RotorEndpoint &rotor : config.rotors) {
+        if (rotor.id.isEmpty())
+            continue;
+        keep.insert(rotor.id);
+        const bool isActive = active && active->id == rotor.id;
+        Rt21Driver *driver = drivers.value(rotor.id, nullptr);
+        if (driver && isActive && !driver->serves(rotor)) {
+            // Transport, host, or port changed. The old driver is fully shut
+            // down before the replacement exists in the map.
+            retireDriver(rotor.id);
+            driver = nullptr;
+        }
+        if (!driver) {
+            driver = new Rt21Driver(this);
+            drivers.insert(rotor.id, driver);
+        }
+        if (isActive)
+            want = driver;
+        else if (driver->link() != Rt21Driver::Link::Off)
+            driver->disconnectLink();
+    }
+    const QStringList ids = drivers.keys();
+    for (const QString &id : ids) {
+        if (!keep.contains(id))
+            retireDriver(id);
+    }
+    if (want) {
+        adopt(want);
+        const RotorEndpoint *rotor = config.activeRotor();
+        if (rotor && !want->serves(*rotor))
+            want->connectEndpoint(*rotor);
+        else if (want->link() == Rt21Driver::Link::Off)
+            want->connectEndpoint(*rotor);
+    } else {
+        adopt(nullptr);
+        globe->setHeading(std::nullopt);
+        globe->setTarget(std::nullopt);
+        globe->setLink(GlobeWidget::Link::Off, QStringLiteral("Disconnected"));
+    }
+    if (settingsUi)
+        settingsUi->setDriver(link);
 }
 
 void MainWindow::openSettings()
@@ -120,16 +220,7 @@ void MainWindow::openSettings()
     if (!settingsUi) {
         settingsUi = new SettingsDialog(config, &zips, link, this);
         connect(settingsUi, &SettingsDialog::configSaved, this, [this](const AppConfig &saved) {
-            config = saved;
-            TrafficLog::instance().setEnabled(config.trafficLog);
-            if (settings)
-                config.save(*settings);
-            applyHome();
-            QStringList names;
-            for (const RotorEndpoint &rotor : config.rotors)
-                names.append(rotor.name);
-            globe->setRotors(names, config.active);
-            connectActive();
+            applyConfig(saved);
         });
     } else {
         settingsUi->setConfig(config);

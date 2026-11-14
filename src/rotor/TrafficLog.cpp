@@ -92,13 +92,24 @@ void TrafficLog::ensureOpen()
     path = QDir(dir).filePath(QStringLiteral("meridian-%1.log")
                                   .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss"))));
     logFile().setFileName(path);
-    opened = logFile().open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
-    if (opened) {
-        QTextStream stream(&logFile());
-        stream << stamp() << " NOTE Meridian " << QStringLiteral("0.1.0-alpha1")
-               << " traffic log " << path << "\n";
-        stream.flush();
-    }
+    opened = logFile().open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Unbuffered);
+    if (opened)
+        writeLine(QStringLiteral("NOTE Meridian 0.1.0-alpha2 traffic log ") + path);
+}
+
+void TrafficLog::flush()
+{
+    if (opened)
+        logFile().flush();
+}
+
+void TrafficLog::writeLine(const QString &line)
+{
+    if (!opened)
+        return;
+    const QByteArray bytes = (line + QLatin1Char('\n')).toUtf8();
+    logFile().write(bytes);
+    logFile().flush();
 }
 
 void TrafficLog::note(const QString &text)
@@ -106,11 +117,7 @@ void TrafficLog::note(const QString &text)
     if (!enabled)
         return;
     ensureOpen();
-    if (!opened)
-        return;
-    QTextStream stream(&logFile());
-    stream << stamp() << " NOTE " << text << "\n";
-    stream.flush();
+    writeLine(stamp() + QStringLiteral(" NOTE ") + text);
 }
 
 void TrafficLog::record(const char *direction, const QByteArray &bytes)
@@ -118,10 +125,6 @@ void TrafficLog::record(const char *direction, const QByteArray &bytes)
     if (!enabled || bytes.isEmpty())
         return;
     ensureOpen();
-    if (!opened)
-        return;
-    QTextStream stream(&logFile());
-    stream << stamp() << ' ' << direction << ' ' << bytes.size() << " |" << printable(bytes) << "| " << hexBytes(bytes)
-           << "\n";
-    stream.flush();
+    writeLine(stamp() + QLatin1Char(' ') + QLatin1String(direction) + QLatin1Char(' ') + QString::number(bytes.size())
+              + QStringLiteral(" |") + printable(bytes) + QStringLiteral("| ") + hexBytes(bytes));
 }

@@ -12,6 +12,7 @@
 #include "rotor/TrafficLog.h"
 
 #include <QCheckBox>
+#include <QCloseEvent>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QDir>
@@ -110,28 +111,28 @@ SettingsDialog::SettingsDialog(const AppConfig &config, const ZipDatabase *zipDb
     });
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Close);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::close);
-    connect(buttons, &QDialogButtonBox::accepted, this, [this]() {
-        if (rotorIndex >= 0)
-            storeRotor(rotorIndex);
-        QString error;
-        if (!resolveLocation(homeEdit->text(), zips, &error)) {
-            QMessageBox::warning(this, QStringLiteral("Location"), error);
-            tabs->setCurrentIndex(0);
-            return;
-        }
-        draft.homeText = homeEdit->text().trimmed();
-        if (trafficBox)
-            draft.trafficLog = trafficBox->isChecked();
-        emit configSaved(draft);
-    });
+    connect(buttons, &QDialogButtonBox::accepted, this, [this]() { commitDraft(true); });
     auto *row = new QHBoxLayout;
     row->addWidget(about);
     row->addStretch();
     row->addWidget(buttons);
     layout->addLayout(row);
 
-    if (driver) {
-        connect(driver, &Rt21Driver::configField, this,
+    setDriver(driver);
+    refreshLocation();
+}
+
+void SettingsDialog::setDriver(Rt21Driver *next)
+{
+    if (driverWired && driver == next)
+        return;
+    if (driverWired && driver)
+        disconnect(driver, nullptr, this, nullptr);
+    driver = next;
+    driverWired = true;
+    if (!driver)
+        return;
+    connect(driver, &Rt21Driver::configField, this,
                 [this](QChar id, const QString &raw, bool numeric, int value) {
                     for (FieldRow &field : fields) {
                         if (field.id != id)
@@ -174,11 +175,40 @@ SettingsDialog::SettingsDialog(const AppConfig &config, const ZipDatabase *zipDb
         });
         connect(driver, &Rt21Driver::writeFinished, this, [this](bool ok, const QString &message) {
             QMessageBox::information(this, QStringLiteral("Apply"), message);
-            if (ok)
+            if (ok && driver)
                 driver->readConfiguration();
         });
+}
+
+void SettingsDialog::closeEvent(QCloseEvent *event)
+{
+    commitDraft(false);
+    QDialog::closeEvent(event);
+}
+
+bool SettingsDialog::commitDraft(bool interactive)
+{
+    if (committing)
+        return true;
+    committing = true;
+    if (rotorIndex >= 0)
+        storeRotor(rotorIndex);
+    QString error;
+    if (!resolveLocation(homeEdit->text(), zips, &error)) {
+        if (interactive) {
+            QMessageBox::warning(this, QStringLiteral("Location"), error);
+            tabs->setCurrentIndex(0);
+            committing = false;
+            return false;
+        }
+    } else {
+        draft.homeText = homeEdit->text().trimmed();
     }
-    refreshLocation();
+    if (trafficBox)
+        draft.trafficLog = trafficBox->isChecked();
+    emit configSaved(draft);
+    committing = false;
+    return true;
 }
 
 void SettingsDialog::setConfig(const AppConfig &config)
@@ -265,6 +295,7 @@ void SettingsDialog::buildRotors()
 
     nameEdit = new QLineEdit;
     transport = new QComboBox;
+    transport->setObjectName(QStringLiteral("transportPick"));
     transport->addItems({QStringLiteral("IP / TCP"), QStringLiteral("Serial")});
     hostEdit = new QLineEdit;
     portSpin = new QSpinBox;
@@ -299,7 +330,10 @@ void SettingsDialog::buildRotors()
     layout->addStretch();
     tabs->addTab(page, QStringLiteral("Rotors"));
 
-    connect(transport, qOverload<int>(&QComboBox::currentIndexChanged), transportPages, &QStackedWidget::setCurrentIndex);
+    // The combo only swaps the form. Nothing connects, and nothing is saved,
+    // until Save or the dialog closes.
+    connect(transport, qOverload<int>(&QComboBox::currentIndexChanged), transportPages,
+            &QStackedWidget::setCurrentIndex);
     connect(add, &QPushButton::clicked, this, [this]() {
         if (rotorIndex >= 0)
             storeRotor(rotorIndex);

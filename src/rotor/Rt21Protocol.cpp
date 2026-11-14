@@ -10,6 +10,7 @@
 
 #include <QString>
 
+#include <cctype>
 #include <cmath>
 
 namespace Rt21 {
@@ -129,6 +130,49 @@ std::optional<double> parseHeading(const QByteArray &frame)
     return value;
 }
 
+bool isCommandEcho(const QByteArray &frame)
+{
+    const QByteArray body = stripNoise(frame).toUpper();
+    if (body.isEmpty())
+        return false;
+    if (body == "BI1" || body == "AI1" || body == "AM1" || body == "R21" || body == "R11"
+        || body == "R01" || body == "R41" || body == "ST1")
+        return true;
+    if (body.startsWith("AP"))
+        return !parseHeading(body.mid(body.startsWith("AP1") ? 3 : 2)).has_value() || body.startsWith("AP");
+    return false;
+}
+
+std::optional<double> parseHeadingFrame(const QByteArray &frame)
+{
+    QByteArray body = stripNoise(frame);
+    if (body.isEmpty())
+        return std::nullopt;
+    if (const auto status = parseStatusFrame(body))
+        return status->azimuth;
+
+    const QByteArray upper = body.toUpper();
+    if (upper.startsWith("AP") || upper.startsWith("AM") || upper.startsWith("ST") || upper.startsWith("R1")
+        || upper.startsWith("R0") || upper.startsWith("R4") || upper == "R21")
+        return std::nullopt;
+
+    if (upper.startsWith("BI") || upper.startsWith("AI")) {
+        int index = 0;
+        while (index < body.size() && std::isalpha(static_cast<unsigned char>(body.at(index))))
+            ++index;
+        if (index < body.size() && std::isdigit(static_cast<unsigned char>(body.at(index)))) {
+            const auto heading = parseHeading(body.mid(index + 1));
+            if (heading)
+                return heading;
+        }
+        return std::nullopt;
+    }
+
+    if (body.startsWith(';'))
+        body = body.mid(1).trimmed();
+    return parseHeading(body);
+}
+
 std::optional<HeadingReading> parseStatusFrame(const QByteArray &frame)
 {
     QByteArray body = frame;
@@ -142,10 +186,15 @@ std::optional<HeadingReading> parseStatusFrame(const QByteArray &frame)
         return std::nullopt;
     HeadingReading reading;
     reading.azimuth = *heading;
-    const char status = body.at(gt - 1);
+    const unsigned char status = static_cast<unsigned char>(body.at(gt - 1));
     if (status >= '0' && status <= '9') {
         reading.haveStatus = true;
         reading.status = status - '0';
+    } else if (status <= 5) {
+        // Observed on the LAN module: 01 30 xx 3E, where xx is a binary
+        // flag (0 stopped, 1 rotating), not the ASCII digit from the manual.
+        reading.haveStatus = true;
+        reading.status = int(status);
     }
     return reading;
 }
@@ -170,14 +219,37 @@ std::optional<int> parseIntegerPayload(const QByteArray &frame)
 void Framer::append(const QByteArray &bytes)
 {
     for (unsigned char c : bytes) {
-        if (c == '\r' || c == '\n')
+        if (c == '\n')
             continue;
-        if (c == ';') {
-            if (!buffer.isEmpty())
+        if (c == '\r') {
+            // "100.0\r;" still terminates on the semicolon. A bare CR after a
+            // heading is also accepted so a short reply is not stuck.
+            if (parseHeading(buffer)) {
                 frames.append(buffer);
+                buffer.clear();
+            }
+            continue;
+        }
+        if (c == ';') {
+            if (buffer.isEmpty()) {
+                buffer = ";"; // DCU-1 replies start with ';' and have no trailer.
+                continue;
+            }
+            if (buffer == ";") {
+                buffer.clear();
+                continue;
+            }
+            frames.append(buffer.startsWith(';') ? buffer.mid(1) : buffer);
             buffer.clear();
-        } else {
-            buffer.append(char(c));
+            continue;
+        }
+        buffer.append(char(c));
+        if (buffer.size() == 4 && buffer.at(0) == ';'
+            && std::isdigit(static_cast<unsigned char>(buffer.at(1)))
+            && std::isdigit(static_cast<unsigned char>(buffer.at(2)))
+            && std::isdigit(static_cast<unsigned char>(buffer.at(3)))) {
+            frames.append(buffer.mid(1));
+            buffer.clear();
         }
     }
 }

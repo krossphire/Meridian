@@ -24,10 +24,12 @@ public:
 
     void note(const QString &text);
     void record(const char *direction, const QByteArray &bytes);
+    void flush();
 
 private:
     TrafficLog() = default;
     void ensureOpen();
+    void writeLine(const QString &line);
 
     bool enabled = false;
     QString path;

@@ -6,9 +6,11 @@
 
 #include "Rt21Driver.h"
 
+#include "Reconnect.h"
 #include "TrafficLog.h"
 #include "core/Bearing.h"
 
+#include <QDateTime>
 #include <QSerialPort>
 #include <QTcpSocket>
 #include <QTimer>
@@ -16,9 +18,65 @@
 #include <algorithm>
 #include <cmath>
 
+#if defined(Q_OS_WIN)
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  include <winsock2.h>
+#else
+#  include <sys/socket.h>
+#endif
+
+namespace {
+
+int g_alive = 0;
+int g_transports = 0;
+int g_transportHighWater = 0;
+
+void trackTransport(int delta)
+{
+    g_transports += delta;
+    if (g_transports > g_transportHighWater)
+        g_transportHighWater = g_transports;
+}
+
+} // namespace
+
+int Rt21Driver::instanceCount()
+{
+    return g_alive;
+}
+
+int Rt21Driver::transportHighWater()
+{
+    return g_transportHighWater;
+}
+
+int Rt21Driver::transportsOpen()
+{
+    return g_transports;
+}
+
+void Rt21Driver::resetDiagnostics()
+{
+    g_transportHighWater = g_transports;
+}
+
+bool Rt21Driver::serves(const RotorEndpoint &next) const
+{
+    if (!bound || retired)
+        return false;
+    if (endpoint.transport != next.transport)
+        return false;
+    if (endpoint.transport == RotorEndpoint::Transport::Tcp)
+        return endpoint.host == next.host && endpoint.tcpPort == next.tcpPort;
+    return endpoint.serialPort == next.serialPort && endpoint.baud == next.baud;
+}
+
 Rt21Driver::Rt21Driver(QObject *parent)
     : QObject(parent)
 {
+    ++g_alive;
     replyTimer = new QTimer(this);
     replyTimer->setSingleShot(true);
     connect(replyTimer, &QTimer::timeout, this, [this]() {
@@ -70,15 +128,16 @@ Rt21Driver::Rt21Driver(QObject *parent)
     reconnectTimer = new QTimer(this);
     reconnectTimer->setSingleShot(true);
     connect(reconnectTimer, &QTimer::timeout, this, [this]() {
-        if (wantLink)
-            connectEndpoint(endpoint);
+        if (retired || !wantLink)
+            return;
+        connectEndpoint(endpoint);
     });
 }
 
 Rt21Driver::~Rt21Driver()
 {
-    wantLink = false;
-    tearDownSocket();
+    retire();
+    --g_alive;
 }
 
 void Rt21Driver::setLink(Link state, const QString &detail)
@@ -92,33 +151,80 @@ void Rt21Driver::setLink(Link state, const QString &detail)
 
 void Rt21Driver::tearDownSocket()
 {
+    closeIo(QStringLiteral("teardown"));
+}
+
+void Rt21Driver::closeIo(const QString &reason)
+{
+    ++suppress;
     replyTimer->stop();
     pollTimer->stop();
     inflight.reset();
     queue.clear();
     framer.clear();
     if (tcp) {
-        tcp->disconnect(this);
-        tcp->abort();
-        tcp->deleteLater();
+        QTcpSocket *socket = tcp;
         tcp = nullptr;
+        if (io == socket)
+            io = nullptr;
+        socket->disconnect(this);
+        TrafficLog::instance().note(QStringLiteral("close %1 state=%2 error=%3")
+                                        .arg(reason)
+                                        .arg(int(socket->state()))
+                                        .arg(socket->errorString()));
+        const qintptr fd = socket->socketDescriptor();
+        if (fd >= 0) {
+#if defined(Q_OS_WIN)
+            ::shutdown(static_cast<SOCKET>(fd), SD_BOTH);
+#else
+            ::shutdown(static_cast<int>(fd), SHUT_RDWR);
+#endif
+        }
+        if (socket->state() != QAbstractSocket::UnconnectedState)
+            socket->disconnectFromHost();
+        socket->close();
+        socket->setParent(nullptr);
+        socket->deleteLater();
+        trackTransport(-1);
     }
     if (serial) {
-        serial->disconnect(this);
-        if (serial->isOpen())
-            serial->close();
-        serial->deleteLater();
+        QSerialPort *port = serial;
         serial = nullptr;
+        if (io == port)
+            io = nullptr;
+        port->disconnect(this);
+        TrafficLog::instance().note(QStringLiteral("close %1 serial error=%2").arg(reason, port->errorString()));
+        if (port->isOpen())
+            port->close();
+        port->setParent(nullptr);
+        port->deleteLater();
+        trackTransport(-1);
     }
     io = nullptr;
+    --suppress;
+}
+
+void Rt21Driver::retire()
+{
+    if (retired)
+        return;
+    retired = true;
+    wantLink = false;
+    pendingGoto.reset();
+    reconnectTimer->stop();
+    closeIo(QStringLiteral("driver retired"));
+    setLink(Link::Off, QStringLiteral("Disconnected"));
 }
 
 void Rt21Driver::connectEndpoint(const RotorEndpoint &next)
 {
+    if (retired)
+        return;
     reconnectTimer->stop();
     endpoint = next;
+    bound = true;
     wantLink = true;
-    tearDownSocket();
+    closeIo(QStringLiteral("new connection"));
     failures = 0;
     setLink(Link::Connecting, endpoint.transport == RotorEndpoint::Transport::Tcp
                                   ? QStringLiteral("Connecting to %1:%2").arg(endpoint.host).arg(endpoint.tcpPort)
@@ -126,21 +232,25 @@ void Rt21Driver::connectEndpoint(const RotorEndpoint &next)
 
     if (endpoint.transport == RotorEndpoint::Transport::Tcp) {
         tcp = new QTcpSocket(this);
+        trackTransport(1);
         io = tcp;
         tcp->setSocketOption(QAbstractSocket::LowDelayOption, 1);
         connect(tcp, &QTcpSocket::connected, this, &Rt21Driver::onConnected);
         connect(tcp, &QTcpSocket::readyRead, this, &Rt21Driver::onReadyRead);
         connect(tcp, &QTcpSocket::errorOccurred, this, [this](QAbstractSocket::SocketError) { onSocketError(); });
         connect(tcp, &QTcpSocket::disconnected, this, [this]() {
-            if (!wantLink || !tcp)
+            if (suppress || retired || !wantLink || !tcp)
                 return;
-            failLink(QStringLiteral("The rotor closed the connection."));
+            const QString err = tcp->errorString();
+            closeIo(QStringLiteral("peer closed"));
+            failLink(err.isEmpty() ? QStringLiteral("The rotor closed the connection.") : err);
         });
         tcp->connectToHost(endpoint.host, quint16(std::clamp(endpoint.tcpPort, 1, 65535)));
         return;
     }
 
     serial = new QSerialPort(this);
+    trackTransport(1);
     io = serial;
     serial->setPortName(endpoint.serialPort);
     serial->setBaudRate(endpoint.baud > 0 ? endpoint.baud : 4800);
@@ -154,11 +264,13 @@ void Rt21Driver::connectEndpoint(const RotorEndpoint &next)
             return;
         onSocketError();
     });
-    if (!serial->open(QIODevice::ReadWrite)) {
-        const QString message = serial->errorString().isEmpty()
-                                    ? QStringLiteral("Couldn't open %1.").arg(endpoint.serialPort)
-                                    : serial->errorString();
-        tearDownSocket();
+    const bool opened = serial && serial->open(QIODevice::ReadWrite);
+    if (!opened || !serial) {
+        const QString message = (serial && !serial->errorString().isEmpty())
+                                    ? serial->errorString()
+                                    : QStringLiteral("Couldn't open %1.").arg(endpoint.serialPort);
+        if (serial)
+            closeIo(message);
         failLink(message);
         return;
     }
@@ -167,12 +279,16 @@ void Rt21Driver::connectEndpoint(const RotorEndpoint &next)
 
 void Rt21Driver::disconnectLink()
 {
+    if (retired)
+        return;
     wantLink = false;
     reconnectTimer->stop();
+    downSinceMs = -1;
+    postGrace = 0;
     pendingGoto.reset();
     target_.reset();
     emit targetChanged(0, false);
-    tearDownSocket();
+    closeIo(QStringLiteral("disconnect"));
     moving = false;
     setLink(Link::Off, QStringLiteral("Disconnected"));
 }
@@ -180,15 +296,21 @@ void Rt21Driver::disconnectLink()
 void Rt21Driver::onConnected()
 {
     failures = 0;
+    downSinceMs = -1;
+    postGrace = 0;
     const QString where = endpoint.transport == RotorEndpoint::Transport::Tcp
                               ? QStringLiteral("Connected to %1:%2").arg(endpoint.host).arg(endpoint.tcpPort)
                               : QStringLiteral("Connected on %1").arg(endpoint.serialPort);
     TrafficLog::instance().note(where);
     setLink(Link::On, where);
     if (pendingGoto) {
+        // One shot, for a turn the user asked for while this connect was
+        // already in progress. Cleared here so a later reconnect cannot
+        // send the same AP again.
         Job job;
         job.kind = Kind::Motion;
         job.bytes = Rt21::gotoImmediate(*pendingGoto);
+        pendingGoto.reset();
         queue.prepend(job);
     }
     startPoll();
@@ -197,7 +319,7 @@ void Rt21Driver::onConnected()
 
 void Rt21Driver::onSocketError()
 {
-    if (!wantLink)
+    if (suppress || retired || !wantLink)
         return;
     QString message;
     if (tcp) {
@@ -212,8 +334,8 @@ void Rt21Driver::onSocketError()
     }
     if (message.isEmpty())
         message = QStringLiteral("Connection failed.");
-    TrafficLog::instance().note(message);
-    tearDownSocket();
+    TrafficLog::instance().note(QStringLiteral("socket error %1").arg(message));
+    closeIo(message);
     failLink(message);
 }
 
@@ -223,6 +345,7 @@ void Rt21Driver::failLink(const QString &message)
     replyTimer->stop();
     inflight.reset();
     queue.clear();
+    pendingGoto.reset();
     moving = false;
     if (link_ != Link::Failed || detail_ != message)
         setLink(Link::Failed, message);
@@ -232,9 +355,18 @@ void Rt21Driver::failLink(const QString &message)
 
 void Rt21Driver::scheduleReconnect()
 {
-    const int shift = std::min(failures, 4);
-    const int delay = std::min(15000, 1000 * (1 << shift));
-    ++failures;
+    if (retired || !wantLink)
+        return;
+    if (downSinceMs < 0)
+        downSinceMs = QDateTime::currentMSecsSinceEpoch();
+    const qint64 down = QDateTime::currentMSecsSinceEpoch() - downSinceMs;
+    const int delay = reconnectDelayMs(down, postGrace);
+    if (down >= 5LL * 60 * 1000)
+        ++postGrace;
+    TrafficLog::instance().note(QStringLiteral("reconnect in %1 ms after %2 ms down (%3)")
+                                    .arg(delay)
+                                    .arg(down)
+                                    .arg(detail_));
     reconnectTimer->start(delay);
 }
 
@@ -257,20 +389,21 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
         return;
 
     if (inflight && (inflight->kind == Kind::Heading || inflight->kind == Kind::Status)) {
-        if (inflight->kind == Kind::Status) {
-            if (const auto status = Rt21::parseStatusFrame(frame)) {
-                failures = 0;
-                noteArrival(status->azimuth, status->haveStatus, status->status);
-                finishInflight();
-                return;
-            }
+        if (const auto status = Rt21::parseStatusFrame(frame)) {
+            failures = 0;
+            noteArrival(status->azimuth, status->haveStatus, status->status);
+            finishInflight();
+            return;
         }
-        if (const auto heading = Rt21::parseHeading(frame)) {
+        if (const auto heading = Rt21::parseHeadingFrame(frame)) {
             failures = 0;
             noteArrival(*heading, false, -1);
             finishInflight();
             return;
         }
+        if (Rt21::isCommandEcho(frame))
+            return;
+        return;
     }
 
     if (inflight && inflight->kind == Kind::Read) {
@@ -403,10 +536,11 @@ void Rt21Driver::goTo(double azimuth)
     const bool transportOpen = (tcp && tcp->state() == QAbstractSocket::ConnectedState)
                                || (serial && serial->isOpen());
     if (!transportOpen) {
-        if (wantLink && link_ != Link::Connecting && link_ != Link::On)
+        if (wantLink && link_ != Link::Connecting && link_ != Link::On && link_ != Link::Moving)
             connectEndpoint(endpoint);
         return;
     }
+    pendingGoto.reset();
     Job job;
     job.kind = Kind::Motion;
     job.bytes = Rt21::gotoImmediate(clamped);

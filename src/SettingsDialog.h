@@ -10,6 +10,8 @@
 
 #include <QDialog>
 
+class QCloseEvent;
+
 class QComboBox;
 class QLabel;
 class QLineEdit;
@@ -26,6 +28,7 @@ public:
     SettingsDialog(const AppConfig &config, const ZipDatabase *zips, Rt21Driver *driver, QWidget *parent = nullptr);
 
     void setConfig(const AppConfig &config);
+    void setDriver(Rt21Driver *driver);
     AppConfig config() const { return draft; }
     void showPage(int index);
 
@@ -45,6 +48,7 @@ private:
     void buildStation();
     void buildRotors();
     void buildController();
+    bool commitDraft(bool interactive);
     void refreshLocation();
     void loadRotor(int index);
     void storeRotor(int index);
@@ -73,4 +77,9 @@ private:
     QVector<FieldRow> fields;
     class QCheckBox *bits[12] = {};
     bool fillingBits = false;
+    bool driverWired = false;
+    bool committing = false;
+
+protected:
+    void closeEvent(QCloseEvent *event) override;
 };

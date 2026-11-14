@@ -37,8 +37,14 @@ struct HeadingReading {
     int status = -1; // v4 R2n: 0 idle, 1 moving, 2 error, 4 pot, 5 counter
 };
 
-// Frame contents without the trailing ';'.
+// Strict numeric token: "123", "123.4", " 45.2".
 std::optional<double> parseHeading(const QByteArray &frame);
+
+// A full reply frame. Accepts DCU-1 ";123", "123;", " 100.0", "BI1100.0",
+// and ignores pure command echoes (BI1, AI1, AP1..., AM1).
+std::optional<double> parseHeadingFrame(const QByteArray &frame);
+bool isCommandEcho(const QByteArray &frame);
+
 std::optional<HeadingReading> parseStatusFrame(const QByteArray &frame);
 QString payloadAfterSoh(const QByteArray &frame);
 std::optional<int> parseIntegerPayload(const QByteArray &frame);

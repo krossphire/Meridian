@@ -47,6 +47,19 @@ public:
     std::optional<double> target() const { return target_; }
     QString detail() const { return detail_; }
 
+    // True once this driver has been bound to this exact transport.
+    // A name-only edit does not count as a different connection.
+    bool serves(const RotorEndpoint &endpoint) const;
+
+    // Stop timers, drop signals, shut the socket down, and refuse later use.
+    // The caller deleteLater's the driver after this returns.
+    void retire();
+
+    static int instanceCount();
+    static int transportHighWater();
+    static int transportsOpen();
+    static void resetDiagnostics();
+
 signals:
     void linkChanged(Rt21Driver::Link state, const QString &detail);
     void headingChanged(double azimuth);
@@ -67,6 +80,7 @@ private:
     };
 
     void setLink(Link state, const QString &detail);
+    void closeIo(const QString &reason);
     void tearDownSocket();
     void onReadyRead();
     void onConnected();
@@ -104,4 +118,9 @@ private:
     std::optional<double> pendingGoto;
     bool moving = false;
     double lastHeading = -1;
+    bool retired = false;
+    bool bound = false;
+    int suppress = 0;
+    qint64 downSinceMs = -1;
+    int postGrace = 0;
 };

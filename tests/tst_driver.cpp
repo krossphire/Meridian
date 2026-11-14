@@ -23,6 +23,7 @@ class TestDriver : public QObject
 private slots:
     void tcpMoveAndStop();
     void secondClientRefused();
+    void hardwareReplyBytes();
 #ifdef Q_OS_UNIX
     void serialPty();
 #endif
@@ -54,6 +55,37 @@ void TestDriver::tcpMoveAndStop()
     QTRY_VERIFY_WITH_TIMEOUT(driver.link() == Rt21Driver::Link::Moving || driver.target().has_value(), 2000);
     driver.stopMotion();
     QTRY_COMPARE_WITH_TIMEOUT(server.sim()->moving(), false, 2000);
+}
+
+void TestDriver::hardwareReplyBytes()
+{
+    Rt21Simulator sim;
+    QByteArray got;
+    QObject::connect(&sim, &Rt21Simulator::output, &sim, [&](const QByteArray &bytes) { got = bytes; });
+    sim.setHeading(131.9);
+    for (int i = 0; i < 4; ++i) {
+        got.clear();
+        sim.feed("BI1;");
+        QCOMPARE(got, QByteArray("131.9;"));
+    }
+    got.clear();
+    sim.feed("BI1;");
+    QCOMPARE(got, QByteArray::fromHex("0130003E3133312E393B"));
+
+    Rt21Simulator moving;
+    QObject::connect(&moving, &Rt21Simulator::output, &moving, [&](const QByteArray &bytes) { got = bytes; });
+    moving.setHeading(122.6);
+    moving.setSpeed(0);
+    moving.feed("AP1100.0\r;");
+    QVERIFY(moving.moving());
+    for (int i = 0; i < 4; ++i) {
+        got.clear();
+        moving.feed("BI1;");
+        QCOMPARE(got, QByteArray("122.6;"));
+    }
+    got.clear();
+    moving.feed("BI1;");
+    QCOMPARE(got, QByteArray::fromHex("0130013E3132322E363B"));
 }
 
 void TestDriver::secondClientRefused()

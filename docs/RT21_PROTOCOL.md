@@ -95,3 +95,29 @@ Also behind an explicit confirmation:
 | `ATn;`, `T0n;`, `T1n;`, `<esc>` | Wi-Fi / LAN module passthrough |
 
 `R3n;` and the bootloader commands are the sort of thing a mis-click should not be able to do.
+
+## Observed on hardware
+
+A healthy session on 14 November 2026, from 14:06:18 to about 14:12, stayed on one TCP connection the whole time. There were no reconnects and 646 RX frames. The earlier dead session (13:44–14:03, zero RX, then a reconnect that resent the same `AP`) came right after a rapid reconnect loop. That matches the quiet-backoff theory: the network module wedges when Meridian drops the socket and dials straight back.
+
+On that healthy session, replies to `BI1;` were plain ASCII `NNN.N;` with no leading space and no CR/LF. One captured frame:
+
+```text
+31 33 31 2E 39 3B    131.9;
+```
+
+About every 4th to 6th frame arrived with a 4-byte prefix. Idle:
+
+```text
+01 30 00 3E 31 33 32 2E 34 3B    <01> '0' <00> '>' 132.4;
+```
+
+While the rotor was turning:
+
+```text
+01 30 01 3E 31 32 32 2E 36 3B    <01> '0' <01> '>' 122.6;
+```
+
+The byte after `01 30` behaves as a moving flag: `00` stopped, `01` rotating, then `>` (`3E`) and the same `NNN.N;` heading. It is not requested by `R21;`. It looks like an unsolicited status frame from the network module, mixed into the `BI1;` replies. Meridian strips leading non-numeric bytes, treats `01 30 xx 3E` as that status header, and uses `xx` as the rotating flag when it is 0–5. A stopped flag is the settled signal.
+
+Replies on that session arrived about every 2 seconds while idle and about every 250 ms while the rotor was moving. Those are the rates the controller was actually answering, not a reason to reconnect.

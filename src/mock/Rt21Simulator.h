@@ -53,6 +53,7 @@ private:
     QByteArray buffer;
     QHash<QChar, int> ee;
     int pot = 512;
+    int biReplies = 0;
 };
 
 class MockRt21Server : public QObject
@@ -64,6 +65,8 @@ public:
     Rt21Simulator *sim() { return &sim_; }
     bool listenTcp(quint16 port);
     quint16 port() const;
+    int accepts() const { return accepts_; }
+    bool hasClient() const;
     // Returns the slave path, or empty if a pty could not be opened.
     QString listenPty();
 
@@ -75,6 +78,7 @@ private:
     QTcpServer *server = nullptr;
     QTcpSocket *client = nullptr;
     quint16 tcpPort = 0;
+    int accepts_ = 0;
     QTimer *motion = nullptr;
     int ptyMaster = -1;
     QString ptyName;
