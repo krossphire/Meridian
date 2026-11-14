@@ -141,6 +141,11 @@ QString UserFiles::backupDirectory()
 AppConfig UserFiles::load()
 {
     prepare();
+    if (!QFileInfo::exists(settingsPath())) {
+        const AppConfig config = AppConfig::defaults();
+        save(config);
+        return config;
+    }
     QSettings file(settingsPath(), QSettings::IniFormat);
     return AppConfig::load(file);
 }
