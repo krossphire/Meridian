@@ -55,10 +55,12 @@ public:
     void append(const QByteArray &bytes);
     QList<QByteArray> take();
     void clear();
+    void setLineMode(bool on) { lineMode = on; }
 
 private:
     QByteArray buffer;
     QList<QByteArray> frames;
+    bool lineMode = false;
 };
 
 } // namespace Rt21

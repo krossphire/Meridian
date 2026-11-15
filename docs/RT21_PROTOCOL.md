@@ -128,4 +128,4 @@ The Version 4 addendum (rev 4, November 2022), section “WiFi/LAN Operation”,
 
 Hamlib’s RT-21 backend (`rotators/rotorez/rotorez.c`, `rt21_rot_caps`, version string 20230507.0) is `RIG_PORT_SERIAL` at 4800 8N1. It has no TCP port.
 
-**Unverified:** a factory default for the serial-TCP port. 6555 is a port some stations, including the original Meridian default, were configured to use. It is not printed in the addendum or in Hamlib. Find RT-21 does not assume it. It probes 23, 4001, 5000, 6555, 8080, and 10001, plus any port already saved and an optional custom port, and lists a host only when `BI1;` parses as a heading.
+**Unverified on a live module:** a factory default for the serial-TCP port. Setup Utility 4.B12's "RESET to DEFAULTS" writes `AT*NVREG16_0=6555`. The addendum and Hamlib do not print that number. Find RT-21 does not assume it. It probes 23, 4001, 5000, 6555, 8080, and 10001, plus any port already saved and an optional custom port, and lists a host only when `BI1;` parses as a heading. The module's other settings, and the warning that `T11;` leaves TCP mode, are in `docs/RT21_SETUP_PARITY.md`.

@@ -44,6 +44,7 @@ signals:
 private:
     void handle(const QByteArray &command, bool immediate);
     void reply(const QByteArray &payload, bool soh);
+    void replyLine(const QByteArray &line);
     void startMotion();
     void restoreDefaults();
 
@@ -56,6 +57,8 @@ private:
     bool sawCr = false;
     QByteArray buffer;
     QHash<QChar, int> ee;
+    QHash<QByteArray, QByteArray> module;
+    bool atMode = false;
     int pot = 512;
     int biReplies = 0;
     bool ignoreQueries = false;

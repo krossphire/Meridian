@@ -11,8 +11,10 @@
 
 #include <QDialog>
 #include <QList>
+#include <QMap>
 
 class QCloseEvent;
+class SetupPanel;
 
 class QComboBox;
 class QLabel;
@@ -60,6 +62,8 @@ private:
     void finishFind(const QList<FoundRotor> &found, bool network);
     void applyFound(const FoundRotor &found);
     void styleFindButton();
+    void setStatus(const QString &text);
+    void exportSetup();
     QString backupConfig(const QString &path) const;
 
     AppConfig draft;
@@ -68,6 +72,13 @@ private:
     int rotorIndex = -1;
 
     class QTabWidget *tabs = nullptr;
+    class QTabWidget *setupTabs = nullptr;
+    SetupPanel *setupPanel = nullptr;
+    QLabel *statusLabel = nullptr;
+    QMap<QString, QString> eeRaw;
+    QLabel *screenSaver = nullptr;
+    QLabel *multiplier = nullptr;
+    QLabel *magnetic = nullptr;
     QLineEdit *homeEdit = nullptr;
     QLabel *summary = nullptr;
     QLabel *detail = nullptr;

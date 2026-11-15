@@ -27,7 +27,7 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
     , config(std::move(initial))
     , settings(store)
 {
-    setWindowTitle(QStringLiteral("Meridian 0.1.0-alpha6"));
+    setWindowTitle(QStringLiteral("Meridian 0.1.0-alpha7"));
     TrafficLog::instance().setEnabled(config.trafficLog);
     globe = new GlobeWidget;
     setCentralWidget(globe);

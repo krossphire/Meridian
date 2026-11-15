@@ -11,6 +11,7 @@
 #include "core/Bearing.h"
 
 #include <QDateTime>
+#include <QFileInfo>
 #include <QSerialPort>
 #include <QTcpSocket>
 #include <QTimer>
@@ -89,7 +90,20 @@ Rt21Driver::Rt21Driver(QObject *parent)
             return;
         const Kind kind = inflight->kind;
         const QChar id = inflight->id;
+        const QString moduleKey = inflight->moduleKey;
+        const bool moduleOptional = inflight->moduleOptional;
         inflight.reset();
+        if (kind == Kind::Module) {
+            if (!moduleOptional && !moduleKey.isEmpty())
+                emit networkField(moduleKey, QString());
+            if (networkMode && queue.isEmpty())
+                finishNetwork(!writeCompareFailed, writeCompareFailed
+                                                         ? QStringLiteral("A setting did not read back as written.")
+                                                         : QString());
+            else
+                pump();
+            return;
+        }
         if (kind == Kind::Motion || kind == Kind::Write) {
             if (kind == Kind::Write && queue.isEmpty() && configMode) {
                 configMode = false;
@@ -187,6 +201,11 @@ void Rt21Driver::setIdlePollSeconds(int seconds)
     idlePollMs = std::clamp(seconds, 30, 60) * 1000;
     if (!fastPace && pollTimer && pollTimer->isActive())
         pollTimer->start(idlePollMs);
+}
+
+void Rt21Driver::postNote(const QString &note)
+{
+    showNote(note);
 }
 
 void Rt21Driver::showNote(const QString &note)
@@ -571,10 +590,18 @@ void Rt21Driver::onSocketError()
 
 void Rt21Driver::failLink(const QString &message, bool linkDown)
 {
+    const bool droppedNetwork = networkMode;
     pollTimer->stop();
     replyTimer->stop();
     inflight.reset();
     queue.clear();
+    if (droppedNetwork) {
+        networkMode = false;
+        configMode = false;
+        framer.setLineMode(false);
+        emit networkFinished(false, QStringLiteral(
+            "The link dropped while talking to the network module. T11 leaves TCP mode, so use USB if you can."));
+    }
     pendingGoto.reset();
     awaitPrePoll = false;
     commandArmed = false;
@@ -650,16 +677,67 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
         return;
     }
 
+    if (inflight && inflight->kind == Kind::Module) {
+        const QString line = QString::fromLatin1(frame).trimmed();
+        if (line.isEmpty())
+            return;
+        const bool okLine = line.compare(QStringLiteral("OK"), Qt::CaseInsensitive) == 0;
+        const bool token = !inflight->expectToken.isEmpty() && inflight->expectToken != QLatin1String("OK")
+                           && line.startsWith(inflight->expectToken, Qt::CaseInsensitive);
+        const bool matched = inflight->expectToken == QLatin1String("OK") ? okLine : token;
+        if (!matched) {
+            if (line.startsWith(QLatin1String("AT"), Qt::CaseInsensitive))
+                return;
+            return;
+        }
+        QString value = line;
+        if (token)
+            value = line.mid(inflight->expectToken.size()).trimmed();
+        if (!inflight->expectValue.isEmpty() && value != inflight->expectValue) {
+            writeCompareFailed = true;
+            for (int i = queue.size() - 1; i >= 0; --i) {
+                if (!queue.at(i).moduleExit)
+                    queue.removeAt(i);
+            }
+        } else if (!inflight->moduleKey.isEmpty()) {
+            emit networkField(inflight->moduleKey, value);
+        }
+        const bool done = networkMode && queue.isEmpty();
+        finishInflight();
+        if (done && !inflight)
+            finishNetwork(!writeCompareFailed, writeCompareFailed
+                                                   ? QStringLiteral("A setting did not read back as written.")
+                                                   : QString());
+        return;
+    }
+
     if (inflight && inflight->kind == Kind::Read) {
         failures = 0;
         configTimeouts = 0;
         const QString raw = Rt21::payloadAfterSoh(frame);
         const auto number = Rt21::parseIntegerPayload(frame);
-        emit configField(inflight->id, raw, number.has_value(), number.value_or(0));
+        const QString wanted = inflight->expectValue;
+        const QChar readId = inflight->id;
+        if (!wanted.isEmpty()) {
+            const QString got = number ? QString::number(*number) : raw;
+            if (got != wanted) {
+                writeCompareFailed = true;
+                queue.clear();
+                finishInflight();
+                configMode = false;
+                emit writeFinished(false, QStringLiteral("Read-back for %1 was %2, not %3.").arg(QString(readId), got, wanted));
+                startPoll();
+                return;
+            }
+        }
+        emit configField(readId, raw, number.has_value(), number.value_or(0));
         finishInflight();
         if (configMode && !inflight && queue.isEmpty()) {
             configMode = false;
-            emit configFinished(true, QString());
+            if (!wanted.isEmpty())
+                emit writeFinished(true, QStringLiteral("Read back the same value."));
+            else
+                emit configFinished(true, QString());
             startPoll();
         }
         return;
@@ -771,7 +849,11 @@ void Rt21Driver::pump()
     inflight = queue.dequeue();
     TrafficLog::instance().record("TX", inflight->bytes);
     io->write(inflight->bytes);
-    const int wait = (inflight->kind == Kind::Motion || inflight->kind == Kind::Write) ? 60 : 1200;
+    int wait = 1200;
+    if (inflight->kind == Kind::Motion || inflight->kind == Kind::Write)
+        wait = 60;
+    else if (inflight->kind == Kind::Module)
+        wait = inflight->moduleOptional ? 250 : 800;
     replyTimer->start(wait);
 }
 
@@ -869,7 +951,116 @@ void Rt21Driver::readConfiguration()
         job.bytes = Rt21::readEe(letter);
         queue.enqueue(job);
     }
+    Job magnetic;
+    magnetic.kind = Kind::Read;
+    magnetic.id = QLatin1Char('[');
+    magnetic.bytes = Rt21::readEe(QLatin1Char('['));
+    queue.enqueue(magnetic);
     pump();
+}
+
+void Rt21Driver::enqueueModule(const Rt21::ModuleQuery &query)
+{
+    Job job;
+    job.kind = Kind::Module;
+    job.bytes = query.command;
+    job.moduleKey = query.key;
+    job.expectToken = query.token;
+    job.moduleOptional = query.optional;
+    job.moduleExit = query.exitStep;
+    queue.enqueue(job);
+}
+
+void Rt21Driver::finishNetwork(bool ok, const QString &message)
+{
+    const bool compared = writeCompareFailed;
+    networkMode = false;
+    configMode = false;
+    writeCompareFailed = false;
+    framer.setLineMode(false);
+    emit networkFinished(ok, message);
+    if (compared)
+        emit writeFinished(false, message.isEmpty() ? QStringLiteral("A setting did not read back as written.") : message);
+    startPoll();
+}
+
+void Rt21Driver::readNetwork()
+{
+    if (!io) {
+        emit networkFinished(false, QStringLiteral("Connect to a rotor before reading the network module."));
+        return;
+    }
+    configMode = true;
+    networkMode = true;
+    writeCompareFailed = false;
+    configTimeouts = 0;
+    framer.setLineMode(true);
+    pollTimer->stop();
+    queue.clear();
+    for (const Rt21::ModuleQuery &query : Rt21::networkReadSequence())
+        enqueueModule(query);
+    pump();
+}
+
+void Rt21Driver::applySetupGroup(const QString &group, const QMap<QString, QString> &fields, const QString &backupPath)
+{
+#if MERIDIAN_ALPHA_READONLY
+    Q_UNUSED(group);
+    Q_UNUSED(fields);
+    Q_UNUSED(backupPath);
+    emit writeFinished(false, QStringLiteral("Writes are off in this alpha. Nothing was sent."));
+#else
+    if (!QFileInfo::exists(backupPath)) {
+        emit writeFinished(false, QStringLiteral("Save a copy of the settings before writing."));
+        return;
+    }
+    QList<Rt21::PlannedWrite> plan;
+    const QString error = Rt21::planGroup(group, fields, &plan);
+    if (!error.isEmpty()) {
+        emit writeFinished(false, error);
+        return;
+    }
+    if (!io) {
+        emit writeFinished(false, QStringLiteral("Connect to a rotor before writing."));
+        return;
+    }
+    const bool module = !plan.isEmpty() && plan.first().module;
+    configMode = true;
+    networkMode = module;
+    writeCompareFailed = false;
+    if (module)
+        framer.setLineMode(true);
+    pollTimer->stop();
+    queue.clear();
+    if (module) {
+        for (const Rt21::ModuleQuery &query : Rt21::networkReadSequence()) {
+            if (!query.exitStep && query.key.isEmpty())
+                enqueueModule(query);
+        }
+    }
+    for (const Rt21::PlannedWrite &step : plan) {
+        Job write;
+        write.kind = step.module ? Kind::Module : Kind::Write;
+        write.bytes = step.command;
+        write.expectToken = step.module ? QStringLiteral("OK") : QString();
+        queue.enqueue(write);
+        Job read;
+        read.kind = step.module ? Kind::Module : Kind::Read;
+        read.bytes = step.readBack;
+        read.expectToken = step.token;
+        read.expectValue = step.expectValue;
+        if (!step.module && step.readBack.size() >= 2)
+            read.id = QChar::fromLatin1(step.readBack.at(1));
+        queue.enqueue(read);
+    }
+    if (module) {
+        for (const Rt21::ModuleQuery &query : Rt21::networkReadSequence()) {
+            if (query.exitStep)
+                enqueueModule(query);
+        }
+    }
+    pump();
+#endif
 }
 
 void Rt21Driver::writeConfiguration(const QList<QPair<QChar, int>> &changes)

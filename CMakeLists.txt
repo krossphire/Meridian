@@ -27,6 +27,7 @@ add_library(meridian-core STATIC
     src/rotor/Rt21Driver.cpp
     src/rotor/TrafficLog.cpp
     src/rotor/Rt21Finder.cpp
+    src/rotor/Rt21Setup.cpp
     src/rotor/UserFiles.cpp
 )
 target_include_directories(meridian-core PUBLIC ${CMAKE_SOURCE_DIR}/src)
@@ -50,6 +51,7 @@ add_executable(meridian
     src/GlobeWidget.cpp
     src/MainWindow.cpp
     src/SettingsDialog.cpp
+    src/SetupPanel.cpp
     src/AboutDialog.cpp
     resources.qrc
 )
@@ -92,8 +94,10 @@ meridian_test(tst_settings)
 target_sources(tst_settings PRIVATE
     src/MainWindow.cpp
     src/SettingsDialog.cpp
+    src/SetupPanel.cpp
     src/AboutDialog.cpp
     src/GlobeWidget.cpp)
+meridian_test(tst_setup)
 target_link_libraries(tst_settings PRIVATE Qt6::Svg)
 set_tests_properties(tst_settings PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()

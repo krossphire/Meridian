@@ -6,6 +6,7 @@
 
 #include "TrafficLog.h"
 
+#include "Rt21Setup.h"
 #include "UserFiles.h"
 
 #include <QDateTime>
@@ -86,7 +87,7 @@ void TrafficLog::ensureOpen()
     logFile().setFileName(path);
     opened = logFile().open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Unbuffered);
     if (opened)
-        writeLine(QStringLiteral("NOTE Meridian 0.1.0-alpha6 traffic log ") + path);
+        writeLine(QStringLiteral("NOTE Meridian 0.1.0-alpha7 traffic log ") + path);
 }
 
 void TrafficLog::flush()
@@ -117,6 +118,7 @@ void TrafficLog::record(const char *direction, const QByteArray &bytes)
     if (!enabled || bytes.isEmpty())
         return;
     ensureOpen();
-    writeLine(stamp() + QLatin1Char(' ') + QLatin1String(direction) + QLatin1Char(' ') + QString::number(bytes.size())
-              + QStringLiteral(" |") + printable(bytes) + QStringLiteral("| ") + hexBytes(bytes));
+    const QByteArray safe = Rt21::redactForLog(bytes);
+    writeLine(stamp() + QLatin1Char(' ') + QLatin1String(direction) + QLatin1Char(' ') + QString::number(safe.size())
+              + QStringLiteral(" |") + printable(safe) + QStringLiteral("| ") + hexBytes(safe));
 }

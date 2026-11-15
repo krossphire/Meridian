@@ -10,8 +10,10 @@
 
 #include "AppConfig.h"
 #include "Rt21Protocol.h"
+#include "Rt21Setup.h"
 
 #include <QHash>
+#include <QMap>
 #include <QObject>
 #include <QQueue>
 
@@ -38,9 +40,12 @@ public:
     void stopMotion();
 
     void readConfiguration();
+    void readNetwork();
     void writeConfiguration(const QList<QPair<QChar, int>> &changes);
+    void applySetupGroup(const QString &group, const QMap<QString, QString> &fields, const QString &backupPath);
     void sendCalibrate(bool clockwise);
     void sendPulseHeading(double azimuth);
+    void postNote(const QString &note);
 
     Link link() const { return link_; }
     RotorEndpoint linkEndpoint() const { return endpoint; }
@@ -73,17 +78,24 @@ signals:
     void configField(QChar id, const QString &raw, bool numeric, int value);
     void configNote(const QString &text);
     void configFinished(bool ok, const QString &message);
+    void networkField(const QString &key, const QString &value);
+    void networkFinished(bool ok, const QString &message);
     void writeFinished(bool ok, const QString &message);
     void statusNote(const QString &text);
 
 private:
-    enum class Kind { Motion, Heading, Status, Read, Write, Note };
+    enum class Kind { Motion, Heading, Status, Read, Write, Note, Module };
 
     struct Job {
         Kind kind = Kind::Motion;
         QByteArray bytes;
         QChar id;
         QString note;
+        QString moduleKey;
+        QString expectToken;
+        QString expectValue;
+        bool moduleOptional = false;
+        bool moduleExit = false;
     };
 
     void setLink(Link state, const QString &detail);
@@ -108,6 +120,9 @@ private:
     void sendArmedGoto();
     void dropCommand(const QString &note);
     void showNote(const QString &note);
+    void finishNetwork(bool ok, const QString &message);
+    void enqueueModule(const Rt21::ModuleQuery &query);
+    bool moduleLineMatches(const QByteArray &frame) const;
     void startFastPoll();
     void startIdlePoll();
     void enableKeepAlive();
@@ -147,6 +162,8 @@ private:
     QString note_;
     int configTimeouts = 0;
     bool configMode = false;
+    bool networkMode = false;
+    bool writeCompareFailed = false;
     int pollsSinceStatus = 0;
     bool statusDisabled = false;
     std::optional<double> heading_;

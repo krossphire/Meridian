@@ -40,6 +40,35 @@ void Rt21Simulator::restoreDefaults()
     };
     for (const auto &item : defaults)
         ee.insert(item.first, item.second);
+    module.clear();
+    const QList<QPair<QByteArray, QByteArray>> net = {
+        {"HWTYPE", "2"},
+        {"DHCP", "0"},
+        {"IP", "192.168.1.50"},
+        {"AIP", "192.168.1.50"},
+        {"NMASK", "255.255.255.0"},
+        {"ANMASK", "255.255.255.0"},
+        {"GW", "192.168.1.1"},
+        {"AGW", "192.168.1.1"},
+        {"ID", "Tower"},
+        {"HTTP", "80"},
+        {"UDP", "0"},
+        {"TFTP", "69"},
+        {"NVREG16_0", "6555"},
+        {"WIFI_SECURITY", "6"},
+        {"WIFI_ASSID", "shack-2g"},
+        {"WIFI_KEY", "prairie-not-logged"},
+        {"HTTP_USER", "rt21"},
+        {"HTTP_PASS", "webpass"},
+        {"LINK", "1"},
+    };
+    for (const auto &item : net)
+        module.insert(item.first, item.second);
+}
+
+void Rt21Simulator::replyLine(const QByteArray &line)
+{
+    emit output(line + QByteArray("\r\n"));
 }
 
 void Rt21Simulator::setHeading(double azimuth)
@@ -91,7 +120,20 @@ void Rt21Simulator::feed(const QByteArray &bytes)
     for (unsigned char c : bytes) {
         if (c == '\n')
             continue;
+        if (c == 0x1b) {
+            atMode = false;
+            replyLine(QByteArray("OK"));
+            buffer.clear();
+            sawCr = false;
+            continue;
+        }
         if (c == '\r') {
+            if (buffer.startsWith("AT")) {
+                handle(buffer, false);
+                buffer.clear();
+                sawCr = false;
+                continue;
+            }
             // CR inside AP1xxx.y\r; is what makes the turn immediate. The ';'
             // still terminates the command, so it is not a separate stop.
             sawCr = true;
@@ -182,6 +224,10 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
         reply(QByteArray("12"), true);
         return;
     }
+    if (cmd.startsWith("R[")) {
+        reply(QByteArray("0"), true);
+        return;
+    }
     if (cmd.size() >= 3 && cmd.at(0) == 'R' && cmd.at(1) >= 'A' && cmd.at(1) <= 'Z') {
         const QChar id(cmd.at(1));
         if (id == QLatin1Char('J')) {
@@ -220,6 +266,41 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
     }
     if (cmd.startsWith("C0") || cmd.startsWith("C1"))
         return;
+    if (cmd == "T11" || cmd == "T01" || cmd == "AT") {
+        if (cmd == "AT")
+            atMode = true;
+        if (cmd == "T01")
+            atMode = false;
+        replyLine(QByteArray("OK"));
+        return;
+    }
+    if (cmd.startsWith("AT*")) {
+        const int eq = cmd.indexOf('=');
+        const QByteArray name = eq < 0 ? cmd.mid(3) : cmd.mid(3, eq - 3);
+        QByteArray key = name;
+        if (key.endsWith('?'))
+            key.chop(1);
+        auto stored = [&](const char *id) { return module.value(QByteArray(id)); };
+        if (eq >= 0 && !cmd.endsWith('?')) {
+            module.insert(key, cmd.mid(eq + 1));
+            replyLine(QByteArray("OK"));
+            return;
+        }
+        const QByteArray value = stored(key.constData());
+        QByteArray prefix = key;
+        if (key == "WIFI_SECURITY")
+            prefix = "SECURITY";
+        else if (key == "WIFI_ASSID")
+            prefix = "ASSID";
+        else if (key == "WIFI_KEY")
+            prefix = "KEY";
+        else if (key == "HTTP_USER")
+            prefix = "USER";
+        else if (key == "HTTP_PASS")
+            prefix = "PASS";
+        replyLine(prefix + "=" + value);
+        return;
+    }
     if (cmd.startsWith("AA")) {
         heading_ = clampRt21Azimuth(heading_ - 1.0);
         return;

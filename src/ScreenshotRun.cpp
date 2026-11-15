@@ -18,7 +18,10 @@
 #include <QEvent>
 #include <QEventLoop>
 #include <QLabel>
+#include <QLineEdit>
+#include <QPushButton>
 #include <QSettings>
+#include <QTabWidget>
 #include <QTimer>
 
 #include <functional>
@@ -174,5 +177,35 @@ int runScreenshots(const QString &directory, qreal dpr)
     QApplication::processEvents();
     if (!read || !dialog->grab().save(directory + QStringLiteral("/settings-controller.png")))
         return 12;
+
+    auto *setupTabs = dialog->findChild<QTabWidget *>(QStringLiteral("setupTabs"));
+    if (!setupTabs)
+        return 19;
+    setupTabs->setCurrentIndex(2);
+    auto *readNetwork = dialog->findChild<QPushButton *>(QStringLiteral("readNetwork"));
+    if (!readNetwork)
+        return 20;
+    readNetwork->click();
+    const bool network = waitUntil([&]() {
+        auto *name = dialog->findChild<QLineEdit *>(QStringLiteral("net-id"));
+        auto *status = dialog->findChild<QLabel *>(QStringLiteral("setupStatus"));
+        return name && name->text() == QStringLiteral("Tower") && status
+               && status->text().contains(QStringLiteral("answered"));
+    }, 8000);
+    QApplication::processEvents();
+    if (!network || !dialog->grab().save(directory + QStringLiteral("/setup-network.png")))
+        return 21;
+    auto *guide = dialog->findChild<QPushButton *>(QStringLiteral("openWizard"));
+    if (!guide)
+        return 22;
+    guide->click();
+    auto *next = dialog->findChild<QPushButton *>(QStringLiteral("wizardNext"));
+    if (!next)
+        return 23;
+    next->click();
+    next->click();
+    QApplication::processEvents();
+    if (!dialog->grab().save(directory + QStringLiteral("/setup-wizard.png")))
+        return 24;
     return 0;
 }

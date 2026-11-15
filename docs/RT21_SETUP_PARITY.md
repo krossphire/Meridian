@@ -1,107 +1,201 @@
 # RT-21 Setup Utility parity
 
-Meridian should eventually replace the Green Heron RT-21 Setup Utility (4.B12). Until each write has been checked on Andrew's rotor, **writes stay compiled out** (`MERIDIAN_ALPHA_READONLY`). Reads and backups are available. This inventory is the map for that work. It is not a promise that Apply sends anything in the current build.
+Meridian should replace the Green Heron RT-21 Setup Utility. This file is the inventory of every setting that utility exposes, the bytes it sends, and whether those bytes have been seen on a live rotor. Alpha 7 can read them and save a plain-text copy. It does not write them.
 
-Status words:
+**Verified** means the bytes were seen on a live RT-21 (Andrew's session of 14 Nov 2026, or a later one). **Unverified** means the command is printed in a Green Heron manual or is a literal string in Setup Utility 4.B12, and has not been seen on Andrew's rotor. Do not treat Unverified as safe to send.
 
-- **done** — in the app and safe to use now
-- **read-only** — the screen can show it; the write exists in source but is compiled out
-- **todo** — not built yet
-- **excluded** — will not be sent unless a later, explicit, safe path is added
+Writes stay compiled out (`MERIDIAN_ALPHA_READONLY`). A future write, once a group is approved, saves a copy under `backups/`, sends the group, reads it back, and compares. One group at a time. Factory reset, the bootloader, and the module's "reset to defaults" stay excluded.
 
-Risk is about a mistaken write: **low** (display or a value you can put back), **medium** (motion limits and speed), **high** (calibration, the network module, or anything that reboots).
+## Sources
 
-## How a write gets approved
+- RT-21 manual 3.05 (8 August 2014), Appendix F. EEPROM letters, defaults, and `WXn(value)`. `n = 0` reboots after the write. Any other digit stores it.
+- RT-21 Version 4 addendum, rev 4 (November 2022), [greenheronengineering.com](https://www.greenheronengineering.com/wp-content/uploads/2022/11/Version-4-rev-4.pdf). `T0n;`, `T1n;`, `AT;`, escape, `R2n;`, `R3n;`, `R4n;`, bootloader. Wi-Fi/LAN section: rotator name, DHCP or static IP, mask, gateway, Wi-Fi security, SSID, key, HTTP port. Example browser URL `http://192.168.1.4:8080`. It does not print a factory serial-TCP port, a DNS server, or an AP/client switch.
+- Version 4 manual rev 2 (August 2019). Same Wi-Fi window. It says UDP and Serial were "for future use" and web login was not in the first release.
+- Setup Utility 4.B12 (December 2023) and 4.11 (December 2022), zip files on the [software page](https://www.greenheronengineering.com/rotator-controllers-software/). 4.B12 is a .NET program (`RT-21 Setup Utility.exe`, file version 1.0.0.0, assembly 1.0.0.35). The command strings below are `ldstr` operands in that binary, tied to the named method. 4.11 has the same `AT*` set; 4.B12 adds magnetic variation.
+- Firmware page, same site: 4.13.2 is current. 4.13 adds LAN and direct TCP for Ethernet or Wi-Fi. Version 4 firmware is only for serial numbers above 4000. 4.12 was a limited LAN/TCP build; Green Heron says to update it to 4.13.
+- Product page for the controller: the utility also changes the vanity boot line, shows the rotation range, sets security, the no-motion timeout, auto-cal, and save/restore of a `.ghr` file.
+- groups.io/g/greenheron is members-only. No public post was used as a source for a command.
 
-On the real RT-21, one group at a time:
+## How a setting is approved
 
-1. Read every field and save the backup JSON.
-2. Change one harmless value (brightness is the first candidate).
-3. Read it back and confirm the number.
-4. Restore the backup and read it back again.
-5. Only then compile that group in, still behind the Apply confirmation.
+On Andrew's rotor, one group at a time:
 
-Do not enable a second group in the same session. Factory reset and the bootloader stay excluded.
+1. Read every field and save `backups/meridian-setup-*.txt`.
+2. Change one harmless value. Brightness (`O`) is the first candidate.
+3. Read it back and compare.
+4. Restore the previous value and read it back again.
+5. Only then compile that group in.
 
-## Find RT-21
+Do not enable a second group in the same session.
 
-**done.** On an unconfigured rotor, Settings leads with **Find RT-21**. It checks USB and COM ports first, shows a friendly name when the adapter is FTDI, Prolific, CH340, or CP210, and probes each port with `BI1;` at 4800 then 9600. A port that will not open (another program has it, including Flex SmartSDR CAT ports) is skipped with no error and no dialog. A result looks like `RT-21 on COM6 (USB, 4800), heading 132°`. One click saves it. **Scan the network** is a separate button: it walks local /24s for TCP port 6555, a few hosts at a time, and only when asked. Nothing is selected automatically. A saved rotor is left alone.
+## What can brick the rotor or drop the link
 
-## Controller tab
+| Action | Why it is dangerous | Meridian |
+| --- | --- | --- |
+| `W00;` | Loads default EEPROM and resets the CPU. The utility sends this for factory reset and when the rotor type changes. | Excluded |
+| `R3n;` | CPU and display reset. Same as power cycle. | Excluded |
+| `B2n;` / `BUn;` | Bootloader on RS-232 or USB. | Excluded |
+| `W` with `n = 0` | Appendix F: the controller reboots after the write. The utility's live sliders use this (`WO0`, `WG0`, `WD0180`). | Not sent. A later write uses `n = 1` (`WO18;`), which is what the utility's file restore uses. Still Unverified. |
+| `T1n;` (`T11;`) | Addendum: leaves TCP mode so AT commands work. Sent over an IP connection, this can drop the link you are using. | Sent only while reading the module. `T01;` is sent afterward to put TCP mode back. Prefer USB. Unverified whether `T01;` recovers a socket that already died. |
+| `AT*RESET=1` | Utility button "Re-Connect". Reboots the module. | Excluded |
+| Utility "RESET to DEFAULTS" | Writes DHCP static, `192.168.2.100`, gateway `192.168.2.1`, serial port `6555`, SSID `NETGEAR24`, a passphrase, and an adhoc name `RT-21`. The link will not come back on the old address. The passphrase is a known string in the program. | Excluded |
+| Address, DHCP, or serial-TCP port write | The IP session dies. The new address has to be used afterward. | Not sent. The guide says so, and offers a reconnect only once writes exist. |
+| Calibration `C0n;` `C1n;` `AWn;` and letters A, B, K | A bad cal makes the heading wrong until it is put back. | Read-only |
+| Rotor type `WJ0` | The utility offers a factory reset as part of changing type. | Read-only. Meridian will not send `W00;` with it. |
 
-Reads work over serial, USB, and IP. The same command bytes go out on every transport. The tab stays grouped, in plain language, in this order:
+## Session for the network module
 
-1. Identity — version (`R11;`), pot A/D (`R01;`), last reset (`R41;`)
-2. Motion — min speed, max speed, ramp, delays, counter-rotate delay
-3. Stops and travel — CCW limit, CW limit, cal range, overtravel
-4. Display — brightness, and the display bits inside advanced options
-5. Calibration — offset, CCW cal, CW cal, pulse divider, alt offsets, pulse heading, cal-here buttons
-6. Rotor type — option, mode, security, limit switch (shown, not written until the codes are known)
-7. Network module — its own section, below, not mixed into EEPROM letters
+The utility's constructor, then `PollWiFiValues`, then the Wi-Fi form's close:
 
-Apply, calibration, and pulse heading stay disabled while writes are compiled out. Backup writes a JSON file on this computer and does not send a command.
+1. `AT*SERIAL_ECHO=0` (only if it is already in AT mode; not part of Meridian's read)
+2. Escape, escape, `;`
+3. `AI1;`
+4. `T11;` — allow AT passthrough, leave TCP mode
+5. `AT;` — expect `OK`. Addendum: 30 second activity timeout, then the module returns to the rotor CPU
+6. `AT*HWTYPE?` — the utility continues only when it sees `HWTYPE=2`. Other types are not decoded in the program.
+7. The queries in the table below. Each reply is a `NAME=value` line. The utility treats `OK` as success for a write.
+8. Escape and `;` leave AT mode (form close)
+9. `T01;` on the main window close — put TCP mode back
 
-## EEPROM letters
+Meridian's read is steps 4 through 9, without the echo command and without a second escape. Commands that expect `OK` or a `NAME=` line also finish on a timeout when they are marked optional (`T11;`, escape, `T01;`), because the manual does not promise a reply. Queries wait for their token. The Wi-Fi key and the web password are replaced with `****` in the traffic log. They are kept in the backup file so a later restore has them.
 
-Read command is `R` + letter + `1;`. A numeric write, when a group is later enabled, is `W` + letter + `1` + decimal + `;` (`n = 1`, store, do not reboot). Example: offset 180 is `WD1180;`. That shape is inferred from Appendix F and **has not been checked on hardware**.
+`AT*` commands are sent with a carriage return, the way a .NET `WriteLine` sends them. They are not given a semicolon. Semicolon is `AT*Serial_End` (`0x3B`), which the module uses as the end of a forwarded serial frame.
 
-| ID | What you see | Manual default | Read | Write | Risk | Status |
+## Controller
+
+Reads use `R` + letter + `1;`. A numeric write, when that group is later enabled, is `W` + letter + `1` + decimal + `;` (`WD1180;` for offset 180). The utility's on-screen controls use `n = 0` instead (`WD0180`, and the slider prefixes `WO0`, `WF0`, `WG0`, `WN0`, `WH0`, `WI0`, `WL0`, `WK0`, `WU0`, `WV0`, `WY0`, `WZ0`, `WT0`). File restore uses `n = 1` (`WA1`, `WB1`, `WD1`, … `WZ1`) except rotor type, which stays `WJ0`. Both shapes are Unverified on hardware. Meridian will use `n = 1` so a write does not reboot the controller.
+
+The `.ghr` restore file uses these names: `ccwcal`, `cwcal`, `caloffset`, `reversedelay`, `minspeed`, `maxspeed`, `ccwlimit`, `cwlimit`, `rotortype`, `pulsedivider`, `rampdelay`, `brightness`, `motortimeout`, `security`, `altoffset1`, `altoffset2`, `advanced`, `otallow`, `crdelay`, `limitposition`, `multiplier`.
+
+| ID | What you see | Manual default | Read | Write the utility actually loads | Risk | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| A | CCW cal | 0 | `RA1;` | `WA1` + value + `;` | high | read-only |
-| B | CW cal | 950 | `RB1;` | `WB1` + value + `;` | high | read-only |
-| C | Reserved | | `RC1;` | none | | excluded |
-| D | Offset | 180 | `RD1;` | `WD1` + value + `;` | medium | read-only |
-| E | Delays (brake and reversal are not separate) | 3 | `RE1;` | `WE1` + value + `;` | medium | read-only |
-| F | Min speed | 3 | `RF1;` | `WF1` + value + `;` | medium | read-only |
-| G | Max speed | 10 | `RG1;` | `WG1` + value + `;` | medium | read-only |
-| H | CCW limit | 180 | `RH1;` | `WH1` + value + `;` | medium | read-only |
-| I | CW limit | 180 | `RI1;` | `WI1` + value + `;` | medium | read-only |
-| J | Option (pot / counter) | Pot | `RJ1;` | unknown codes | high | read-only |
-| K | Pulse divider | 3960 | `RK1;` | `WK1` + value + `;` | high | read-only |
-| L | Cal range | 360 | `RL1;` | `WL1` + value + `;` | medium | read-only |
-| M | Mode | Normal | `RM1;` | unknown codes | high | read-only |
-| N | Ramp | 3 | `RN1;` | `WN1` + value + `;` | medium | read-only |
-| O | Brightness | 8 | `RO1;` | `WO1` + value + `;` | low | read-only |
-| P | Fail timeout | 4 | `RP1;` | `WP1` + value + `;` | low | read-only |
-| Q | Security | Admin | `RQ1;` | unknown | high | read-only |
-| R | Alt offset 1 | 361 | `RR1;` | `WR1` + value + `;` | medium | read-only |
-| S | Alt offset 2 | 361 | `RS1;` | `WS1` + value + `;` | medium | read-only |
-| T | Advanced options (bits below) | 0 | `RT1;` | `WT1` + value + `;` | medium | read-only |
-| U | Overtravel | 90 | `RU1;` | `WU1` + value + `;` | medium | read-only |
-| V | Counter-rotate delay | 10 | `RV1;` | `WV1` + value + `;` | low | read-only |
-| W | Reserved | | `RW1;` | none | | excluded |
-| X | Limit switch position | | `RX1;` | none | | read-only |
-| Y | Knob time | 40 | `RY1;` | `WY1` + value + `;` | low | read-only |
-| Z | Not used | | `RZ1;` | none | | excluded |
+| A | CCW cal | 0 | `RA1;` | live `WA0` + value, restore `WA1` + value. Reset button sends `WA00`. | high | Unverified. Read-only |
+| B | CW cal | 950 | `RB1;` | `WB0` / `WB1`. Reset sends `WB0950`. | high | Unverified. Read-only |
+| C | Reserved | | `RC1;` | none | | Excluded |
+| D | Offset | 180 | `RD1;` | `WD0` + value. North button is the literal `WD0180`. South is `WD00`. Restore uses `WD1`. | medium | Unverified. Read-only |
+| E | Delays (brake and reversal are this one field) | 3 | `RE1;` | `WE0` / `WE1` | medium | Unverified. Read-only |
+| F | Min speed | 3 | `RF1;` | `WF0` / `WF1` | medium | Unverified. Read-only |
+| G | Max speed | 10 | `RG1;` | `WG0` / `WG1`. Orion auto-cal uses the literals `WG04` and `WG010`. | medium | Unverified. Read-only |
+| H | CCW limit | 180 | `RH1;` | `WH0` / `WH1` | medium | Unverified. Read-only |
+| I | CW limit | 180 | `RI1;` | `WI0` / `WI1` | medium | Unverified. Read-only |
+| J | Rotor type | Pot | `RJ1;` | `WJ0` + code. See the table under this one. | high | Unverified. Read-only |
+| K | Pulse divider | 3960 | `RK1;` | `WK0` / `WK1`. The utility rejects a value at or above 43600. | high | Unverified. Read-only |
+| L | Cal range | 360 | `RL1;` | `WL0` / `WL1` | medium | Unverified. Read-only |
+| M | Mode | Normal | `RM1;` | `WM00` … `WM05`. See below. | high | Unverified. Read-only |
+| N | Ramp | 3 | `RN1;` | `WN0` / `WN1` | medium | Unverified. Read-only |
+| O | Brightness | 8 | `RO1;` | `WO0` / `WO1` | low | Unverified. Read-only. First group to try on hardware. |
+| P | No-motion timeout | 4 | `RP1;` | `WP0` / `WP1` | low | Unverified. Read-only |
+| Q | Security | Admin | `RQ1;` | `WQ00` user, `WQ01` admin | high | Unverified. Read-only |
+| R | Alt offset 1 | 361 | `RR1;` | `WR0` / `WR1`. Unused is the literal `WR0361`. | medium | Unverified. Read-only |
+| S | Alt offset 2 | 361 | `RS1;` | `WS0` / `WS1`, `WS0361` | medium | Unverified. Read-only |
+| T | Advanced options | 0 | `RT1;` | `WT0` or `WT1` plus the bitfield. Bits below. | medium | Unverified. Read-only |
+| U | Overtravel | 90 | `RU1;` | `WU0` / `WU1`. The utility rejects a value above 180. | medium | Unverified. Read-only |
+| V | Counter-rotate delay | 10 | `RV1;` | `WV0` / `WV1` | low | Unverified. Read-only |
+| W | Screen saver minutes. The 2014 manual calls W reserved. | | `RW1;` | `WW00` is Off. Other values use `WW0` + minutes. | low | Unverified. Read-only |
+| X | Limit switch position. The 2014 manual says read-only. The utility writes it. | | `RX1;` | `WX0` + value, must be 45 or below | medium | Unverified. Read-only |
+| Y | Knob time | 40 | `RY1;` | `WY0` / `RY1` | low | Unverified. Read-only |
+| Z | Multiplier. The 2014 manual says Z is unused. | | `RZ1;` | `WZ0` / `WZ1` | medium | Unverified. Read-only |
+| `[` | Magnetic variation, degrees, −60 to +60. Added in utility 4.B12 for firmware 4.d14. | | `R[1;` | `W[0` + value | medium | Unverified. Read-only |
 
-`T` bits, same page: 1 freeze display, 2 fast brake release, 4 auto go-back, 8 elevation, 16 auto dim, 32 analog heading out, 64 EME, 128 point-and-shoot, 256 port is 9600, 512 2-bit encoder, 1024 demo, 2048 allow cal to the CCW limit.
+Rotor type codes, from the click handler of each radio button in 4.B12 (`rdoOptionPot_MouseClick` loads 0, and so on):
+
+| Code | Utility label | `.ghr` name |
+| --- | --- | --- |
+| 0 | Pot | pot |
+| 1 | Counter | counter |
+| 2 | Ham-x | ham |
+| 3 | T2X | t2x |
+| 4 | TIC-PST | ticpst |
+| 5 | Orion | orion |
+| 6 | Spid | spid |
+| 7 | Yaesu G-800/1000 | Yaesu |
+| 8 | Yaesu G-5400 | YaesuAC360 |
+| 9 | Yaesu G-5500 | YaesuAC450 |
+| 10 | Yaesu G-2800 | (no name in the restore strings) |
+| 11 | DX Engineering | (no name in the restore strings) |
+| 12 | Sub-Lunar | SubLunar |
+
+Mode codes, from `rdoNormal_Click` and the matching handlers: 0 Normal `WM00`, 1 Master/slave `WM01`, 2 Master counter-rotate `WM02`, 3 Slave counter-rotate `WM03`, 4 Offset `WM04`, 5 Debug `WM05`. Debug is only offered after an Az/El version check.
+
+Security: 0 User `WQ00`, 1 Admin `WQ01`.
+
+`T` bits, Appendix F: 1 freeze display, 2 fast brake release, 4 auto go-back, 8 elevation, 16 auto dim, 32 analog heading out, 64 EME, 128 point-and-shoot, 256 port is 9600, 512 2-bit encoder, 1024 demo, 2048 allow cal to the CCW limit. The utility writes the whole field with `WT0` on each checkbox, including `cboPort9600` and `cboSerialSensor`. The bit number for "Use Serial Sensor" (4.B12, firmware 4.14) was not separated from the other bits in the IL. It is not shown as its own checkbox here.
 
 Other controller actions:
 
 | Action | Command | Risk | Status |
 | --- | --- | --- | --- |
-| Version | `R11;` | low | done (read) |
-| Pot A/D | `R01;` | low | done (read) |
-| Last abnormal reset | `R41;` | low | done (read) |
-| Calibrate CCW here | `C01;` | high | read-only |
-| Calibrate CW here | `C11;` | high | read-only |
-| Set pulse heading | `AW1` + `xxx.y` + `;` | high | read-only |
-| Backup to a JSON file | none on the wire | low | done |
-| Factory reset | `W00;` | high | excluded |
-| Bootloader | `B2n;` / `BUn;` | high | excluded |
-| CPU reset | `R3n;` | high | excluded |
+| Version | `R11;` | low | Verified as a command we send. The reply text is Unverified on Andrew's unit. |
+| Pot A/D | `R01;` | low | Unverified reply |
+| Last abnormal reset | `R41;` then the controller clears it | low | Unverified reply |
+| Heading, tenths | `BI1;` reply `NNN.N;` | low | Verified, 14 Nov 2026 |
+| Status prefix | `01 30 xx 3E` then the heading. `xx` 0 stopped, 1 moving | low | Verified on that session. Not requested by `R21;`. |
+| Calibrate CCW here | `C01;` | high | Unverified. Not sent |
+| Calibrate CW here | `C11;` | high | Unverified. Not sent |
+| Set pulse heading | `AW1` + `xxx.y` | high | Unverified. Not sent |
+| Point and shoot | `AP1` + heading + CR + `;` | low | Sent by the controller page, not by setup |
+| Vanity boot line | `W88` then text, max 14 characters, and `W00` appears in the same method | high | Excluded |
+| Factory reset | `W00;` | high | Excluded |
+| Backup to a file | no bytes on the wire | low | Done. JSON from the controller page, and `backups/meridian-setup-*.txt` for the whole read |
+| Orion auto-cal | a script of `WG04`, `AW1`, `AP1`, `WG010` | high | Not implemented |
+
+The PC baud box (`cboBaud`, 4800 or 9600) has no rotor command in its handler. It only changes the port this computer opens. The rotor's own speed is the 9600 bit above.
+
+## Ports
+
+One byte stream, three sockets:
+
+| Port | What it is | Baud / framing | Status |
+| --- | --- | --- | --- |
+| RS-232 | The DB-9. DCU-1 superset, 8N1. | 4800 unless the 9600 bit is set | Baud default is the manual. Unverified as a read-back of the bit. |
+| USB | FTDI on older units. CP210x from November 2022 (the port enumerates even when the rotor is off). Same bytes as RS-232. | Same baud bit | Driver note is the addendum. |
+| Serial TCP | The module register `NVREG16_0`. Programs such as GH Everyware and PST Rotator. | `AT*Serial_Start=0x01` and `AT*Serial_End=0x3B` on the utility's reset. The 14 Nov session showed frames that start with `0x01` and end with `;`. | The start/end bytes are Unverified as the cause of that framing. The port number is Unverified on a live module. The utility's reset writes `6555`. |
 
 ## Network module
 
-**todo**, and the priority inside setup parity. The Green Heron utility often crashes while editing the module's own Ethernet and Wi-Fi settings. Those settings are not EEPROM letters. They belong to the LAN module (IP address, DHCP, TCP port, Wi-Fi SSID, passphrase) and are reached through the module passthrough (`ATn;`, `T0n;`, `T1n;`), which Meridian does not send today.
+These are not EEPROM letters. They are AT commands to the add-in module, reached only after `T11;` and `AT;`.
 
-Design when that page is built:
+There is no DNS command in the manual or in the utility. There is no AP/client mode command. The only related write is `AT*WiFi_Def_Adhoc=`, and it appears only inside "RESET to DEFAULTS", which Meridian does not send. The 2019 manual's "UDP and Serial are for future use" is out of date: 4.B12 reads and writes both, and the addendum describes the serial TCP port.
 
-- It works over serial, USB, or IP. The same forms are used on every transport.
-- Prefer serial or USB for a network change. Say so on the page, in one sentence.
-- If the session is IP and the user changes the address, DHCP, or port, warn before the write that this connection will drop, show the new address to reconnect to, and offer to reconnect there automatically after the write.
-- Back up the current network values before any write.
-- Do not store the passphrase in the traffic log.
-- Rate-limit and confirm. No scan and no write runs by itself.
+| What you see | Read | Reply token | Write | Risk | Status |
+| --- | --- | --- | --- | --- | --- |
+| Module type | `AT*HWTYPE?` | `HWTYPE=` | none | low | Unverified. The utility accepts only `HWTYPE=2`. |
+| DHCP or static | `AT*DHCP?` | `DHCP=` | `AT*DHCP=0` when the DHCP radio is selected. `AT*DHCP=1` when Static IP is selected. The reset button sends `AT*DHCP=1` together with a static address. | high, drops an IP link | Unverified. The polarity is the opposite of the usual "1 means DHCP". |
+| Current IP | `AT*IP?` | `IP=` | none (it follows DHCP) | low | Unverified |
+| Static IP | `AT*AIP?` | `AIP=` | `AT*AIP=` + address. The reset writes `192.168.2.100`. | high, drops the link | Unverified |
+| Current mask | `AT*NMASK?` | `NMASK=` | none | low | Unverified |
+| Static mask | `AT*ANMASK?` | `ANMASK=` | `AT*ANMASK=` + mask. The form's placeholder is `255.255.255.0`. | high | Unverified |
+| Current gateway | `AT*GW?` | `GW=` | none | low | Unverified |
+| Static gateway | `AT*AGW?` | `AGW=` | `AT*AGW=` + gateway. The reset writes `192.168.2.1`. | high | Unverified |
+| DNS | none | | none | | Not in the utility or the addendum |
+| Rotator name | `AT*ID?` | `ID=` | `AT*ID=` + name. The reset writes `RT-21`. | low | Unverified |
+| HTTP port | `AT*HTTP?` | `HTTP=` | `AT*HTTP=` + port. Port 80 means the browser URL has no port. | medium | Unverified |
+| UDP port | `AT*UDP?` | `UDP=` | `AT*UDP=` + port | medium | Unverified |
+| TFTP port | `AT*TFTP?` | `TFTP=` | The read is real. The write handler `txtPortTFTP_Validated` sends `AT*HTTP=` again. That is a bug in 4.B12. | medium | Read Unverified. Write excluded so we do not copy the bug. |
+| Serial TCP port | `AT*NVREG16_0?` | `NVREG16_0=` | `AT*NVREG16_0=` + port. The reset writes `6555`. | high, drops the link | Unverified. 6555 is the utility's reset value, not a number printed in the addendum. |
+| Wi-Fi security | `AT*WIFI_SECURITY?` | `SECURITY=` | `6` WPA2-PSK, `4` WPA-PSK, `8` WPA Auto, `0` None. Same order as the combo box and `SetSecurityType`. | high, can fail to join | Unverified. The index-to-code mapping is the order of the four strings in that method. |
+| SSID | `AT*WIFI_ASSID?` | `ASSID=` | `AT*WIFI_ASSID=` + name. The reset writes `NETGEAR24`. | high | Unverified |
+| Passphrase | `AT*WIFI_KEY?` | `KEY=` | `AT*WIFI_KEY=` + phrase. The utility requires 8 characters. The reset writes a known phrase. Not logged. | high | Unverified |
+| AP or client | none | | `AT*WiFi_Def_Adhoc=` only inside the excluded reset | high | Not a user setting |
+| Web user | `AT*HTTP_USER?` | `USER=` | not sent by Meridian. The 2019 manual says login was not implemented yet. 4.B12 still has the fields. | medium | Unverified |
+| Web password | `AT*HTTP_PASS?` | `PASS=` | not sent. Not logged. | medium | Unverified |
+| Link | `AT*LINK?` | `LINK=1` is "Link OK" | none | low | Unverified |
+| Serial framing | not polled | | `AT*Serial_Start=0x01`, `AT*Serial_End=0x3B` on reset only | high | Unverified |
+| Module reboot | | | `AT*RESET=1` | high, drops the link | Excluded |
+| Named presets on the module | not polled | | `AT*NVREG16_12` through `AT*NVREG16_32` step 2, and `AT*NVSTRING100` then every 13 bytes through `AT*NVSTRING243` | medium | Unverified. Not shown. The web page's presets, not the rotor EEPROM. |
+| Beamwidth / region | not polled | | Reset writes `AT*NVREG16_10=36`, `AT*NVREG8_255=42`, and `AT*NVSTRING100=Europe`, which overwrites the first preset name. | medium | Unverified. Not shown. |
 
-`docs/RT21_PROTOCOL.md` remains the byte-level note. This file is the product map.
+## Where Meridian stands
+
+| Area | Now |
+| --- | --- |
+| Find RT-21, USB first, then a short port list | Done |
+| Controller read, including magnetic variation | Done, read-only |
+| Ports page: controller speed, this computer's saved connection, local serial ports, module TCP port | Done, read-only |
+| Network page | Done, read-only, over serial, USB, or IP |
+| Guide: free TCP port, a static address outside .100–.199, drop-link warning, prefer USB | Done. Suggestions are not copied into the connection fields. |
+| Plain-text copy in `backups/` | Done, and it runs before any future write |
+| Write, read back, compare | Implemented behind the read-only switch. Not in this build. |
+| Factory reset, bootloader, module reset, TFTP write, vanity line | Excluded |
+
+`docs/RT21_PROTOCOL.md` is the motion-protocol note. This file is the setup map.

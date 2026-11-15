@@ -7,8 +7,10 @@
 #include "SettingsDialog.h"
 
 #include "AboutDialog.h"
+#include "SetupPanel.h"
 #include "core/Coordinates.h"
 #include "rotor/Rt21Driver.h"
+#include "rotor/Rt21Setup.h"
 #include "rotor/TrafficLog.h"
 #include "rotor/UserFiles.h"
 
@@ -78,9 +80,9 @@ const FieldDef kFields[] = {
     {'R', "Alt offset 1", "361 means unused. Manual default 361.", true, 0, 999},
     {'S', "Alt offset 2", "Manual default 361.", true, 0, 999},
     {'T', "Advanced options", "Bitfield from Appendix F. The boxes below edit the documented bits.", true, 0, 65535},
-    {'J', "Option", "Rotor type. The manual does not document the numeric codes, so this is not written.", false, 0, 0},
-    {'M', "Mode", "Not written. The manual lists the words, not the codes.", false, 0, 0},
-    {'Q', "Security", "Not written.", false, 0, 0},
+    {'J', "Option", "Rotor type. The utility's codes are 0 pot through 12 sub-lunar. Not written until checked on your rotor.", false, 0, 0},
+    {'M', "Mode", "0 normal, 1 master/slave, 2 master counter-rotate, 3 slave counter-rotate, 4 offset, 5 debug.", false, 0, 0},
+    {'Q', "Security", "0 user, 1 admin, from the utility. Not written yet.", false, 0, 0},
     {'X', "Limit switch", "Read from the controller. Not written from here.", false, 0, 0},
 };
 
@@ -105,10 +107,23 @@ SettingsDialog::SettingsDialog(const AppConfig &config, const ZipDatabase *zipDb
 
     auto *layout = new QVBoxLayout(this);
     tabs = new QTabWidget;
+    setupTabs = new QTabWidget;
+    setupTabs->setObjectName(QStringLiteral("setupTabs"));
+    setupTabs->setDocumentMode(true);
     layout->addWidget(tabs, 1);
     buildStation();
     buildRotors();
     buildController();
+    setupPanel = new SetupPanel(this);
+    setupTabs->addTab(setupPanel->portsPage(), QStringLiteral("Ports"));
+    setupTabs->addTab(setupPanel->networkPage(), QStringLiteral("Network"));
+    tabs->addTab(setupTabs, QStringLiteral("Setup"));
+    connect(setupPanel, &SetupPanel::statusMessage, this, [this](const QString &text) { setStatus(text); });
+    connect(setupPanel, &SetupPanel::exportRequested, this, [this]() { exportSetup(); });
+    statusLabel = new QLabel;
+    statusLabel->setObjectName(QStringLiteral("setupStatus"));
+    statusLabel->setWordWrap(true);
+    layout->addWidget(statusLabel);
 
     auto *about = new QPushButton(QStringLiteral("About Meridian"));
     about->setFlat(true);
@@ -137,14 +152,31 @@ void SettingsDialog::setDriver(Rt21Driver *next)
         disconnect(driver, nullptr, this, nullptr);
     driver = next;
     driverWired = true;
+    if (setupPanel)
+        setupPanel->setDriver(driver);
     if (!driver)
         return;
     connect(driver, &Rt21Driver::configField, this,
                 [this](QChar id, const QString &raw, bool numeric, int value) {
+                    eeRaw.insert(QString(id), raw);
+                    QString shown = raw;
+                    if (numeric && id == QLatin1Char('J'))
+                        shown = QStringLiteral("%1 — %2").arg(value).arg(Rt21::rotorTypeName(value));
+                    else if (numeric && id == QLatin1Char('M'))
+                        shown = QStringLiteral("%1 — %2").arg(value).arg(Rt21::modeName(value));
+                    else if (numeric && id == QLatin1Char('Q'))
+                        shown = QStringLiteral("%1 — %2").arg(value).arg(Rt21::securityName(value));
+                    else if (numeric && id == QLatin1Char('W') && screenSaver)
+                        screenSaver->setText(value == 0 ? QStringLiteral("Screen saver: off")
+                                                        : QStringLiteral("Screen saver: %1 min").arg(value));
+                    else if (numeric && id == QLatin1Char('Z') && multiplier)
+                        multiplier->setText(QStringLiteral("Multiplier: %1").arg(value));
+                    else if (id == QLatin1Char('[') && magnetic)
+                        magnetic->setText(QStringLiteral("Magnetic variation: %1").arg(raw));
                     for (FieldRow &field : fields) {
                         if (field.id != id)
                             continue;
-                        field.raw->setText(raw);
+                        field.raw->setText(shown);
                         field.numeric = numeric;
                         if (numeric && field.spin) {
 #if MERIDIAN_ALPHA_READONLY
@@ -177,14 +209,40 @@ void SettingsDialog::setDriver(Rt21Driver *next)
                 versionLabel->setText(current + QStringLiteral("   ·   ") + text);
         });
         connect(driver, &Rt21Driver::configFinished, this, [this](bool ok, const QString &message) {
-            if (!ok && !message.isEmpty() && !message.contains(QStringLiteral("Connect")))
-                QMessageBox::warning(this, QStringLiteral("Read setup"), message);
+            if (!ok && !message.isEmpty())
+                setStatus(message);
+            else if (ok)
+                setStatus(QStringLiteral("Controller settings read. Nothing was written."));
         });
         connect(driver, &Rt21Driver::writeFinished, this, [this](bool ok, const QString &message) {
-            QMessageBox::information(this, QStringLiteral("Apply"), message);
+            const QString fallback = ok ? QStringLiteral("Read back the same value.")
+                                         : QStringLiteral("The write did not stick.");
+            setStatus(message.isEmpty() ? fallback : message);
             if (ok && driver)
                 driver->readConfiguration();
         });
+}
+
+void SettingsDialog::setStatus(const QString &text)
+{
+    if (statusLabel)
+        statusLabel->setText(text);
+    if (driver && !text.isEmpty())
+        driver->postNote(text);
+}
+
+void SettingsDialog::exportSetup()
+{
+    QMap<QString, QString> controller = eeRaw;
+    if (versionLabel)
+        controller.insert(QStringLiteral("version"), versionLabel->text());
+    QString error;
+    const QMap<QString, QString> network = setupPanel ? setupPanel->networkValues() : QMap<QString, QString>();
+    const QString path = Rt21::saveSetupBackup(controller, network, &error);
+    if (path.isEmpty())
+        setStatus(error.isEmpty() ? QStringLiteral("Couldn't write the setup copy.") : error);
+    else
+        setStatus(QStringLiteral("Saved a copy at %1").arg(path));
 }
 
 void SettingsDialog::closeEvent(QCloseEvent *event)
@@ -478,6 +536,8 @@ void SettingsDialog::loadRotor(int index)
         portCombo->addItem(rotor.serialPort);
     portCombo->setCurrentText(rotor.serialPort);
     baudCombo->setCurrentText(QString::number(rotor.baud == 9600 ? 9600 : 4800));
+    if (setupPanel)
+        setupPanel->setEndpoint(rotor);
     styleFindButton();
 }
 
@@ -744,6 +804,13 @@ void SettingsDialog::buildController()
         fields.append(row);
     }
 
+    screenSaver = new QLabel(QStringLiteral("Screen saver: not read yet."));
+    multiplier = new QLabel(QStringLiteral("Multiplier: not read yet."));
+    magnetic = new QLabel(QStringLiteral("Magnetic variation: not read yet."));
+    auto *extra = new QLabel(QStringLiteral(
+        "Screen saver and the multiplier are utility fields on W and Z. Magnetic variation is R[1 / W[0 in utility 4.B12, range −60 to +60. None of these are written yet."));
+    extra->setWordWrap(true);
+
     auto *bitHost = new QWidget;
     auto *bitForm = new QFormLayout(bitHost);
     for (int bit = 0; bit < 12; ++bit) {
@@ -770,6 +837,10 @@ void SettingsDialog::buildController()
     auto *scrollBody = new QWidget;
     auto *scrollLayout = new QVBoxLayout(scrollBody);
     scrollLayout->addWidget(formHost);
+    scrollLayout->addWidget(screenSaver);
+    scrollLayout->addWidget(multiplier);
+    scrollLayout->addWidget(magnetic);
+    scrollLayout->addWidget(extra);
     scrollLayout->addWidget(bitHost);
     scrollLayout->addStretch();
     scroll->setWidget(scrollBody);
@@ -800,7 +871,7 @@ void SettingsDialog::buildController()
 #endif
     layout->addWidget(scroll, 1);
     layout->addLayout(calRow);
-    tabs->addTab(page, QStringLiteral("Controller"));
+    setupTabs->addTab(page, QStringLiteral("Controller"));
 
     connect(read, &QPushButton::clicked, this, [this]() {
         if (!driver)
@@ -818,9 +889,9 @@ void SettingsDialog::buildController()
                                                .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss"))));
         const QString error = backupConfig(path);
         if (!error.isEmpty())
-            QMessageBox::warning(this, QStringLiteral("Backup"), error);
+            setStatus(error);
         else
-            versionLabel->setText(QStringLiteral("Backup saved: %1").arg(path));
+            setStatus(QStringLiteral("Backup saved: %1").arg(path));
     });
     connect(apply, &QPushButton::clicked, this, [this]() {
         if (!driver)

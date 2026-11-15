@@ -219,9 +219,14 @@ std::optional<int> parseIntegerPayload(const QByteArray &frame)
 void Framer::append(const QByteArray &bytes)
 {
     for (unsigned char c : bytes) {
-        if (c == '\n')
-            continue;
-        if (c == '\r') {
+        if (c == '\n' || c == '\r') {
+            if (lineMode && !buffer.isEmpty()) {
+                frames.append(buffer);
+                buffer.clear();
+                continue;
+            }
+            if (c == '\n')
+                continue;
             // "100.0\r;" still terminates on the semicolon. A bare CR after a
             // heading is also accepted so a short reply is not stuck.
             if (parseHeading(buffer)) {
@@ -265,6 +270,7 @@ void Framer::clear()
 {
     buffer.clear();
     frames.clear();
+    lineMode = false;
 }
 
 } // namespace Rt21
