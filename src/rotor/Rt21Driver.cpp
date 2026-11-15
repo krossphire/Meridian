@@ -167,7 +167,11 @@ Rt21Driver::Rt21Driver(QObject *parent)
         if (!lastQueryWasAi)
             useAiNext = true;
         if (failures >= 3) {
-            failLink(QStringLiteral("No reply from the RT-21."));
+            const QString message = endpoint.transport == RotorEndpoint::Transport::Serial
+                                        ? QStringLiteral("%1 open, no reply from RT-21 — check port/baud or run Find")
+                                              .arg(endpoint.serialPort)
+                                        : QStringLiteral("No reply from the RT-21.");
+            failLink(message);
             return;
         }
         if (awaitPrePoll) {

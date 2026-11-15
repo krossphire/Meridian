@@ -40,6 +40,14 @@ QList<int> networkCandidatePorts(const QList<int> &extra = {});
 // 4800, then 9600, then 19200.
 QList<int> serialProbeBauds();
 
+struct SerialPortChoice {
+    QString port;
+    QString label;
+};
+
+// COM1, COM2, … COM10, COM110. A saved port that is not present is appended as "COM6 (missing)".
+QList<SerialPortChoice> arrangeSerialPorts(QList<SerialPortChoice> present, const QString &saved);
+
 class Rt21Finder
 {
 public:

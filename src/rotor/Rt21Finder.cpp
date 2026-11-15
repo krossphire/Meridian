@@ -174,6 +174,61 @@ QList<int> serialProbeBauds()
     return {4800, 9600, 19200};
 }
 
+namespace {
+
+int portOrdinal(const QString &name)
+{
+    QRegularExpression digits(QStringLiteral("(\\d+)"));
+    auto match = digits.globalMatch(name);
+    int value = -1;
+    while (match.hasNext())
+        value = match.next().captured(1).toInt();
+    return value;
+}
+
+bool portLess(const QString &a, const QString &b)
+{
+    const int left = portOrdinal(a);
+    const int right = portOrdinal(b);
+    if (left >= 0 && right >= 0 && left != right)
+        return left < right;
+    return a.compare(b, Qt::CaseInsensitive) < 0;
+}
+
+} // namespace
+
+QList<SerialPortChoice> arrangeSerialPorts(QList<SerialPortChoice> present, const QString &saved)
+{
+    std::sort(present.begin(), present.end(), [](const SerialPortChoice &a, const SerialPortChoice &b) {
+        return portLess(a.port, b.port);
+    });
+    QList<SerialPortChoice> unique;
+    for (const SerialPortChoice &choice : present) {
+        bool duplicate = false;
+        for (const SerialPortChoice &kept : unique) {
+            if (kept.port.compare(choice.port, Qt::CaseInsensitive) == 0) {
+                duplicate = true;
+                break;
+            }
+        }
+        if (!duplicate)
+            unique.append(choice);
+    }
+    const QString wanted = saved.trimmed();
+    if (!wanted.isEmpty()) {
+        bool found = false;
+        for (const SerialPortChoice &choice : unique) {
+            if (choice.port.compare(wanted, Qt::CaseInsensitive) == 0) {
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+            unique.append(SerialPortChoice{wanted, wanted + QStringLiteral(" (missing)")});
+    }
+    return unique;
+}
+
 QList<FoundRotor> Rt21Finder::scanSerialPorts(int timeoutMs, const std::function<void(const FoundRotor &)> &onFound)
 {
     QList<FoundRotor> found;

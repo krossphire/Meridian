@@ -25,6 +25,7 @@ private slots:
     void mockNetworkRead();
     void screenSaverIsOnlyInTheDisplayGroup();
     void firmwareGate();
+    void serialPortsStayOnTheSavedName();
 };
 
 void TestSetup::commandsMatchTheUtility()
@@ -216,6 +217,29 @@ void TestSetup::firmwareGate()
                 .isEmpty());
     QCOMPARE(serialProbeBauds().first(), 4800);
     QVERIFY(serialProbeBauds().contains(19200));
+}
+
+void TestSetup::serialPortsStayOnTheSavedName()
+{
+    const QList<SerialPortChoice> messy = {
+        {QStringLiteral("COM10"), QStringLiteral("COM10")},
+        {QStringLiteral("COM2"), QStringLiteral("COM2")},
+        {QStringLiteral("COM1"), QStringLiteral("COM1 — Edgeport")},
+        {QStringLiteral("COM109"), QStringLiteral("COM109")},
+        {QStringLiteral("COM6"), QStringLiteral("COM6 — Edgeport")},
+        {QStringLiteral("COM9"), QStringLiteral("COM9")},
+        {QStringLiteral("COM110"), QStringLiteral("COM110")},
+    };
+    const QList<SerialPortChoice> arranged = arrangeSerialPorts(messy, QStringLiteral("COM6"));
+    QStringList names;
+    for (const SerialPortChoice &choice : arranged)
+        names.append(choice.port);
+    QCOMPARE(names, QStringList({QStringLiteral("COM1"), QStringLiteral("COM2"), QStringLiteral("COM6"),
+                                 QStringLiteral("COM9"), QStringLiteral("COM10"), QStringLiteral("COM109"),
+                                 QStringLiteral("COM110")}));
+    const QList<SerialPortChoice> missing = arrangeSerialPorts(messy, QStringLiteral("COM4"));
+    QCOMPARE(missing.last().port, QStringLiteral("COM4"));
+    QVERIFY(missing.last().label.contains(QStringLiteral("(missing)")));
 }
 
 QTEST_MAIN(TestSetup)

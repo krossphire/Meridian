@@ -27,7 +27,7 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
     , config(std::move(initial))
     , settings(store)
 {
-    setWindowTitle(QStringLiteral("Meridian 0.1.0-alpha10"));
+    setWindowTitle(QStringLiteral("Meridian 0.1.0-alpha11"));
     TrafficLog::instance().setEnabled(config.trafficLog);
     globe = new GlobeWidget;
     setCentralWidget(globe);
@@ -145,7 +145,9 @@ void MainWindow::refreshStatus()
         const auto state = link->link();
         if (state == Rt21Driver::Link::Failed || state == Rt21Driver::Link::Off
             || state == Rt21Driver::Link::Connecting) {
-            if (link->lastSeenMs() >= 0) {
+            if (state == Rt21Driver::Link::Failed && link->lastSeenMs() < 0 && !link->detail().isEmpty()) {
+                line = link->detail();
+            } else if (link->lastSeenMs() >= 0) {
                 const qint64 secs = std::max<qint64>(0, (QDateTime::currentMSecsSinceEpoch() - link->lastSeenMs()) / 1000);
                 line = lastSeenPhrase(secs);
             } else if (state == Rt21Driver::Link::Connecting) {

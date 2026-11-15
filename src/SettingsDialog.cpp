@@ -621,9 +621,7 @@ void SettingsDialog::loadRotor(int index)
     transport->setCurrentIndex(transportIndex);
     hostEdit->setText(rotor.host);
     portSpin->setValue(rotor.tcpPort);
-    if (!rotor.serialPort.isEmpty() && portCombo->findText(rotor.serialPort) < 0)
-        portCombo->addItem(rotor.serialPort);
-    portCombo->setCurrentText(rotor.serialPort);
+    showSerialPort(rotor.serialPort);
     baudCombo->setCurrentText(QString::number(rotor.baud == 9600 ? 9600 : 4800));
     if (setupPanel)
         setupPanel->setEndpoint(rotor);
@@ -804,26 +802,47 @@ void SettingsDialog::storeRotor(int index)
     draft.active = rotorList->currentRow() >= 0 ? rotorList->currentRow() : index;
 }
 
+void SettingsDialog::showSerialPort(const QString &port)
+{
+    haveSerialHold = true;
+    serialHold = port;
+    refreshPorts();
+}
+
 void SettingsDialog::refreshPorts()
 {
-    const QString selected = portCombo->currentText();
-    portCombo->blockSignals(true);
-    portCombo->clear();
-    portCombo->addItem(QString());
+    QString saved;
+    if (haveSerialHold) {
+        saved = serialHold.trimmed();
+        haveSerialHold = false;
+    } else if (portCombo) {
+        saved = portCombo->currentData().toString().trimmed();
+        if (saved.isEmpty()) {
+            saved = portCombo->currentText().section(QStringLiteral(" — "), 0, 0);
+            saved = saved.section(QStringLiteral(" ("), 0, 0).trimmed();
+        }
+    }
+    QList<SerialPortChoice> present;
     const auto ports = QSerialPortInfo::availablePorts();
     for (const QSerialPortInfo &info : ports) {
         const QString label = info.description().isEmpty()
                                   ? info.portName()
                                   : QStringLiteral("%1 — %2").arg(info.portName(), info.description());
-        portCombo->addItem(label, info.portName());
+        present.append(SerialPortChoice{info.portName(), label});
     }
-    int match = portCombo->findData(selected);
-    if (match < 0)
-        match = portCombo->findText(selected);
+    const QList<SerialPortChoice> arranged = arrangeSerialPorts(present, saved);
+    portCombo->blockSignals(true);
+    portCombo->clear();
+    portCombo->addItem(QString());
+    for (const SerialPortChoice &choice : arranged)
+        portCombo->addItem(choice.label, choice.port);
+    int match = -1;
+    for (int i = 0; i < portCombo->count(); ++i) {
+        if (!saved.isEmpty() && portCombo->itemData(i).toString().compare(saved, Qt::CaseInsensitive) == 0)
+            match = i;
+    }
     if (match >= 0)
         portCombo->setCurrentIndex(match);
-    else if (!selected.isEmpty())
-        portCombo->setCurrentText(selected);
     portCombo->blockSignals(false);
 }
 

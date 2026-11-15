@@ -62,6 +62,7 @@ private:
     void loadRotor(int index);
     void storeRotor(int index);
     void refreshPorts();
+    void showSerialPort(const QString &port);
     void refreshUsbHints();
     void renderUsbHints(const QList<UsbHint> &hints);
     void startFind(bool network);
@@ -123,6 +124,8 @@ private:
     bool fillingBits = false;
     bool driverWired = false;
     bool committing = false;
+    bool haveSerialHold = false;
+    QString serialHold;
 
 protected:
     void closeEvent(QCloseEvent *event) override;
