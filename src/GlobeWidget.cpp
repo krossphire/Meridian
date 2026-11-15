@@ -9,6 +9,7 @@
 #include "core/Bearing.h"
 #include "core/Projection.h"
 #include "core/Solar.h"
+#include "map/DayNight.h"
 
 #include <QAbstractButton>
 #include <QComboBox>
@@ -694,73 +695,14 @@ void GlobeWidget::ensureSun()
     sunDirty = false;
     sunMinute = minute;
     sunSize = size();
-    const double utcMinutes = utc.time().hour() * 60.0 + utc.time().minute() + utc.time().second() / 60.0;
-    sunNow = solarAt(homeLat_, homeLon_, utc);
+    const QDateTime when = utc.toUTC();
+    const double minutes = when.time().hour() * 60.0 + when.time().minute() + when.time().second() / 60.0;
+    sunNow = solarAt(homeLat_, homeLon_, when);
     if (detailLevel() < 1) {
         sunOverlay = QImage();
         return;
     }
-
-    // Night keeps the map as it is. Twilight is a faint band. Day is a little
-    // more opaque than that band. Tunable, and soft enough to scale.
-    constexpr double kNight = -6.0;
-    constexpr double kDay = 6.0;
-    constexpr int kTwilightAlpha = 28;
-    constexpr int kDayAlpha = 46;
-
-    const int sidePx = std::min(width(), height());
-    const qreal dpr = activeDpr();
-    const int limit = 720;
-    const qreal drawScale = std::min(1.0, limit / std::max(1.0, sidePx * dpr));
-    const int iw = std::max(1, qRound(width() * dpr * drawScale));
-    const int ih = std::max(1, qRound(height() * dpr * drawScale));
-    QImage overlay(iw, ih, QImage::Format_ARGB32_Premultiplied);
-    overlay.fill(Qt::transparent);
-    const qreal side = std::max(2.0, qreal(std::min(width(), height())) - 2.0);
-    const qreal radius = side / 2.0;
-    const qreal cx = width() / 2.0;
-    const qreal cy = height() / 2.0;
-    const qreal sample = 1.0 / (dpr * drawScale);
-    for (int y = 0; y < ih; ++y) {
-        auto *row = reinterpret_cast<QRgb *>(overlay.scanLine(y));
-        const double ly = (y + 0.5) * sample;
-        for (int x = 0; x < iw; ++x) {
-            const double lx = (x + 0.5) * sample;
-            const double ux = (lx - cx) / radius;
-            const double uy = -(ly - cy) / radius;
-            if (ux * ux + uy * uy > 1.0)
-                continue;
-            double lat = 0;
-            double lon = 0;
-            if (!unprojectAzimuthal(homeLat_, homeLon_, ux, uy, lat, lon))
-                continue;
-            const double elevation = solarElevation(lat, lon, sunNow, utcMinutes);
-            if (elevation <= kNight)
-                continue;
-            int alpha = kDayAlpha;
-            int red = 196;
-            int green = 186;
-            int blue = 156;
-            if (elevation < 0.0) {
-                const double t = (elevation - kNight) / (0.0 - kNight);
-                alpha = int(kTwilightAlpha * t);
-                red = 158;
-                green = 166;
-                blue = 170;
-            } else if (elevation < kDay) {
-                const double t = elevation / kDay;
-                alpha = int(kTwilightAlpha + (kDayAlpha - kTwilightAlpha) * t);
-                red = int(158 + (196 - 158) * t);
-                green = int(166 + (186 - 166) * t);
-                blue = int(170 + (156 - 170) * t);
-            }
-            if (alpha <= 0)
-                continue;
-            row[x] = qPremultiply(qRgba(red, green, blue, alpha));
-        }
-    }
-    overlay.setDevicePixelRatio(std::max(qreal(1), dpr * drawScale));
-    sunOverlay = overlay;
+    sunOverlay = renderDayNightDisc(384, homeLat_, homeLon_, sunNow, minutes);
 }
 
 void GlobeWidget::paintScene(QPainter &painter)

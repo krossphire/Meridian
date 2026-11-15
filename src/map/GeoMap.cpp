@@ -111,10 +111,15 @@ P toP(const UnitPoint &u)
 
 bool breakSegment(const P &a, const P &b)
 {
-    const double d = std::hypot(a.x - b.x, a.y - b.y);
-    if (d > 0.72)
+    // 179.5° from the station is rho = 179.5/180. Past that, AE piles the
+    // antipode onto the rim and a straight join becomes a concentric arc.
+    constexpr double kRim = 179.5 / 180.0;
+    if (a.rho > kRim || b.rho > kRim)
         return true;
-    if (a.rho > 0.93 && b.rho > 0.93 && d > 0.28)
+    const double d = std::hypot(a.x - b.x, a.y - b.y);
+    if (d > 0.45)
+        return true;
+    if (a.rho > 0.90 && b.rho > 0.90 && d > 0.08)
         return true;
     return false;
 }

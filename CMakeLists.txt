@@ -21,6 +21,7 @@ add_library(meridian-core STATIC
     src/core/Coordinates.cpp
     src/core/Solar.cpp
     src/map/GeoMap.cpp
+    src/map/DayNight.cpp
     src/rotor/Rt21Protocol.cpp
     src/rotor/AppConfig.cpp
     src/rotor/Rt21Driver.cpp
