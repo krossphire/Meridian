@@ -7,6 +7,10 @@ Sources, both from Green Heron Engineering:
 
 The protocol is a superset of Hy-Gain DCU-1. Commands are ASCII, case-insensitive, and end with `;`. There is no inter-character timeout. A bare `;` also clears the receive buffer. Serial defaults are 4800 8N1 (9600 is an advanced-option bit and a SETUP Utility choice). USB and the LAN/Wi-Fi serial-TCP port carry the same byte stream. `n` below is a digit 0–9; Meridian always sends `1`.
 
+## USB chips
+
+Older RT-21s use an FTDI USB chip. Serial numbers 2000 and up use the standard FTDI driver, which current Windows already has through Windows Update. Serial numbers under 2000 need Green Heron's INF from the [software page](https://www.greenheronengineering.com/rotator-controllers-software/). Units shipped from November 2022 use a Silicon Labs CP210x instead, because FTDI parts were short. Andrew's unit is one of those. The CP210x driver is the [Silicon Labs VCP package](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers); Green Heron hosts a copy on the same software page. The port enumerates even when the rotor is off. Find RT-21 probes an FTDI COM port and a CP210x COM port the same way. A chip with no COM port is only a possible RT-21, and the hint names the driver that chip needs. An unknown device whose descriptor request failed (Windows problem code 43, often `VID_0000&PID_0002`) is not identified as an RT-21.
+
 Commands that return a value, other than `AI1;`, are documented to put SOH (`0x01`) ahead of the payload. Meridian accepts an optional SOH on every reply.
 
 ## Motion and heading

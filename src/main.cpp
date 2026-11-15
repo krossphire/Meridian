@@ -83,7 +83,8 @@ void installPalette(QApplication &app)
         "QTabBar::tab { background: transparent; color: #8ea099; padding: 8px 14px; }"
         "QTabBar::tab:selected { color: #f2f6f4; border-bottom: 2px solid #ffbf00; }"
         "QScrollArea { border: none; background: transparent; }"
-        "QLabel#hint, QLabel#detailLabel { color: #8ea099; }"
+        "QLabel#hint, QLabel#detailLabel, QLabel#usbHint { color: #8ea099; }"
+        "QLabel#usbHint a { color: #ffbf00; }"
         "QCheckBox { spacing: 8px; }"));
 }
 
@@ -96,7 +97,7 @@ int main(int argc, char *argv[])
     QApplication::setOrganizationName(QStringLiteral("K5PO"));
     QApplication::setOrganizationDomain(QStringLiteral("k5po.example"));
     QApplication::setApplicationName(QStringLiteral("Meridian"));
-    QApplication::setApplicationVersion(QStringLiteral("0.1.0-alpha8"));
+    QApplication::setApplicationVersion(QStringLiteral("0.1.0-alpha9"));
     QApplication::setWindowIcon(appIcon());
     installFonts();
     installPalette(app);

@@ -8,10 +8,12 @@
 
 #include "rotor/AppConfig.h"
 #include "rotor/Rt21Finder.h"
+#include "rotor/UsbHint.h"
 
 #include <QDialog>
 #include <QList>
 #include <QMap>
+#include <QSet>
 
 class QCloseEvent;
 class SetupPanel;
@@ -36,6 +38,7 @@ public:
     AppConfig config() const { return draft; }
     void showPage(int index);
     void presentFound(const FoundRotor &found);
+    void showUsbFacts(const QList<UsbDeviceFact> &devices);
 
 signals:
     void configSaved(const AppConfig &config);
@@ -58,6 +61,8 @@ private:
     void loadRotor(int index);
     void storeRotor(int index);
     void refreshPorts();
+    void refreshUsbHints();
+    void renderUsbHints(const QList<UsbHint> &hints);
     void startFind(bool network);
     void finishFind(const QList<FoundRotor> &found, bool network);
     void applyFound(const FoundRotor &found);
@@ -99,6 +104,10 @@ private:
     class QPushButton *findButton = nullptr;
     class QPushButton *networkButton = nullptr;
     QLabel *findNote = nullptr;
+    QLabel *usbHint = nullptr;
+    bool usbBaselineReady = false;
+    bool usbFactsLocked = false;
+    QSet<QString> usbSeen;
     class QVBoxLayout *findResults = nullptr;
     class QThread *findThread = nullptr;
     QStringList foundKeys;

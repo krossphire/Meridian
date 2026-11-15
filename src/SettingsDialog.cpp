@@ -480,6 +480,12 @@ void SettingsDialog::buildRotors()
     findNote = new QLabel;
     findNote->setObjectName(QStringLiteral("findNote"));
     findNote->setWordWrap(true);
+    usbHint = new QLabel;
+    usbHint->setObjectName(QStringLiteral("usbHint"));
+    usbHint->setWordWrap(true);
+    usbHint->setTextFormat(Qt::RichText);
+    usbHint->setOpenExternalLinks(true);
+    usbHint->setVisible(false);
     auto *resultsHost = new QWidget;
     findResults = new QVBoxLayout(resultsHost);
     findResults->setContentsMargins(0, 0, 0, 0);
@@ -498,6 +504,7 @@ void SettingsDialog::buildRotors()
     customRow->addWidget(customPortEdit);
     layout->addWidget(findButton);
     layout->addWidget(findNote);
+    layout->addWidget(usbHint);
     layout->addWidget(resultsHost);
     layout->addWidget(networkButton);
     layout->addLayout(customRow);
@@ -555,10 +562,49 @@ void SettingsDialog::buildRotors()
     connect(ports, &QTimer::timeout, this, [this]() {
         if (isVisible() && transport->currentIndex() == 2)
             refreshPorts();
+        if (isVisible())
+            refreshUsbHints();
     });
     ports->start();
     refreshPorts();
+    refreshUsbHints();
     setConfig(draft);
+}
+
+void SettingsDialog::renderUsbHints(const QList<UsbHint> &hints)
+{
+    if (!usbHint)
+        return;
+    if (hints.isEmpty()) {
+        usbHint->clear();
+        usbHint->setVisible(false);
+        return;
+    }
+    QStringList lines;
+    for (const UsbHint &hint : hints)
+        lines.append(hint.html);
+    usbHint->setText(lines.join(QStringLiteral("<br>")));
+    usbHint->setVisible(true);
+}
+
+void SettingsDialog::showUsbFacts(const QList<UsbDeviceFact> &devices)
+{
+    usbFactsLocked = true;
+    renderUsbHints(classifyUsbDevices(devices, QDateTime::currentDateTimeUtc(), true, {}));
+}
+
+void SettingsDialog::refreshUsbHints()
+{
+    if (usbFactsLocked || !usbHint)
+        return;
+    const QList<UsbDeviceFact> devices = enumeratePresentUsbDevices();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    renderUsbHints(classifyUsbDevices(devices, now, usbBaselineReady, usbSeen));
+    for (const UsbDeviceFact &device : devices) {
+        if (!device.instanceId.isEmpty())
+            usbSeen.insert(device.instanceId);
+    }
+    usbBaselineReady = true;
 }
 
 void SettingsDialog::loadRotor(int index)
@@ -646,6 +692,7 @@ void SettingsDialog::startFind(bool networkOnly)
         }
         foundKeys.clear();
         findNote->setText(QStringLiteral("Checking USB and COM ports…"));
+        refreshUsbHints();
     } else {
         findNote->setText(QStringLiteral("Checking the network…"));
     }

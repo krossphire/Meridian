@@ -8,6 +8,7 @@
 #include "MainWindow.h"
 #include "SettingsDialog.h"
 #include "rotor/Rt21Finder.h"
+#include "rotor/UsbHint.h"
 #include "rotor/UserFiles.h"
 #include "mock/Rt21Simulator.h"
 #include "rotor/Rt21Driver.h"
@@ -129,6 +130,24 @@ int runScreenshots(const QString &directory, qreal dpr)
     QApplication::processEvents();
     if (!setup->grab().save(directory + QStringLiteral("/find-rt21.png")))
         return 17;
+    UsbDeviceFact missing;
+    missing.vid = 0x10C4;
+    missing.pid = 0xEA60;
+    missing.instanceId = QStringLiteral("cp210x");
+    missing.name = QStringLiteral("CP2102 USB to UART Bridge");
+    missing.problemCode = 28;
+    missing.lastArrival = QDateTime::currentDateTimeUtc();
+    UsbDeviceFact failed;
+    failed.vid = 0x0000;
+    failed.pid = 0x0002;
+    failed.instanceId = QStringLiteral("descriptor");
+    failed.name = QStringLiteral("Unknown USB Device (Device Descriptor Request Failed)");
+    failed.problemCode = 43;
+    failed.lastArrival = QDateTime::currentDateTimeUtc();
+    setup->showUsbFacts({missing, failed});
+    QApplication::processEvents();
+    if (!setup->grab().save(directory + QStringLiteral("/find-usb.png")))
+        return 25;
     FoundRotor sample;
     sample.endpoint.transport = RotorEndpoint::Transport::Serial;
     sample.endpoint.serialPort = QStringLiteral("COM6");
