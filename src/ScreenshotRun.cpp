@@ -172,7 +172,9 @@ int runScreenshots(const QString &directory, qreal dpr)
     window.driver()->readConfiguration();
     const bool read = waitUntil([&]() {
         auto *label = dialog->findChild<QLabel *>(QStringLiteral("versionLabel"));
-        return label && label->text().contains(QStringLiteral("4.13"));
+        auto *callout = dialog->findChild<QLabel *>(QStringLiteral("displayCallout"));
+        return label && label->text().contains(QStringLiteral("4.14.g1")) && callout
+               && callout->text().contains(QStringLiteral("Screen saver is off"));
     }, 8000);
     QApplication::processEvents();
     if (!read || !dialog->grab().save(directory + QStringLiteral("/settings-controller.png")))

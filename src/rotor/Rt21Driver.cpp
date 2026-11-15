@@ -92,6 +92,7 @@ Rt21Driver::Rt21Driver(QObject *parent)
         const QChar id = inflight->id;
         const QString moduleKey = inflight->moduleKey;
         const bool moduleOptional = inflight->moduleOptional;
+        const QString note = inflight->note;
         inflight.reset();
         if (kind == Kind::Module) {
             if (!moduleOptional && !moduleKey.isEmpty())
@@ -118,7 +119,7 @@ Rt21Driver::Rt21Driver(QObject *parent)
             if (kind == Kind::Read)
                 emit configField(id, QStringLiteral("timeout"), false, 0);
             else
-                emit configNote(QStringLiteral("No reply"));
+                emit configNote(note + QStringLiteral("no reply"));
             if (configTimeouts >= 3) {
                 queue.clear();
                 configMode = false;
@@ -1010,6 +1011,11 @@ void Rt21Driver::applySetupGroup(const QString &group, const QMap<QString, QStri
     Q_UNUSED(backupPath);
     emit writeFinished(false, QStringLiteral("Writes are off in this alpha. Nothing was sent."));
 #else
+    if (!Rt21::firmwareWritesAllowed(fields.value(QStringLiteral("firmware")))) {
+        emit writeFinished(false, QStringLiteral(
+            "Writes stay off unless the rotor reports 4.14.g1, the only firmware this program has been tested with."));
+        return;
+    }
     if (!QFileInfo::exists(backupPath)) {
         emit writeFinished(false, QStringLiteral("Save a copy of the settings before writing."));
         return;

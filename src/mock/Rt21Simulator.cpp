@@ -212,33 +212,33 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
         reply(payload, true);
         return;
     }
+    auto echo = [&](char mark, const QByteArray &value) {
+        // Same shape as firmware 4.14.g1: <echo><SOH><value>;
+        QByteArray payload;
+        payload.append(mark);
+        payload.append(char(0x01));
+        payload.append(value);
+        reply(payload, false);
+    };
     if (cmd.startsWith("R1")) {
-        reply(QByteArray("RT-21 Version 4.13"), true);
+        echo('1', QByteArray("RT-21 4.14.g1"));
         return;
     }
     if (cmd.startsWith("R0")) {
-        reply(QString::asprintf("%04d", pot).toLatin1(), true);
+        echo('0', QByteArray("0334"));
         return;
     }
     if (cmd.startsWith("R4")) {
-        reply(QByteArray("12"), true);
+        echo('4', QByteArray("0"));
         return;
     }
     if (cmd.startsWith("R[")) {
-        reply(QByteArray("0"), true);
+        echo('[', QByteArray("0"));
         return;
     }
     if (cmd.size() >= 3 && cmd.at(0) == 'R' && cmd.at(1) >= 'A' && cmd.at(1) <= 'Z') {
         const QChar id(cmd.at(1));
-        if (id == QLatin1Char('J')) {
-            reply(QByteArray("Pot"), true);
-            return;
-        }
-        if (id == QLatin1Char('M')) {
-            reply(QByteArray("Normal"), true);
-            return;
-        }
-        reply(QByteArray::number(ee.value(id, 0)), true);
+        echo(cmd.at(1), QByteArray::number(ee.value(id, 0)));
         return;
     }
     if (cmd == "W00") {

@@ -91,7 +91,7 @@ The `.ghr` restore file uses these names: `ccwcal`, `cwcal`, `caloffset`, `rever
 | T | Advanced options | 0 | `RT1;` | `WT0` or `WT1` plus the bitfield. Bits below. | medium | Unverified. Read-only |
 | U | Overtravel | 90 | `RU1;` | `WU0` / `WU1`. The utility rejects a value above 180. | medium | Unverified. Read-only |
 | V | Counter-rotate delay | 10 | `RV1;` | `WV0` / `WV1` | low | Unverified. Read-only |
-| W | Screen saver minutes. The 2014 manual calls W reserved. | | `RW1;` | `WW00` is Off. Other values use `WW0` + minutes. | low | Unverified. Read-only |
+| W | Screen saver, minutes. Off, 1, 2, 5, 10, 20, 30, 40, 50, 60. The 2014 manual calls W reserved. 4.13 plus display firmware 1.3 blanks the panel. | Off | `RW1;` | Combo writes `WW00` for Off and `WW0` plus the minutes (`n = 0`, which reboots). 4.11 used `WW0` plus two spaces, which is the bug 4.B12 says it fixed. Meridian's future write is `n = 1` and only from the Display group. | low for the glass, high if a poll wakes it | Unverified on the glass. Read-only. See the protocol note. |
 | X | Limit switch position. The 2014 manual says read-only. The utility writes it. | | `RX1;` | `WX0` + value, must be 45 or below | medium | Unverified. Read-only |
 | Y | Knob time | 40 | `RY1;` | `WY0` / `RY1` | low | Unverified. Read-only |
 | Z | Multiplier. The 2014 manual says Z is unused. | | `RZ1;` | `WZ0` / `WZ1` | medium | Unverified. Read-only |

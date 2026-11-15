@@ -96,6 +96,10 @@ Also behind an explicit confirmation:
 
 `R3n;` and the bootloader commands are the sort of thing a mis-click should not be able to do.
 
+## Firmware this program is built against
+
+Meridian is designed and tested with Andrew's RT-21, which reports `RT-21 4.14.g1`. That build is not on the public download page. Fetched 15 Nov 2026, [greenheronengineering.com/rotator-controllers-software](https://www.greenheronengineering.com/rotator-controllers-software/) lists RT-21 firmware 4.13.2 as current (version 4, serial numbers 4000 and up). 4.14 is not a download. Setup Utility 4.B12 (beta, December 2023) is the program that mentions it: "Supports 4.14 w/Serial Sensor feedback", "Magnetic Variation with pre-release 4.d14", and "Fixes bug that always cleared the Screen Saver function in RT-21". Utility 4.11 (December 2022) is the non-beta. 4.13.x is expected to speak the same protocol and has not been tested here. A read that is not 4.14.g1 gets a status-line note. Writes stay compiled out, and the write path still refuses anything that is not 4.14.g1.
+
 ## Observed on hardware
 
 A healthy session on 14 November 2026, from 14:06:18 to about 14:12, stayed on one TCP connection the whole time. There were no reconnects and 646 RX frames. The earlier dead session (13:44–14:03, zero RX, then a reconnect that resent the same `AP`) came right after a rapid reconnect loop. That matches the quiet-backoff theory: the network module wedges when Meridian drops the socket and dials straight back.
@@ -121,6 +125,36 @@ While the rotor was turning:
 The byte after `01 30` behaves as a moving flag: `00` stopped, `01` rotating, then `>` (`3E`) and the same `NNN.N;` heading. It is not requested by `R21;`. It looks like an unsolicited status frame from the network module, mixed into the `BI1;` replies. Meridian strips leading non-numeric bytes, treats `01 30 xx 3E` as that status header, and uses `xx` as the rotating flag when it is 0–5. A stopped flag is the settled signal.
 
 Replies on that session arrived about every 2 seconds while idle and about every 250 ms while the rotor was moving. Those are the rates the controller was actually answering, not a reason to reconnect.
+
+A setup read on 15 Nov 2026, firmware 4.14.g1, one TCP session to 192.168.1.106 port 6555, answered EEPROM queries as `<letter><SOH><value>;`. The letter is the echo of the register, then `0x01`, then the decimal text. The same shape covers the version and the pot:
+
+```text
+41 01 35                A <01> 5
+42 01 37 30 35          B <01> 705
+46 01 31 32 35          F <01> 125
+4A 01 31 30             J <01> 10
+4B 01 33 39 36 30       K <01> 3960
+54 01 32 35 37 36       T <01> 2576
+31 01 52 54 2D 32 31 20 34 2E 31 34 2E 67 31
+                        1 <01> RT-21 4.14.g1
+30 01 30 33 33 34       0 <01> 0334
+```
+
+`R11;` is the version (firmware `RT-21 4.14.g1`). `R01;` is the pot (`0334`). `R41;`, the last abnormal reset, produced no semicolon-terminated frame inside the reply window. The driver's "no reply" text is that timeout, not a payload. The next frame was a clean `A<01>5`, so the reset reply was not stuck in front of it, and the link was still up. The manual says `R4` reads and clears a stored reset code. Silence when nothing is stored fits this capture. It is not proof that 4.14.g1 dropped the command.
+
+Registers C, W, and Z were absent from that backup because the file only stored the rows on the form. The driver did send `RC1;`, `RW1;`, `RZ1;`, and `R[1;`. C is reserved and the utility does not show it. W is the screen saver and Z is the multiplier in utility 4.B12. `[` is magnetic variation. Alpha 8 keeps those rows and writes them into the text copy.
+
+## Screen saver
+
+Version 4 addendum, rev 4, "Display Screen Saver operation [4.13]": controller firmware 4.13 adds a setup item for a screen saver of up to 1 hour. Off is the default. It requires display firmware 1.3, shown at the bottom left at boot. With that display module the panel blanks until a button is pressed or a remote command is initiated. The addendum says this is for the planned OLED option. An OLED has no brightness control, unlike the LCD and VFD. LCD and VFD units blank too if their display firmware is 1.3. The display firmware is not field-upgradable. "Display 1.3 FW supports the Screen Saver mode that is introduced in RT-21 v4.13."
+
+Utility 4.B12's combo is labeled Minutes. The items are Off, 1, 2, 5, 10, 20, 30, 40, 50, 60. Read is `RW1;`. Zero is shown as Off. There is no 90-second step and no separate full-black versus dim level. The blank is the whole behavior on display firmware 1.3. Auto-dim is a different switch, advanced-options bit 16, and brightness is register O. The addendum says an OLED ignores brightness.
+
+Andrew's target is full black after 90 seconds, until an interaction. The shortest on-setting the firmware stores is 1 minute, which goes dark sooner than 90 seconds. That is the value Meridian would write, with `n = 1` (`WW11;`), after he has watched it on the glass. It is not sent in this build.
+
+What the addendum counts as a wake: a button, or a remote command. It does not mention the knob, rotor motion, or a poll by name. The knob timer (register Y) is a different control. Serial and TCP carry the same commands, so a remote command is either of them. `BI1;` is a remote command. Nothing in the manual or the utility names a poll that does not count. Meridian asks for the heading every 30 seconds while idle. If the firmware treats that as a remote command, the panel lights on every poll and a 1-minute saver never stays black while Meridian is connected. That has not been watched on this rotor. No write, and no change to the poll, until it has.
+
+The 4.B12 release note says that build fixes a bug that always cleared the screen saver. Utility 4.11's write prefix is the string `WW0` plus two trailing spaces. 4.B12's prefix is `WW0` with the spaces removed. A value glued onto the 4.11 prefix is not a decimal the controller can store, so the saver never engaged. Off is the separate literal `WW00` (`n = 0`, which reboots). Meridian does not write W from any group except Display, so saving speed, limits, or the network cannot clear it.
 
 ## Network module TCP port
 

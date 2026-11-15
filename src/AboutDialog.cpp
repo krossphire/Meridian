@@ -21,7 +21,10 @@ AboutDialog::AboutDialog(QWidget *parent)
     auto *title = new QLabel(QStringLiteral("<span style='font-size:22px;'>Meridian</span>"));
     auto *body = new QLabel(QStringLiteral(
         "<p>A rotator controller for the Green Heron RT-21, written for Andrew, K5PO. "
-        "This build is %1.</p>")
+        "This build is %1.</p>"
+        "<p>Designed and tested with firmware 4.14.g1. That build is not on the public "
+        "download page. The posted current firmware is 4.13.2, which should behave the "
+        "same and has not been tested here.</p>")
         .arg(QCoreApplication::applicationVersion()) + QStringLiteral(
         "<p>Meridian is free software under the GNU General Public License, "
         "version 3 or any later version.</p>"

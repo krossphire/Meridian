@@ -22,6 +22,8 @@ private slots:
     void secretsStayOutOfTheLog();
     void moduleLinesSplitOnCr();
     void mockNetworkRead();
+    void screenSaverIsOnlyInTheDisplayGroup();
+    void firmwareGate();
 };
 
 void TestSetup::commandsMatchTheUtility()
@@ -83,9 +85,16 @@ void TestSetup::adviceStaysOffTheConnectionFields()
 
     const QString text = Rt21::formatSetupBackup({{QStringLiteral("D"), QStringLiteral("180")}},
                                                   {{QStringLiteral("key"), QStringLiteral("secret-phrase")}});
-    QVERIFY(text.contains(QStringLiteral("D=180")));
-    QVERIFY(text.contains(QStringLiteral("key=secret-phrase")));
+    QVERIFY(text.contains(QStringLiteral("Offset (D) = 180 degrees")));
+    QVERIFY(text.contains(QStringLiteral("key = secret-phrase")));
     QVERIFY(text.contains(QStringLiteral("DNS is not")));
+    QCOMPARE(Rt21::formatEeLine(QStringLiteral("J"), QStringLiteral("10")),
+             QStringLiteral("Rotor type (J) = 10 (Yaesu G-2800)"));
+    QVERIFY(Rt21::formatEeLine(QStringLiteral("T"), QStringLiteral("2576")).contains(QStringLiteral("auto dim")));
+    QVERIFY(Rt21::formatEeLine(QStringLiteral("R"), QStringLiteral("361")).contains(QStringLiteral("unused")));
+    QVERIFY(Rt21::formatEeLine(QStringLiteral("K"), QStringLiteral("3960")).contains(QStringLiteral("3960")));
+    QVERIFY(Rt21::formatEeLine(QStringLiteral("F"), QStringLiteral("125")).contains(QStringLiteral("125")));
+    QVERIFY(Rt21::formatEeLine(QStringLiteral("W"), QStringLiteral("0")).contains(QStringLiteral("Off")));
 }
 
 void TestSetup::secretsStayOutOfTheLog()
@@ -132,6 +141,72 @@ void TestSetup::mockNetworkRead()
     QCOMPARE(got.value(QStringLiteral("security")), QStringLiteral("6"));
     QCOMPARE(got.value(QStringLiteral("key")), QStringLiteral("prairie-not-logged"));
     QCOMPARE(done.at(0).at(0).toBool(), true);
+}
+
+void TestSetup::screenSaverIsOnlyInTheDisplayGroup()
+{
+    QCOMPARE(Rt21::recommendedScreenSaverMinutes(), 1);
+    QVERIFY(!Rt21::screenSaverMinuteAllowed(90));
+    QVERIFY(Rt21::screenSaverRecommendation().contains(QStringLiteral("90 seconds")));
+    QVERIFY(Rt21::screenSaverRecommendation().contains(QStringLiteral("30 seconds")));
+
+    QMap<QString, QString> fields;
+    fields.insert(QStringLiteral("screenSaver"), QStringLiteral("1"));
+    fields.insert(QStringLiteral("brightness"), QStringLiteral("8"));
+    QList<Rt21::PlannedWrite> plan;
+    QVERIFY(Rt21::planGroup(QStringLiteral("display"), fields, &plan).isEmpty());
+    QByteArray joined;
+    for (const auto &step : plan)
+        joined += step.command;
+    QVERIFY(joined.contains("WW11;"));
+    QVERIFY(joined.contains("WO18;"));
+
+    fields.insert(QStringLiteral("screenSaver"), QStringLiteral("90"));
+    QVERIFY(Rt21::planGroup(QStringLiteral("display"), fields, &plan).contains(QStringLiteral("90")));
+
+    const QStringList others = {QStringLiteral("motion"), QStringLiteral("stops"), QStringLiteral("calibration"),
+                                QStringLiteral("advanced"), QStringLiteral("rotor-type")};
+    QMap<QString, QString> filled;
+    filled.insert(QStringLiteral("screenSaver"), QStringLiteral("1"));
+    filled.insert(QStringLiteral("minSpeed"), QStringLiteral("3"));
+    filled.insert(QStringLiteral("maxSpeed"), QStringLiteral("10"));
+    filled.insert(QStringLiteral("ramp"), QStringLiteral("3"));
+    filled.insert(QStringLiteral("delays"), QStringLiteral("3"));
+    filled.insert(QStringLiteral("counterDelay"), QStringLiteral("10"));
+    filled.insert(QStringLiteral("ccwLimit"), QStringLiteral("180"));
+    filled.insert(QStringLiteral("cwLimit"), QStringLiteral("180"));
+    filled.insert(QStringLiteral("calRange"), QStringLiteral("360"));
+    filled.insert(QStringLiteral("overtravel"), QStringLiteral("90"));
+    filled.insert(QStringLiteral("ccwCal"), QStringLiteral("0"));
+    filled.insert(QStringLiteral("cwCal"), QStringLiteral("950"));
+    filled.insert(QStringLiteral("offset"), QStringLiteral("180"));
+    filled.insert(QStringLiteral("divider"), QStringLiteral("3960"));
+    filled.insert(QStringLiteral("alt1"), QStringLiteral("361"));
+    filled.insert(QStringLiteral("alt2"), QStringLiteral("361"));
+    filled.insert(QStringLiteral("advanced"), QStringLiteral("2576"));
+    filled.insert(QStringLiteral("option"), QStringLiteral("10"));
+    filled.insert(QStringLiteral("mode"), QStringLiteral("0"));
+    filled.insert(QStringLiteral("security"), QStringLiteral("1"));
+    for (const QString &group : others) {
+        QVERIFY2(Rt21::planGroup(group, filled, &plan).isEmpty(), qPrintable(group));
+        for (const auto &step : plan) {
+            QVERIFY2(!step.command.contains("WW"), qPrintable(group + QLatin1Char(' ') + QString::fromLatin1(step.command)));
+            QVERIFY2(!step.readBack.startsWith("RW"), qPrintable(group));
+        }
+    }
+}
+
+void TestSetup::firmwareGate()
+{
+    QCOMPARE(Rt21::classifyFirmware(QStringLiteral("RT-21 4.14.g1")), Rt21::FirmwareClass::Tested);
+    QCOMPARE(Rt21::classifyFirmware(QStringLiteral("RT-21 4.13.2")), Rt21::FirmwareClass::ExpectedCompatible);
+    QCOMPARE(Rt21::classifyFirmware(QStringLiteral("RT-21 3.08")), Rt21::FirmwareClass::Untested);
+    QVERIFY(Rt21::firmwareNotice(QStringLiteral("RT-21 4.14.g1")).isEmpty());
+    QVERIFY(Rt21::firmwareNotice(QStringLiteral("RT-21 4.13.2")).contains(QStringLiteral("4.13.2")));
+    QVERIFY(Rt21::firmwareWritesAllowed(QStringLiteral("RT-21 4.14.g1")));
+    QVERIFY(!Rt21::firmwareWritesAllowed(QStringLiteral("RT-21 4.13.2")));
+    QVERIFY(!Rt21::firmwareWritesAllowed(QStringLiteral("RT-21 4.14")));
+    QVERIFY(!Rt21::setupWritesCompiledIn());
 }
 
 QTEST_MAIN(TestSetup)

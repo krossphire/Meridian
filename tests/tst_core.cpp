@@ -263,6 +263,27 @@ void TestCore::headingParse()
     QVERIFY(pot && *pot == 512);
     QVERIFY(!Rt21::parseIntegerPayload("Pot"));
     QCOMPARE(Rt21::payloadAfterSoh(QByteArray("\x01RT-21 Version 4.13")), QStringLiteral("RT-21 Version 4.13"));
+
+    // Andrew's RT-21, firmware 4.14.g1, 15 Nov 2026, over 192.168.1.106:6555.
+    auto echo = [](const char *mark, const char *value) {
+        QByteArray frame(mark);
+        frame.append(char(0x01));
+        frame.append(value);
+        return frame;
+    };
+    QCOMPARE(Rt21::payloadAfterSoh(echo("A", "5")), QStringLiteral("5"));
+    QCOMPARE(Rt21::parseIntegerPayload(echo("A", "5")).value_or(-1), 5);
+    QCOMPARE(Rt21::parseIntegerPayload(echo("B", "705")).value_or(-1), 705);
+    QCOMPARE(Rt21::parseIntegerPayload(echo("D", "174")).value_or(-1), 174);
+    QCOMPARE(Rt21::parseIntegerPayload(echo("F", "125")).value_or(-1), 125);
+    QCOMPARE(Rt21::parseIntegerPayload(echo("J", "10")).value_or(-1), 10);
+    QCOMPARE(Rt21::parseIntegerPayload(echo("K", "3960")).value_or(-1), 3960);
+    QCOMPARE(Rt21::parseIntegerPayload(echo("R", "361")).value_or(-1), 361);
+    QCOMPARE(Rt21::parseIntegerPayload(echo("S", "361")).value_or(-1), 361);
+    QCOMPARE(Rt21::parseIntegerPayload(echo("T", "2576")).value_or(-1), 2576);
+    QCOMPARE(Rt21::payloadAfterSoh(echo("1", "RT-21 4.14.g1")), QStringLiteral("RT-21 4.14.g1"));
+    QCOMPARE(Rt21::payloadAfterSoh(echo("0", "0334")), QStringLiteral("0334"));
+    QCOMPARE(Rt21::parseIntegerPayload(echo("0", "0334")).value_or(-1), 334);
 }
 
 void TestCore::hardwareRx()

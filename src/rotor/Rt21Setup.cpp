@@ -13,6 +13,8 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QHostAddress>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QPair>
 
 namespace Rt21 {
@@ -193,8 +195,25 @@ QString planGroup(const QString &group, const QMap<QString, QString> &fields, QL
         return true;
     };
 
-    if (group == QLatin1String("display"))
-        return ee({{QStringLiteral("brightness"), QLatin1Char('O')}}) ? QString() : error;
+    if (group == QLatin1String("display")) {
+        // Brightness (O) and screen saver (W) only. No other group may write W.
+        bool any = false;
+        if (fields.contains(QStringLiteral("brightness"))) {
+            if (!ee({{QStringLiteral("brightness"), QLatin1Char('O')}}))
+                return error;
+            any = true;
+        }
+        if (fields.contains(QStringLiteral("screenSaver"))) {
+            int minutes = 0;
+            if (!takeInt(fields, QStringLiteral("screenSaver"), &minutes, &error))
+                return error;
+            if (!screenSaverMinuteAllowed(minutes))
+                return QStringLiteral("Screen saver is whole minutes: Off, 1, 2, 5, 10, 20, 30, 40, 50, or 60. 90 seconds is not a value this rotor stores.");
+            addEe(out, QLatin1Char('W'), minutes);
+            any = true;
+        }
+        return any ? QString() : QStringLiteral("Nothing to write in Display.");
+    }
     if (group == QLatin1String("motion")) {
         return ee({{QStringLiteral("minSpeed"), QLatin1Char('F')},
                    {QStringLiteral("maxSpeed"), QLatin1Char('G')},
@@ -305,14 +324,29 @@ QString formatSetupBackup(const QMap<QString, QString> &controller, const QMap<Q
     QString text;
     text += QStringLiteral("Meridian RT-21 setup copy\n");
     text += QStringLiteral("Saved %1\n").arg(QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
-    text += QStringLiteral("This file is what was read. Writing it back is not enabled in this build.\n");
+    text += QStringLiteral("Designed and tested with firmware 4.14.g1. That build is not on the public download page. Posted current firmware is 4.13.2, expected compatible, untested.\n");
+    text += QStringLiteral("This file is what was read. Nothing was written back.\n");
     text += QStringLiteral("The Wi-Fi key and the web password are included so a later restore has them.\n\n");
-    text += QStringLiteral("[controller]\n");
-    for (auto it = controller.cbegin(); it != controller.cend(); ++it)
-        text += it.key() + QLatin1Char('=') + it.value() + QLatin1Char('\n');
+    if (controller.contains(QStringLiteral("version")))
+        text += QStringLiteral("Firmware: %1\n").arg(controller.value(QStringLiteral("version")));
+    if (controller.contains(QStringLiteral("pot")))
+        text += QStringLiteral("Pot A/D: %1\n").arg(controller.value(QStringLiteral("pot")));
+    if (controller.contains(QStringLiteral("reset")))
+        text += QStringLiteral("Last abnormal reset (R41): %1\n").arg(controller.value(QStringLiteral("reset")));
+    text += QLatin1Char('\n');
+    text += screenSaverRecommendation();
+    text += QStringLiteral("\n\n[controller]\n");
+    for (auto it = controller.cbegin(); it != controller.cend(); ++it) {
+        if (it.key().size() == 1)
+            text += formatEeLine(it.key(), it.value()) + QLatin1Char('\n');
+    }
     text += QStringLiteral("\n[network]\n");
-    for (auto it = network.cbegin(); it != network.cend(); ++it)
-        text += it.key() + QLatin1Char('=') + it.value() + QLatin1Char('\n');
+    for (auto it = network.cbegin(); it != network.cend(); ++it) {
+        const QString shown = (it.key() == QLatin1String("key") || it.key() == QLatin1String("pass"))
+                                  ? it.value()
+                                  : it.value();
+        text += it.key() + QStringLiteral(" = ") + shown + QLatin1Char('\n');
+    }
     text += QStringLiteral("\nDNS is not a field in the setup utility.\n");
     text += QStringLiteral("AP or client mode is not a field in the setup utility.\n");
     return text;
@@ -338,6 +372,24 @@ QString saveSetupBackup(const QMap<QString, QString> &controller, const QMap<QSt
         if (error)
             *error = QStringLiteral("Couldn't write %1.").arg(path);
         return {};
+    }
+    QJsonObject machine;
+    for (auto it = controller.cbegin(); it != controller.cend(); ++it)
+        machine.insert(it.key(), it.value());
+    QJsonObject net;
+    for (auto it = network.cbegin(); it != network.cend(); ++it)
+        net.insert(it.key(), it.value());
+    QJsonObject root;
+    root.insert(QStringLiteral("controller"), machine);
+    root.insert(QStringLiteral("network"), net);
+    const QString jsonPath = path.endsWith(QStringLiteral(".txt")) ? path.chopped(4) + QStringLiteral(".json")
+                                                                    : path + QStringLiteral(".json");
+    QFile json(jsonPath + QStringLiteral(".tmp"));
+    if (json.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        json.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
+        json.close();
+        QFile::remove(jsonPath);
+        QFile::rename(jsonPath + QStringLiteral(".tmp"), jsonPath);
     }
     return path;
 }
@@ -467,6 +519,142 @@ bool setupWritesCompiledIn()
 #else
     return true;
 #endif
+}
+
+FirmwareClass classifyFirmware(const QString &report)
+{
+    if (report.contains(QStringLiteral("4.14.g1")))
+        return FirmwareClass::Tested;
+    if (report.contains(QStringLiteral("4.13")))
+        return FirmwareClass::ExpectedCompatible;
+    return FirmwareClass::Untested;
+}
+
+QString firmwareNotice(const QString &report)
+{
+    const FirmwareClass kind = classifyFirmware(report);
+    if (kind == FirmwareClass::Tested)
+        return {};
+    const QString shown = report.trimmed().isEmpty() ? QStringLiteral("nothing") : report.trimmed();
+    if (kind == FirmwareClass::ExpectedCompatible)
+        return QStringLiteral("Designed and tested with 4.14.g1. This unit reports %1. 4.13.x is the public current firmware and should behave the same; it has not been tested here. Writes stay off.").arg(shown);
+    return QStringLiteral("Designed and tested with 4.14.g1. This unit reports %1. Writes stay off for firmware that has not been tested.").arg(shown);
+}
+
+bool firmwareWritesAllowed(const QString &report)
+{
+    return classifyFirmware(report) == FirmwareClass::Tested;
+}
+
+bool screenSaverMinuteAllowed(int minutes)
+{
+    switch (minutes) {
+    case 0:
+    case 1:
+    case 2:
+    case 5:
+    case 10:
+    case 20:
+    case 30:
+    case 40:
+    case 50:
+    case 60:
+        return true;
+    default:
+        return false;
+    }
+}
+
+int recommendedScreenSaverMinutes()
+{
+    // Shortest on-setting. 90 seconds is not a stored step.
+    return 1;
+}
+
+QString screenSaverRecommendation()
+{
+    return QStringLiteral(
+        "Screen saver target: full black after 90 seconds, until someone uses the rotor. "
+        "Firmware 4.13 and later stores whole minutes only (Off, 1, 2, 5, 10, 20, 30, 40, 50, 60), and Off is the factory default. "
+        "There is no 90-second step and no separate dim level. On display firmware 1.3 the saver blanks the panel. "
+        "The closest setting Meridian would write, once you approve it, is 1 minute. "
+        "A button or a remote command wakes the panel. Meridian's heading poll is a remote command every 30 seconds, so it may light the display and keep the saver from staying black. That has not been watched on this rotor. Writes stay off.");
+}
+
+QString advancedOptionsText(int value)
+{
+    static const char *names[] = {
+        "freeze display", "fast brake release", "auto go-back", "elevation",
+        "auto dim", "analog heading out", "EME", "point-and-shoot",
+        "port is 9600", "2-bit encoder", "demo", "allow cal to the CCW limit",
+    };
+    QStringList on;
+    for (int bit = 0; bit < 12; ++bit) {
+        if (value & (1 << bit))
+            on.append(QString::fromLatin1(names[bit]));
+    }
+    if (on.isEmpty())
+        return QStringLiteral("no documented bits set");
+    return on.join(QStringLiteral(", "));
+}
+
+QString formatEeLine(const QString &id, const QString &raw)
+{
+    const QString token = raw.trimmed();
+    bool numeric = false;
+    const int value = token.toInt(&numeric);
+    auto named = [&](const QString &name, const QString &detail) {
+        return QStringLiteral("%1 (%2) = %3").arg(name, id, detail);
+    };
+    if (!numeric)
+        return named(id == QLatin1String("W") ? QStringLiteral("Screen saver") : id, token.isEmpty() ? QStringLiteral("no reply") : token);
+    if (id == QLatin1String("W")) {
+        const QString state = value == 0 ? QStringLiteral("Off (0 minutes)") : QStringLiteral("%1 minutes").arg(value);
+        QString extra;
+        if (value == 0)
+            extra = QStringLiteral(". Off is the factory default. An OLED will keep showing the heading.");
+        else if (!screenSaverMinuteAllowed(value))
+            extra = QStringLiteral(". That is not one of the utility's steps.");
+        else if (value > recommendedScreenSaverMinutes())
+            extra = QStringLiteral(". Longer than the 1 minute Meridian would use for an OLED.");
+        return named(QStringLiteral("Screen saver"), state + extra);
+    }
+    if (id == QLatin1String("J"))
+        return named(QStringLiteral("Rotor type"), QStringLiteral("%1 (%2)").arg(value).arg(rotorTypeName(value)));
+    if (id == QLatin1String("M"))
+        return named(QStringLiteral("Mode"), QStringLiteral("%1 (%2)").arg(value).arg(modeName(value)));
+    if (id == QLatin1String("Q"))
+        return named(QStringLiteral("Security"), QStringLiteral("%1 (%2)").arg(value).arg(securityName(value)));
+    if (id == QLatin1String("T"))
+        return named(QStringLiteral("Advanced options"), QStringLiteral("%1 (%2)").arg(value).arg(advancedOptionsText(value)));
+    if (id == QLatin1String("R") || id == QLatin1String("S")) {
+        const QString which = id == QLatin1String("R") ? QStringLiteral("Alt offset 1") : QStringLiteral("Alt offset 2");
+        const QString note = value == 361 ? QStringLiteral(" (361 means unused)") : QString();
+        return named(which, QStringLiteral("%1 degrees%2").arg(value).arg(note));
+    }
+    if (id == QLatin1String("K"))
+        return named(QStringLiteral("Pulse divider"), QStringLiteral("%1 (manual default is 3960)").arg(value));
+    if (id == QLatin1String("F"))
+        return named(QStringLiteral("Min speed"), QStringLiteral("%1 (the 2014 manual's scale is 0 to 10)").arg(value));
+    if (id == QLatin1String("O"))
+        return named(QStringLiteral("Brightness"), QString::number(value));
+    if (id == QLatin1String("D") || id == QLatin1String("H") || id == QLatin1String("I") || id == QLatin1String("L") || id == QLatin1String("U")) {
+        const QString name = id == QLatin1String("D") ? QStringLiteral("Offset")
+                             : id == QLatin1String("H") ? QStringLiteral("CCW limit")
+                             : id == QLatin1String("I") ? QStringLiteral("CW limit")
+                             : id == QLatin1String("L") ? QStringLiteral("Cal range")
+                                                        : QStringLiteral("Overtravel");
+        return named(name, QStringLiteral("%1 degrees").arg(value));
+    }
+    if (id == QLatin1String("C"))
+        return named(QStringLiteral("Reserved"), QString::number(value));
+    if (id == QLatin1String("Z"))
+        return named(QStringLiteral("Multiplier"), QString::number(value));
+    if (id == QLatin1String("["))
+        return named(QStringLiteral("Magnetic variation"), QStringLiteral("%1 degrees").arg(value));
+    if (id == QLatin1String("X"))
+        return named(QStringLiteral("Limit switch"), QString::number(value));
+    return named(id, QString::number(value));
 }
 
 } // namespace Rt21

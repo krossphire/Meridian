@@ -1,0 +1,24 @@
+; Meridian settings. Copy this file to back it up or move it to another computer.
+; No passwords are stored here.
+[home]
+text=EM26
+
+[link]
+idlePoll=30
+
+[log]
+traffic=true
+
+[rotors]
+1\baud=4800
+1\host=
+1\id=52ae985d-10cf-44d2-9ea3-a5381632593a
+1\name=RT-21
+1\serialPort=
+1\tcpPort=0
+1\transport=
+active=0
+size=1
+
+[view]
+sun=true

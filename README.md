@@ -4,7 +4,9 @@ Meridian is a small, fast rotator controller for the Green Heron RT-21 (Traditio
 
 The window is the azimuthal map. The heading is a number over the globe. Click the number to type a heading, or click the map to turn to that bearing. Esc or Space stops the rotor. A gear in the corner opens settings. Nothing else sits on the map.
 
-Written for Andrew, K5PO. Licensed under GPL-3.0-or-later. The 0.1.0-alpha7 build keeps controller and network writes off and, by default, records raw rotor traffic in `%APPDATA%\Meridian\logs` (a `Record rotor traffic` checkbox turns that off). Each log line is flushed immediately. Rebuild with `-DMERIDIAN_ALPHA_READONLY=OFF` to allow Apply.
+Written for Andrew, K5PO. Licensed under GPL-3.0-or-later. Meridian is designed and tested with RT-21 firmware 4.14.g1. That build is not posted for download. The public current firmware is 4.13.2 (version 4, serial numbers 4000 and up). 4.13.x is expected to behave the same and has not been tested here. Setup says so, quietly, when a read reports anything else, and writes stay off for firmware that is not 4.14.g1.
+
+The 0.1.0-alpha8 build keeps controller and network writes off and, by default, records raw rotor traffic in `%APPDATA%\Meridian\logs` (a `Record rotor traffic` checkbox turns that off). Each log line is flushed immediately. Rebuild with `-DMERIDIAN_ALPHA_READONLY=OFF` to allow Apply.
 
 Every TCP connect is limited to 3 seconds. If the rotor closed the session or stopped answering, the next background try waits 20 seconds, then backs off up to 5 minutes. If the host does not answer, tries are 15 seconds apart for the first 2 minutes, then use that same backoff. A click, a typed heading, opening the app, or leaving settings tries immediately. A goto is never resent on a later reconnect. Idle polls are every 30 seconds (30–60 in Settings). Settings has one map switch, **Show sun & day/night**, on by default. The sun and the day/night tint are not clickable. See [docs/ROADMAP.md](docs/ROADMAP.md) for what comes after this alpha.
 

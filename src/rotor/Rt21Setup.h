@@ -68,4 +68,18 @@ StaticAdvice adviseStaticAddress(const QString &localIp, int prefixLength, const
 
 bool setupWritesCompiledIn();
 
+// Tested firmware is Andrew's 4.14.g1, which is not on the public download page.
+// 4.13.x is the posted current build and is expected to behave the same, untested.
+enum class FirmwareClass { Tested, ExpectedCompatible, Untested };
+FirmwareClass classifyFirmware(const QString &report);
+QString firmwareNotice(const QString &report);
+bool firmwareWritesAllowed(const QString &report);
+
+// Utility combo, in minutes. 0 is Off. 90 seconds is not one of these.
+bool screenSaverMinuteAllowed(int minutes);
+int recommendedScreenSaverMinutes();
+QString screenSaverRecommendation();
+QString formatEeLine(const QString &id, const QString &raw);
+QString advancedOptionsText(int value);
+
 } // namespace Rt21

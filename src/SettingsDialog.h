@@ -64,6 +64,7 @@ private:
     void styleFindButton();
     void setStatus(const QString &text);
     void exportSetup();
+    void refreshDisplayCallout();
     QString backupConfig(const QString &path) const;
 
     AppConfig draft;
@@ -102,6 +103,10 @@ private:
     class QThread *findThread = nullptr;
     QStringList foundKeys;
     QLabel *versionLabel = nullptr;
+    QLabel *displayCallout = nullptr;
+    QString versionReport;
+    QString potReport;
+    QString resetReport;
     QVector<FieldRow> fields;
     class QCheckBox *bits[12] = {};
     bool fillingBits = false;

@@ -25,6 +25,15 @@ QByteArray stripNoise(QByteArray frame)
 {
     if (!frame.isEmpty() && frame.at(0) == char(0x01))
         frame.remove(0, 1);
+    frame = frame.trimmed();
+    // Firmware 4.14.g1, read on 15 Nov 2026: the reply is
+    // <echo><SOH><value>;  — 'A' SOH '5', '1' SOH 'RT-21 4.14.g1', '0' SOH '0334'.
+    // The manual's form is a leading SOH and no echo. Both are accepted.
+    if (frame.size() >= 2 && frame.at(1) == char(0x01)) {
+        const unsigned char echo = static_cast<unsigned char>(frame.at(0));
+        if (std::isalnum(echo) || echo == '[')
+            frame.remove(0, 2);
+    }
     return frame.trimmed();
 }
 

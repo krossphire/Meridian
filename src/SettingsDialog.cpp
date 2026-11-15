@@ -61,8 +61,10 @@ struct FieldDef {
 };
 
 const FieldDef kFields[] = {
+    {'W', "Screen saver", "Minutes. 0 is Off. Steps are 1, 2, 5, 10, 20, 30, 40, 50, 60. Not written yet.", true, 0, 60},
+    {'O', "Brightness", "Manual default 8. OLED modules have no brightness control; the saver blanks them.", true, 0, 15},
     {'D', "Offset", "CCW endpoint in degrees. 180 is north-center, the manual default.", true, 0, 360},
-    {'F', "Min speed", "Manual default 3. 10 is full speed.", true, 0, 10},
+    {'F', "Min speed", "Manual scale is 0 to 10. 4.14.g1 at this station returned 125, so the box allows that.", true, 0, 255},
     {'G', "Max speed", "Manual default 10.", true, 0, 10},
     {'N', "Ramp", "Manual default 3. On relay systems a higher value stops the motor earlier.", true, 0, 10},
     {'E', "Delays", "Manual field E, default 3. Brake and reversal delay are not separate commands.", true, 0, 99},
@@ -70,7 +72,6 @@ const FieldDef kFields[] = {
     {'I', "CW limit", "Manual default 180.", true, 0, 540},
     {'L', "Cal range", "Manual default 360.", true, 0, 540},
     {'K', "Pulse divider", "Manual default 3960 (4015 on some firmware).", true, 1, 20000},
-    {'O', "Brightness", "Manual default 8.", true, 0, 15},
     {'P', "Fail timeout", "Rotor-fail timeout. Manual default 4.", true, 0, 60},
     {'U', "Overtravel", "Degrees of overtravel allowed. Manual default 90.", true, 0, 180},
     {'V', "Counter-rotate delay", "Manual default 10.", true, 0, 999},
@@ -84,6 +85,9 @@ const FieldDef kFields[] = {
     {'M', "Mode", "0 normal, 1 master/slave, 2 master counter-rotate, 3 slave counter-rotate, 4 offset, 5 debug.", false, 0, 0},
     {'Q', "Security", "0 user, 1 admin, from the utility. Not written yet.", false, 0, 0},
     {'X', "Limit switch", "Read from the controller. Not written from here.", false, 0, 0},
+    {'C', "Reserved", "The 2014 manual reserves C. The utility does not show it. Read only.", false, 0, 0},
+    {'Z', "Multiplier", "Utility 4.B12. The 2014 manual said Z was unused. Not written yet.", false, 0, 0},
+    {'[', "Magnetic variation", "4.B12, degrees, -60 to +60. For pre-release 4.d14. Not written yet.", false, 0, 0},
 };
 
 const char *kBits[] = {
@@ -171,8 +175,6 @@ void SettingsDialog::setDriver(Rt21Driver *next)
                                                         : QStringLiteral("Screen saver: %1 min").arg(value));
                     else if (numeric && id == QLatin1Char('Z') && multiplier)
                         multiplier->setText(QStringLiteral("Multiplier: %1").arg(value));
-                    else if (id == QLatin1Char('[') && magnetic)
-                        magnetic->setText(QStringLiteral("Magnetic variation: %1").arg(raw));
                     for (FieldRow &field : fields) {
                         if (field.id != id)
                             continue;
@@ -200,13 +202,27 @@ void SettingsDialog::setDriver(Rt21Driver *next)
                             }
                         }
                     }
+                    refreshDisplayCallout();
                 });
         connect(driver, &Rt21Driver::configNote, this, [this](const QString &text) {
-            const QString current = versionLabel->text();
-            if (current.isEmpty() || current.startsWith(QStringLiteral("Not read")))
-                versionLabel->setText(text);
-            else
-                versionLabel->setText(current + QStringLiteral("   ·   ") + text);
+            if (text.startsWith(QStringLiteral("Version ")))
+                versionReport = text.mid(QStringLiteral("Version ").size());
+            else if (text.startsWith(QStringLiteral("Pot A/D ")))
+                potReport = text.mid(QStringLiteral("Pot A/D ").size());
+            else if (text.startsWith(QStringLiteral("Last reset ")))
+                resetReport = text.mid(QStringLiteral("Last reset ").size());
+            QStringList parts;
+            if (!versionReport.isEmpty())
+                parts.append(QStringLiteral("Version %1").arg(versionReport));
+            if (!potReport.isEmpty())
+                parts.append(QStringLiteral("Pot A/D %1").arg(potReport));
+            if (!resetReport.isEmpty())
+                parts.append(QStringLiteral("Last reset %1").arg(resetReport));
+            versionLabel->setText(parts.join(QStringLiteral("   ·   ")));
+            const QString notice = Rt21::firmwareNotice(versionReport);
+            if (!notice.isEmpty())
+                setStatus(notice);
+            refreshDisplayCallout();
         });
         connect(driver, &Rt21Driver::configFinished, this, [this](bool ok, const QString &message) {
             if (!ok && !message.isEmpty())
@@ -231,11 +247,39 @@ void SettingsDialog::setStatus(const QString &text)
         driver->postNote(text);
 }
 
+void SettingsDialog::refreshDisplayCallout()
+{
+    if (!displayCallout)
+        return;
+    QString saver = QStringLiteral("Screen saver has not been read yet.");
+    for (const FieldRow &field : fields) {
+        if (field.id != QLatin1Char('W') || !field.raw)
+            continue;
+        const QString raw = field.raw->text();
+        if (raw == QLatin1String("…") || raw == QLatin1String("—"))
+            break;
+        bool numeric = false;
+        const int minutes = raw.toInt(&numeric);
+        if (!numeric)
+            saver = QStringLiteral("Screen saver: %1.").arg(raw);
+        else if (minutes == 0)
+            saver = QStringLiteral("Screen saver is off. The heading stays on the display.");
+        else
+            saver = QStringLiteral("Screen saver is %1 minutes.").arg(minutes);
+        break;
+    }
+    displayCallout->setText(saver + QLatin1Char(' ') + Rt21::screenSaverRecommendation());
+}
+
 void SettingsDialog::exportSetup()
 {
     QMap<QString, QString> controller = eeRaw;
-    if (versionLabel)
-        controller.insert(QStringLiteral("version"), versionLabel->text());
+    if (!versionReport.isEmpty())
+        controller.insert(QStringLiteral("version"), versionReport);
+    if (!potReport.isEmpty())
+        controller.insert(QStringLiteral("pot"), potReport);
+    if (!resetReport.isEmpty())
+        controller.insert(QStringLiteral("reset"), resetReport);
     QString error;
     const QMap<QString, QString> network = setupPanel ? setupPanel->networkValues() : QMap<QString, QString>();
     const QString path = Rt21::saveSetupBackup(controller, network, &error);
@@ -756,6 +800,9 @@ void SettingsDialog::buildController()
     versionLabel = new QLabel(QStringLiteral("Not read yet."));
     versionLabel->setObjectName(QStringLiteral("versionLabel"));
     versionLabel->setWordWrap(true);
+    displayCallout = new QLabel(Rt21::screenSaverRecommendation());
+    displayCallout->setObjectName(QStringLiteral("displayCallout"));
+    displayCallout->setWordWrap(true);
 
     auto *read = new QPushButton(QStringLiteral("Read from rotor"));
     auto *backup = new QPushButton(QStringLiteral("Backup…"));
@@ -858,8 +905,12 @@ void SettingsDialog::buildController()
     calRow->addWidget(pulse);
     calRow->addStretch();
 
+    banner->setText(banner->text() + QStringLiteral(
+        " Designed and tested with firmware 4.14.g1, which is not the public download. "
+        "Posted current firmware is 4.13.2. That line is expected to behave the same, and it has not been tested here."));
     layout->addWidget(banner);
     layout->addWidget(versionLabel);
+    layout->addWidget(displayCallout);
     layout->addLayout(actions);
 #if MERIDIAN_ALPHA_READONLY
     apply->setEnabled(false);
@@ -877,22 +928,16 @@ void SettingsDialog::buildController()
         if (!driver)
             return;
         versionLabel->clear();
+        versionReport.clear();
+        potReport.clear();
+        resetReport.clear();
         for (FieldRow &field : fields) {
             field.raw->setText(QStringLiteral("…"));
             field.numeric = false;
         }
         driver->readConfiguration();
     });
-    connect(backup, &QPushButton::clicked, this, [this]() {
-        const QString path = QDir(UserFiles::backupDirectory())
-                                 .filePath(QStringLiteral("meridian-rt21-%1.json")
-                                               .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss"))));
-        const QString error = backupConfig(path);
-        if (!error.isEmpty())
-            setStatus(error);
-        else
-            setStatus(QStringLiteral("Backup saved: %1").arg(path));
-    });
+    connect(backup, &QPushButton::clicked, this, [this]() { exportSetup(); });
     connect(apply, &QPushButton::clicked, this, [this]() {
         if (!driver)
             return;
