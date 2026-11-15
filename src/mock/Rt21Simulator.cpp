@@ -93,6 +93,11 @@ void Rt21Simulator::setIgnoreQueries(bool ignore)
     ignoreQueries = ignore;
 }
 
+void Rt21Simulator::setIgnoreModule(bool ignore)
+{
+    ignoreModule = ignore;
+}
+
 void Rt21Simulator::clearTrace()
 {
     trace_.clear();
@@ -160,6 +165,8 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
     const QByteArray cmd = command.toUpper().trimmed();
     if (!cmd.isEmpty())
         trace_.append(immediate ? cmd + QByteArray("\r") : cmd);
+    if (ignoreModule && (cmd.startsWith("AT") || cmd.startsWith("T0") || cmd.startsWith("T1")))
+        return;
     if ((cmd.startsWith("BI") || cmd.startsWith("AI")) && ignoreQueries)
         return;
     if (cmd.isEmpty() || cmd.startsWith("ST")) {

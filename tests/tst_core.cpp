@@ -297,6 +297,12 @@ void TestCore::hardwareRx()
     QCOMPARE(frames.size(), 1);
     QCOMPARE(frames.at(0), QByteArray("131.9"));
     const auto heading = Rt21::parseHeadingFrame(frames.at(0));
+    // Serial BI1 replies are "37.7;" and sometimes "37.7\r" with no extra terminator.
+    Rt21::Framer serialReply;
+    serialReply.append(QByteArray("37.7;"));
+    QCOMPARE(serialReply.take().value(0), QByteArray("37.7"));
+    serialReply.append(QByteArray("37.7\r"));
+    QCOMPARE(serialReply.take().value(0), QByteArray("37.7"));
     QVERIFY(heading);
     QVERIFY(std::abs(*heading - 131.9) < 1e-9);
 

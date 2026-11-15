@@ -126,6 +126,18 @@ SettingsDialog::SettingsDialog(const AppConfig &config, const ZipDatabase *zipDb
     tabs->addTab(setupTabs, QStringLiteral("Setup"));
     connect(setupPanel, &SetupPanel::statusMessage, this, [this](const QString &text) { setStatus(text); });
     connect(setupPanel, &SetupPanel::exportRequested, this, [this]() { exportSetup(); });
+    if (setupColumn) {
+        connect(setupColumn, &ControllerColumn::readRequested, this, [this]() {
+            if (!driver) {
+                setStatus(QStringLiteral("Connect to a rotor before reading its setup."));
+                return;
+            }
+            continueToNetwork = true;
+            setStatus(QStringLiteral("Reading the RT-21…"));
+            driver->readConfiguration();
+        });
+        connect(setupColumn, &ControllerColumn::backupRequested, this, [this]() { exportSetup(); });
+    }
     statusLabel = new QLabel;
     statusLabel->setObjectName(QStringLiteral("setupStatus"));
     statusLabel->setWordWrap(true);
@@ -229,10 +241,19 @@ void SettingsDialog::setDriver(Rt21Driver *next)
             refreshDisplayCallout();
         });
         connect(driver, &Rt21Driver::configFinished, this, [this](bool ok, const QString &message) {
-            if (!ok && !message.isEmpty())
-                setStatus(message);
-            else if (ok)
-                setStatus(QStringLiteral("Controller settings read. Nothing was written."));
+            if (!ok) {
+                continueToNetwork = false;
+                if (!message.isEmpty())
+                    setStatus(message);
+                return;
+            }
+            if (continueToNetwork && driver) {
+                continueToNetwork = false;
+                setStatus(QStringLiteral("Reading the network module…"));
+                driver->readNetwork();
+                return;
+            }
+            setStatus(QStringLiteral("Controller settings read. Nothing was written."));
         });
         connect(driver, &Rt21Driver::writeFinished, this, [this](bool ok, const QString &message) {
             const QString fallback = ok ? QStringLiteral("Read back the same value.")

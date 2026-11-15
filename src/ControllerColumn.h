@@ -30,6 +30,10 @@ public:
     QLabel *versionLabel() const { return version; }
     QLabel *callout() const { return displayCallout; }
 
+signals:
+    void readRequested();
+    void backupRequested();
+
 private:
     void applyField(QChar id, const QString &raw, bool numeric, int value);
     void selectCode(QChar id, int code);

@@ -13,8 +13,10 @@
 #include <QCheckBox>
 #include <QFormLayout>
 #include <QGroupBox>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QPainter>
+#include <QPushButton>
 #include <QRadioButton>
 #include <QVBoxLayout>
 
@@ -81,6 +83,17 @@ ControllerColumn::ControllerColumn(QWidget *parent)
 {
     column = new QVBoxLayout(this);
     column->setSpacing(14);
+    auto *actions = new QHBoxLayout;
+    auto *read = new QPushButton(QStringLiteral("Read from RT-21"));
+    read->setObjectName(QStringLiteral("readFromRotor"));
+    auto *backup = new QPushButton(QStringLiteral("Save backup"));
+    backup->setObjectName(QStringLiteral("saveBackup"));
+    actions->addWidget(read);
+    actions->addWidget(backup);
+    actions->addStretch();
+    column->addLayout(actions);
+    connect(read, &QPushButton::clicked, this, &ControllerColumn::readRequested);
+    connect(backup, &QPushButton::clicked, this, &ControllerColumn::backupRequested);
     auto *note = new QLabel(QStringLiteral(
         "Read-only in this alpha. The groups follow the setup utility. Nothing here is written."));
     note->setWordWrap(true);

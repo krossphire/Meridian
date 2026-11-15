@@ -26,6 +26,8 @@ private slots:
     void screenSaverIsOnlyInTheDisplayGroup();
     void firmwareGate();
     void serialPortsStayOnTheSavedName();
+    void silentPortSkipsSetupReads();
+    void silentModuleSkipsQueries();
 };
 
 void TestSetup::commandsMatchTheUtility()
@@ -240,6 +242,54 @@ void TestSetup::serialPortsStayOnTheSavedName()
     const QList<SerialPortChoice> missing = arrangeSerialPorts(messy, QStringLiteral("COM4"));
     QCOMPARE(missing.last().port, QStringLiteral("COM4"));
     QVERIFY(missing.last().label.contains(QStringLiteral("(missing)")));
+}
+
+void TestSetup::silentPortSkipsSetupReads()
+{
+    MockRt21Server server;
+    server.sim()->setIgnoreQueries(true);
+    QVERIFY(server.listenTcp(0));
+    Rt21Driver driver;
+    RotorEndpoint endpoint;
+    endpoint.transport = RotorEndpoint::Transport::Tcp;
+    endpoint.host = QStringLiteral("127.0.0.1");
+    endpoint.tcpPort = int(server.port());
+    driver.connectEndpoint(endpoint);
+    QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::On, 3000);
+    QSignalSpy done(&driver, &Rt21Driver::configFinished);
+    driver.readConfiguration();
+    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 4000);
+    QVERIFY(!done.at(0).at(0).toBool());
+    QVERIFY(done.at(0).at(1).toString().contains(QStringLiteral("No reply from RT-21 on")));
+    for (const QByteArray &cmd : server.sim()->trace()) {
+        QVERIFY(!cmd.contains("RA1"));
+        QVERIFY(!cmd.contains("AT*"));
+    }
+}
+
+void TestSetup::silentModuleSkipsQueries()
+{
+    MockRt21Server server;
+    server.sim()->setIgnoreModule(true);
+    QVERIFY(server.listenTcp(0));
+    Rt21Driver driver;
+    RotorEndpoint endpoint;
+    endpoint.transport = RotorEndpoint::Transport::Tcp;
+    endpoint.host = QStringLiteral("127.0.0.1");
+    endpoint.tcpPort = int(server.port());
+    driver.connectEndpoint(endpoint);
+    QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::On, 3000);
+    QSignalSpy done(&driver, &Rt21Driver::networkFinished);
+    driver.readNetwork();
+    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 12000);
+    QVERIFY(!done.at(0).at(0).toBool());
+    bool sawExit = false;
+    for (const QByteArray &cmd : server.sim()->trace()) {
+        QVERIFY(!cmd.contains("AT*DHCP"));
+        if (cmd.startsWith("T01"))
+            sawExit = true;
+    }
+    QVERIFY(sawExit);
 }
 
 QTEST_MAIN(TestSetup)

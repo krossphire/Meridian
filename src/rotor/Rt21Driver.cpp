@@ -98,12 +98,38 @@ Rt21Driver::Rt21Driver(QObject *parent)
         const QByteArray bytes = inflight->bytes;
         const QString note = inflight->note;
         inflight.reset();
+        if (kind == Kind::Probe) {
+            queue.clear();
+            const QString message = noReplyMessage();
+            const bool wasNetwork = probeForNetwork;
+            configMode = false;
+            networkMode = false;
+            probeForNetwork = false;
+            if (wasNetwork)
+                emit networkFinished(false, message);
+            else
+                emit configFinished(false, message);
+            startPoll();
+            return;
+        }
         if (kind == Kind::Module) {
             const bool handshake = expectToken == QLatin1String("OK") && moduleKey.isEmpty() && !moduleOptional && !moduleExit;
             if (handshake && networkTries < 2) {
                 ++networkTries;
                 TrafficLog::instance().recordSession("NOTE", QByteArray("network handshake retry"));
                 startNetworkPass();
+                return;
+            }
+            if (handshake) {
+                countingHandshakeBytes = false;
+                if (!handshakeSawBytes) {
+                    TrafficLog::instance().recordSession("NOTE", QByteArray("network handshake got no bytes"));
+                    sendNetworkExit();
+                    return;
+                }
+                networkHandshakeDone = true;
+                enqueueNetworkQueries();
+                pump();
                 return;
             }
             if (!moduleOptional && !moduleKey.isEmpty() && !moduleRetried && !moduleExit) {
@@ -124,12 +150,17 @@ Rt21Driver::Rt21Driver(QObject *parent)
             }
             if (!moduleOptional && !moduleKey.isEmpty())
                 emit networkField(moduleKey, QString());
-            if (networkMode && queue.isEmpty())
-                finishNetwork(!writeCompareFailed, writeCompareFailed
-                                                         ? QStringLiteral("A setting did not read back as written.")
-                                                         : QString());
-            else
+            if (networkMode && queue.isEmpty()) {
+                const QString message = networkHandshakeDone
+                                            ? (writeCompareFailed ? QStringLiteral("A setting did not read back as written.")
+                                                                  : QString())
+                                            : (handshakeSawBytes
+                                                   ? QStringLiteral("The network module answered, but not with OK.")
+                                                   : QStringLiteral("The network module did not answer."));
+                finishNetwork(networkHandshakeDone && !writeCompareFailed, message);
+            } else {
                 pump();
+            }
             return;
         }
         if (kind == Kind::Motion || kind == Kind::Write) {
@@ -500,6 +531,10 @@ void Rt21Driver::connectEndpoint(const RotorEndpoint &next)
     serial->setDataBits(QSerialPort::Data8);
     serial->setParity(QSerialPort::NoParity);
     serial->setStopBits(QSerialPort::OneStop);
+    // Match Setup Utility 4.B12: Handshake stays None, and both DTR and RTS
+    // are turned on. .NET leaves them false; the utility sets both true
+    // (InitializeComponent: set_DtrEnable 1, set_RtsEnable 1). With them low,
+    // an Edgeport port opens and transmits but the RT-21 sends nothing back.
     serial->setFlowControl(QSerialPort::NoFlowControl);
     connect(serial, &QSerialPort::readyRead, this, &Rt21Driver::onReadyRead);
     connect(serial, &QSerialPort::errorOccurred, this, [this](QSerialPort::SerialPortError error) {
@@ -518,6 +553,13 @@ void Rt21Driver::connectEndpoint(const RotorEndpoint &next)
         failLink(message);
         return;
     }
+    const bool dtr = serial->setDataTerminalReady(true);
+    const bool rts = serial->setRequestToSend(true);
+    serial->clear(QSerialPort::AllDirections);
+    TrafficLog::instance().recordSession(
+        "NOTE", QByteArray("serial open ") + endpoint.serialPort.toLatin1()
+                    + " baud " + QByteArray::number(serial->baudRate())
+                    + " 8N1 DTR " + (dtr ? "on" : "off") + " RTS " + (rts ? "on" : "off"));
     onConnected();
 }
 
@@ -677,7 +719,11 @@ void Rt21Driver::onReadyRead()
     if (!io)
         return;
     const QByteArray received = io->readAll();
-    if (networkMode)
+    if (countingHandshakeBytes && !received.isEmpty())
+        handshakeSawBytes = true;
+    if (serial)
+        TrafficLog::instance().recordSession("SER-RX", received);
+    else if (networkMode)
         TrafficLog::instance().recordSession("NET-RX", received);
     else
         TrafficLog::instance().record("RX", received);
@@ -692,6 +738,26 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
     const QByteArray upper = frame.toUpper();
     if (upper == "BI1" || upper == "AI1" || upper == "R21" || upper == "R11" || upper == "R01" || upper == "R41")
         return;
+
+    if (inflight && inflight->kind == Kind::Probe) {
+        const auto status = Rt21::parseStatusFrame(frame);
+        const auto heading = status ? std::optional<double>(status->azimuth) : Rt21::parseHeadingFrame(frame);
+        if (heading) {
+            failures = 0;
+            noteArrival(*heading, status && status->haveStatus, status ? status->status : -1);
+            const bool network = probeForNetwork;
+            replyTimer->stop();
+            inflight.reset();
+            if (network)
+                startNetworkPass();
+            else {
+                enqueueConfiguration();
+                pump();
+            }
+            return;
+        }
+        return;
+    }
 
     if (inflight && (inflight->kind == Kind::Heading || inflight->kind == Kind::Status)) {
         if (const auto status = Rt21::parseStatusFrame(frame)) {
@@ -737,6 +803,13 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
         QString value = line;
         if (token)
             value = line.mid(tokenAt + inflight->expectToken.size()).trimmed().section(QLatin1Char(' '), 0, 0);
+        const bool handshakeOk = matched && inflight->expectToken == QLatin1String("OK") && inflight->moduleKey.isEmpty()
+                                 && !inflight->moduleOptional && !inflight->moduleExit && !networkHandshakeDone;
+        if (handshakeOk) {
+            networkHandshakeDone = true;
+            countingHandshakeBytes = false;
+            enqueueNetworkQueries();
+        }
         if (!inflight->expectValue.isEmpty() && value != inflight->expectValue) {
             writeCompareFailed = true;
             for (int i = queue.size() - 1; i >= 0; --i) {
@@ -891,7 +964,9 @@ void Rt21Driver::pump()
     if (inflight || queue.isEmpty() || !io)
         return;
     inflight = queue.dequeue();
-    if (networkMode)
+    if (serial)
+        TrafficLog::instance().recordSession("SER-TX", inflight->bytes);
+    else if (networkMode)
         TrafficLog::instance().recordSession("NET-TX", inflight->bytes);
     else
         TrafficLog::instance().record("TX", inflight->bytes);
@@ -961,17 +1036,46 @@ void Rt21Driver::stopMotion()
         startFastPoll();
 }
 
-void Rt21Driver::readConfiguration()
+QString Rt21Driver::noReplyMessage() const
+{
+    if (endpoint.transport == RotorEndpoint::Transport::Serial)
+        return QStringLiteral("No reply from RT-21 on %1 — check port/baud or run Find").arg(endpoint.serialPort);
+    return QStringLiteral("No reply from RT-21 on %1:%2 — check port/baud or run Find")
+        .arg(endpoint.host)
+        .arg(endpoint.tcpPort);
+}
+
+void Rt21Driver::beginGuardedRead(bool network)
 {
     if (!io) {
-        emit configFinished(false, QStringLiteral("Connect to a rotor before reading its setup."));
+        const QString message = QStringLiteral("Connect to a rotor before reading its setup.");
+        if (network)
+            emit networkFinished(false, message);
+        else
+            emit configFinished(false, message);
         return;
     }
-    configMode = true;
-    configTimeouts = 0;
     pollTimer->stop();
+    replyTimer->stop();
+    inflight.reset();
     queue.clear();
+    configMode = true;
+    networkMode = network;
+    probeForNetwork = network;
+    networkHandshakeDone = false;
+    countingHandshakeBytes = false;
+    handshakeSawBytes = false;
+    networkTries = 0;
+    configTimeouts = 0;
+    Job probe;
+    probe.kind = Kind::Probe;
+    probe.bytes = Rt21::queryTenths();
+    queue.enqueue(probe);
+    pump();
+}
 
+void Rt21Driver::enqueueConfiguration()
+{
     Job version;
     version.kind = Kind::Note;
     version.bytes = Rt21::queryVersion();
@@ -1003,7 +1107,11 @@ void Rt21Driver::readConfiguration()
     magnetic.id = QLatin1Char('[');
     magnetic.bytes = Rt21::readEe(QLatin1Char('['));
     queue.enqueue(magnetic);
-    pump();
+}
+
+void Rt21Driver::readConfiguration()
+{
+    beginGuardedRead(false);
 }
 
 void Rt21Driver::enqueueModule(const Rt21::ModuleQuery &query)
@@ -1031,6 +1139,25 @@ void Rt21Driver::finishNetwork(bool ok, const QString &message)
     startPoll();
 }
 
+void Rt21Driver::enqueueNetworkQueries()
+{
+    for (const Rt21::ModuleQuery &query : Rt21::networkReadSequence()) {
+        if (!query.exitStep && query.command.contains("AT*"))
+            enqueueModule(query);
+    }
+    sendNetworkExit();
+}
+
+void Rt21Driver::sendNetworkExit()
+{
+    for (const Rt21::ModuleQuery &query : Rt21::networkReadSequence()) {
+        if (query.exitStep)
+            enqueueModule(query);
+    }
+    if (!inflight)
+        pump();
+}
+
 void Rt21Driver::startNetworkPass()
 {
     queue.clear();
@@ -1039,30 +1166,24 @@ void Rt21Driver::startNetworkPass()
     replyTimer->stop();
     framer.clear();
     framer.setLineMode(true);
+    countingHandshakeBytes = true;
     Job clear;
     clear.kind = Kind::Module;
     clear.bytes = QByteArray(";");
     clear.moduleOptional = true;
     queue.enqueue(clear);
-    for (const Rt21::ModuleQuery &query : Rt21::networkReadSequence())
+    for (const Rt21::ModuleQuery &query : Rt21::networkReadSequence()) {
+        if (query.exitStep || query.command.contains("AT*"))
+            continue;
         enqueueModule(query);
+    }
     pump();
 }
 
 void Rt21Driver::readNetwork()
 {
-    if (!io) {
-        emit networkFinished(false, QStringLiteral("Connect to a rotor before reading the network module."));
-        return;
-    }
-    configMode = true;
-    networkMode = true;
-    networkTries = 0;
-    writeCompareFailed = false;
-    configTimeouts = 0;
-    pollTimer->stop();
     TrafficLog::instance().recordSession("NOTE", QByteArray("network read start"));
-    startNetworkPass();
+    beginGuardedRead(true);
 }
 
 void Rt21Driver::applySetupGroup(const QString &group, const QMap<QString, QString> &fields, const QString &backupPath)

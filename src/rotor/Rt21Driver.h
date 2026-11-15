@@ -84,7 +84,7 @@ signals:
     void statusNote(const QString &text);
 
 private:
-    enum class Kind { Motion, Heading, Status, Read, Write, Note, Module };
+    enum class Kind { Motion, Heading, Status, Read, Write, Note, Module, Probe };
 
     struct Job {
         Kind kind = Kind::Motion;
@@ -124,6 +124,11 @@ private:
     void finishNetwork(bool ok, const QString &message);
     void enqueueModule(const Rt21::ModuleQuery &query);
     void startNetworkPass();
+    void beginGuardedRead(bool network);
+    void enqueueConfiguration();
+    void enqueueNetworkQueries();
+    void sendNetworkExit();
+    QString noReplyMessage() const;
     bool moduleLineMatches(const QByteArray &frame) const;
     void startFastPoll();
     void startIdlePoll();
@@ -166,6 +171,10 @@ private:
     bool configMode = false;
     bool networkMode = false;
     int networkTries = 0;
+    bool probeForNetwork = false;
+    bool networkHandshakeDone = false;
+    bool countingHandshakeBytes = false;
+    bool handshakeSawBytes = false;
     bool writeCompareFailed = false;
     int pollsSinceStatus = 0;
     bool statusDisabled = false;

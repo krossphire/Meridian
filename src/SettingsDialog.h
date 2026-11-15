@@ -126,6 +126,7 @@ private:
     bool committing = false;
     bool haveSerialHold = false;
     QString serialHold;
+    bool continueToNetwork = false;
 
 protected:
     void closeEvent(QCloseEvent *event) override;
