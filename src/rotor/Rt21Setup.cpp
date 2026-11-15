@@ -88,25 +88,26 @@ QList<ModuleQuery> networkReadSequence()
     at.token = QStringLiteral("OK");
     rows.append(at);
 
-    rows.append(query("AT*HWTYPE?\r", "HWTYPE=", "hwtype"));
-    rows.append(query("AT*DHCP?\r", "DHCP=", "dhcp"));
-    rows.append(query("AT*IP?\r", "IP=", "ip"));
-    rows.append(query("AT*AIP?\r", "AIP=", "aip"));
-    rows.append(query("AT*NMASK?\r", "NMASK=", "nmask"));
-    rows.append(query("AT*ANMASK?\r", "ANMASK=", "anmask"));
-    rows.append(query("AT*GW?\r", "GW=", "gw"));
-    rows.append(query("AT*AGW?\r", "AGW=", "agw"));
-    rows.append(query("AT*ID?\r", "ID=", "id"));
-    rows.append(query("AT*HTTP?\r", "HTTP=", "http"));
-    rows.append(query("AT*UDP?\r", "UDP=", "udp"));
-    rows.append(query("AT*TFTP?\r", "TFTP=", "tftp"));
-    rows.append(query("AT*NVREG16_0?\r", "NVREG16_0=", "serialPort"));
-    rows.append(query("AT*WIFI_SECURITY?\r", "SECURITY=", "security"));
-    rows.append(query("AT*WIFI_ASSID?\r", "ASSID=", "ssid"));
-    rows.append(query("AT*WIFI_KEY?\r", "KEY=", "key"));
-    rows.append(query("AT*HTTP_USER?\r", "USER=", "user"));
-    rows.append(query("AT*HTTP_PASS?\r", "PASS=", "pass"));
-    rows.append(query("AT*LINK?\r", "LINK=", "link"));
+    // 4.B12 sends these with SerialPort.WriteLine, whose NewLine is "\n".
+    rows.append(query("AT*HWTYPE?\n", "HWTYPE=", "hwtype"));
+    rows.append(query("AT*DHCP?\n", "DHCP=", "dhcp"));
+    rows.append(query("AT*IP?\n", "IP=", "ip"));
+    rows.append(query("AT*AIP?\n", "AIP=", "aip"));
+    rows.append(query("AT*NMASK?\n", "NMASK=", "nmask"));
+    rows.append(query("AT*ANMASK?\n", "ANMASK=", "anmask"));
+    rows.append(query("AT*GW?\n", "GW=", "gw"));
+    rows.append(query("AT*AGW?\n", "AGW=", "agw"));
+    rows.append(query("AT*ID?\n", "ID=", "id"));
+    rows.append(query("AT*HTTP?\n", "HTTP=", "http"));
+    rows.append(query("AT*UDP?\n", "UDP=", "udp"));
+    rows.append(query("AT*TFTP?\n", "TFTP=", "tftp"));
+    rows.append(query("AT*NVREG16_0?\n", "NVREG16_0=", "serialPort"));
+    rows.append(query("AT*WIFI_SECURITY?\n", "SECURITY=", "security"));
+    rows.append(query("AT*WIFI_ASSID?\n", "ASSID=", "ssid"));
+    rows.append(query("AT*WIFI_KEY?\n", "KEY=", "key"));
+    rows.append(query("AT*HTTP_USER?\n", "USER=", "user"));
+    rows.append(query("AT*HTTP_PASS?\n", "PASS=", "pass"));
+    rows.append(query("AT*LINK?\n", "LINK=", "link"));
 
     ModuleQuery esc;
     esc.command = QByteArray("\x1b");
@@ -451,6 +452,23 @@ QString gatewayFromProcRoute(const QString &text)
         return QHostAddress(address).toString();
     }
     return {};
+}
+
+QString gatewaySubnetNote(const QString &ip, const QString &mask, const QString &gateway)
+{
+    QHostAddress address;
+    QHostAddress netmask;
+    QHostAddress gate;
+    if (!address.setAddress(ip.trimmed()) || !netmask.setAddress(mask.trimmed()) || !gate.setAddress(gateway.trimmed()))
+        return {};
+    if (address.protocol() != QAbstractSocket::IPv4Protocol || netmask.protocol() != QAbstractSocket::IPv4Protocol
+        || gate.protocol() != QAbstractSocket::IPv4Protocol)
+        return {};
+    const quint32 network = address.toIPv4Address() & netmask.toIPv4Address();
+    const quint32 gateNet = gate.toIPv4Address() & netmask.toIPv4Address();
+    if (network == gateNet)
+        return {};
+    return QStringLiteral("The gateway is not on the same subnet as the static address. That is often a typo.");
 }
 
 QString dottedMask(int prefixLength)

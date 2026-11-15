@@ -62,6 +62,7 @@ int recommendTcpPort(const QList<int> &busy);
 QList<int> tcpPortCandidates();
 
 QString gatewayFromProcRoute(const QString &text);
+QString gatewaySubnetNote(const QString &ip, const QString &mask, const QString &gateway);
 QString dottedMask(int prefixLength);
 StaticAdvice adviseStaticAddress(const QString &localIp, int prefixLength, const QString &gateway,
                                  const QStringList &taken);

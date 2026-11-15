@@ -13,10 +13,13 @@
 #include <QHostAddress>
 #include <QNetworkAddressEntry>
 #include <QNetworkInterface>
+#include <QRegularExpression>
 #include <QSerialPort>
 #include <QSerialPortInfo>
 #include <QTcpSocket>
 #include <QTimer>
+
+#include <algorithm>
 
 #include <algorithm>
 #include <cmath>
@@ -166,10 +169,30 @@ std::optional<FoundRotor> Rt21Finder::probeTcp(const QString &host, int port, in
     return found;
 }
 
+QList<int> serialProbeBauds()
+{
+    return {4800, 9600, 19200};
+}
+
 QList<FoundRotor> Rt21Finder::scanSerialPorts(int timeoutMs, const std::function<void(const FoundRotor &)> &onFound)
 {
     QList<FoundRotor> found;
-    const auto ports = QSerialPortInfo::availablePorts();
+    // Edgeport/8 shows up as ordinary COM1–COM8. Every present port is probed.
+    // FTDI and CP210x are not treated differently once a COM port exists.
+    auto ports = QSerialPortInfo::availablePorts();
+    std::sort(ports.begin(), ports.end(), [](const QSerialPortInfo &a, const QSerialPortInfo &b) {
+        auto number = [](QString name) {
+            name.remove(QRegularExpression(QStringLiteral("\\D")));
+            bool ok = false;
+            const int value = name.toInt(&ok);
+            return ok ? value : 100000;
+        };
+        const int left = number(a.portName());
+        const int right = number(b.portName());
+        if (left != right)
+            return left < right;
+        return a.portName() < b.portName();
+    });
     for (const QSerialPortInfo &info : ports) {
         const QString chip = usbChipName(info.manufacturer(), info.description());
         const QString blob = (info.manufacturer() + info.description() + info.portName()).toLower();
@@ -178,7 +201,9 @@ QList<FoundRotor> Rt21Finder::scanSerialPorts(int timeoutMs, const std::function
         QString kind = chip;
         if (kind.isEmpty() && usb)
             kind = QStringLiteral("USB");
-        for (int baud : {4800, 9600}) {
+        else if (kind.isEmpty())
+            kind = QStringLiteral("serial");
+        for (int baud : serialProbeBauds()) {
             if (const auto hit = probeSerial(info.portName(), kind, baud, timeoutMs)) {
                 found.append(*hit);
                 if (onFound)

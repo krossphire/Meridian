@@ -92,9 +92,36 @@ Rt21Driver::Rt21Driver(QObject *parent)
         const QChar id = inflight->id;
         const QString moduleKey = inflight->moduleKey;
         const bool moduleOptional = inflight->moduleOptional;
+        const bool moduleExit = inflight->moduleExit;
+        const bool moduleRetried = inflight->moduleRetried;
+        const QString expectToken = inflight->expectToken;
+        const QByteArray bytes = inflight->bytes;
         const QString note = inflight->note;
         inflight.reset();
         if (kind == Kind::Module) {
+            const bool handshake = expectToken == QLatin1String("OK") && moduleKey.isEmpty() && !moduleOptional && !moduleExit;
+            if (handshake && networkTries < 2) {
+                ++networkTries;
+                TrafficLog::instance().recordSession("NOTE", QByteArray("network handshake retry"));
+                startNetworkPass();
+                return;
+            }
+            if (!moduleOptional && !moduleKey.isEmpty() && !moduleRetried && !moduleExit) {
+                Job again;
+                again.kind = Kind::Module;
+                again.bytes = bytes;
+                again.moduleKey = moduleKey;
+                again.expectToken = expectToken;
+                again.moduleRetried = true;
+                QList<Job> rest;
+                while (!queue.isEmpty())
+                    rest.append(queue.dequeue());
+                queue.enqueue(again);
+                for (const Job &job : rest)
+                    queue.enqueue(job);
+                pump();
+                return;
+            }
             if (!moduleOptional && !moduleKey.isEmpty())
                 emit networkField(moduleKey, QString());
             if (networkMode && queue.isEmpty())
@@ -646,7 +673,10 @@ void Rt21Driver::onReadyRead()
     if (!io)
         return;
     const QByteArray received = io->readAll();
-    TrafficLog::instance().record("RX", received);
+    if (networkMode)
+        TrafficLog::instance().recordSession("NET-RX", received);
+    else
+        TrafficLog::instance().record("RX", received);
     framer.append(received);
     const QList<QByteArray> frames = framer.take();
     for (const QByteArray &frame : frames)
@@ -679,12 +709,21 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
     }
 
     if (inflight && inflight->kind == Kind::Module) {
-        const QString line = QString::fromLatin1(frame).trimmed();
+        QString line;
+        for (unsigned char c : frame) {
+            if (c >= 32 && c < 127)
+                line.append(QChar(c));
+            else if (!line.isEmpty() && !line.endsWith(QLatin1Char(' ')))
+                line.append(QLatin1Char(' '));
+        }
+        line = line.trimmed();
         if (line.isEmpty())
             return;
-        const bool okLine = line.compare(QStringLiteral("OK"), Qt::CaseInsensitive) == 0;
-        const bool token = !inflight->expectToken.isEmpty() && inflight->expectToken != QLatin1String("OK")
-                           && line.startsWith(inflight->expectToken, Qt::CaseInsensitive);
+        const bool okLine = line.contains(QStringLiteral("OK"), Qt::CaseInsensitive);
+        const int tokenAt = inflight->expectToken.isEmpty() || inflight->expectToken == QLatin1String("OK")
+                                ? -1
+                                : line.indexOf(inflight->expectToken, 0, Qt::CaseInsensitive);
+        const bool token = tokenAt >= 0;
         const bool matched = inflight->expectToken == QLatin1String("OK") ? okLine : token;
         if (!matched) {
             if (line.startsWith(QLatin1String("AT"), Qt::CaseInsensitive))
@@ -693,7 +732,7 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
         }
         QString value = line;
         if (token)
-            value = line.mid(inflight->expectToken.size()).trimmed();
+            value = line.mid(tokenAt + inflight->expectToken.size()).trimmed().section(QLatin1Char(' '), 0, 0);
         if (!inflight->expectValue.isEmpty() && value != inflight->expectValue) {
             writeCompareFailed = true;
             for (int i = queue.size() - 1; i >= 0; --i) {
@@ -848,7 +887,10 @@ void Rt21Driver::pump()
     if (inflight || queue.isEmpty() || !io)
         return;
     inflight = queue.dequeue();
-    TrafficLog::instance().record("TX", inflight->bytes);
+    if (networkMode)
+        TrafficLog::instance().recordSession("NET-TX", inflight->bytes);
+    else
+        TrafficLog::instance().record("TX", inflight->bytes);
     io->write(inflight->bytes);
     int wait = 1200;
     if (inflight->kind == Kind::Motion || inflight->kind == Kind::Write)
@@ -985,6 +1027,24 @@ void Rt21Driver::finishNetwork(bool ok, const QString &message)
     startPoll();
 }
 
+void Rt21Driver::startNetworkPass()
+{
+    queue.clear();
+    if (inflight && inflight->kind == Kind::Module)
+        inflight.reset();
+    replyTimer->stop();
+    framer.clear();
+    framer.setLineMode(true);
+    Job clear;
+    clear.kind = Kind::Module;
+    clear.bytes = QByteArray(";");
+    clear.moduleOptional = true;
+    queue.enqueue(clear);
+    for (const Rt21::ModuleQuery &query : Rt21::networkReadSequence())
+        enqueueModule(query);
+    pump();
+}
+
 void Rt21Driver::readNetwork()
 {
     if (!io) {
@@ -993,14 +1053,12 @@ void Rt21Driver::readNetwork()
     }
     configMode = true;
     networkMode = true;
+    networkTries = 0;
     writeCompareFailed = false;
     configTimeouts = 0;
-    framer.setLineMode(true);
     pollTimer->stop();
-    queue.clear();
-    for (const Rt21::ModuleQuery &query : Rt21::networkReadSequence())
-        enqueueModule(query);
-    pump();
+    TrafficLog::instance().recordSession("NOTE", QByteArray("network read start"));
+    startNetworkPass();
 }
 
 void Rt21Driver::applySetupGroup(const QString &group, const QMap<QString, QString> &fields, const QString &backupPath)

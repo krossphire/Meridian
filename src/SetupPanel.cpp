@@ -170,8 +170,10 @@ void SetupPanel::buildNetwork()
     };
     for (const auto &row : rows) {
         auto *edit = roField(QStringLiteral("net-") + row.first);
-        if (row.first == QLatin1String("key") || row.first == QLatin1String("pass"))
+        if (row.first == QLatin1String("key"))
             edit->setEchoMode(QLineEdit::Password);
+        if (row.first == QLatin1String("pass"))
+            edit->setPlaceholderText(QStringLiteral("not set"));
         if (row.first == QLatin1String("dns"))
             edit->setPlaceholderText(QStringLiteral("Not in the setup utility"));
         if (row.first == QLatin1String("mode"))
@@ -179,6 +181,13 @@ void SetupPanel::buildNetwork()
         values.insert(row.first, edit);
         form->addRow(row.second, edit);
     }
+    gatewayNote = new QLabel;
+    gatewayNote->setObjectName(QStringLiteral("gatewayNote"));
+    gatewayNote->setWordWrap(true);
+    form->addRow(QString(), gatewayNote);
+    auto *noReset = new QLabel(QStringLiteral("Reset to defaults is not offered. Nothing on this page is written."));
+    noReset->setWordWrap(true);
+    form->addRow(QString(), noReset);
 
     auto *scroll = new QScrollArea;
     scroll->setWidgetResizable(true);
@@ -383,27 +392,40 @@ void SetupPanel::showWizardStep(int step)
 
 void SetupPanel::remember(const QString &key, const QString &value)
 {
-    rawNetwork.insert(key, value);
+    QString stored = value;
+    if (key == QLatin1String("pass"))
+        stored = value.trimmed().isEmpty() ? QStringLiteral("not set") : QStringLiteral("set");
+    rawNetwork.insert(key, stored);
     QLineEdit *edit = values.value(key);
-    if (!edit)
-        return;
-    const bool secret = key == QLatin1String("key") || key == QLatin1String("pass");
-    if (key == QLatin1String("dhcp"))
-        edit->setText(Rt21::addressModeText(value));
-    else if (key == QLatin1String("security")) {
-        bool ok = false;
-        const int code = value.toInt(&ok);
-        edit->setText(ok ? QStringLiteral("%1 — %2").arg(value, Rt21::wifiSecurityName(code)) : value);
-    } else if (key == QLatin1String("link"))
-        edit->setText(value == QLatin1String("1") ? QStringLiteral("Link OK") : value);
-    else if (key == QLatin1String("hwtype"))
-        edit->setText(value.isEmpty() ? value : QStringLiteral("Type %1").arg(value));
-    else if (secret)
-        edit->setText(value);
-    else
-        edit->setText(value);
+    if (edit) {
+        if (key == QLatin1String("dhcp"))
+            edit->setText(Rt21::addressModeText(value));
+        else if (key == QLatin1String("security")) {
+            bool ok = false;
+            const int code = value.toInt(&ok);
+            edit->setText(ok ? QStringLiteral("%1 — %2").arg(value, Rt21::wifiSecurityName(code)) : value);
+        } else if (key == QLatin1String("link")) {
+            if (value == QLatin1String("1"))
+                edit->setText(QStringLiteral("Link OK"));
+            else if (value == QLatin1String("0"))
+                edit->setText(QStringLiteral("Not linked"));
+            else
+                edit->setText(value);
+        } else if (key == QLatin1String("hwtype"))
+            edit->setText(value.isEmpty() ? value : QStringLiteral("Type %1").arg(value));
+        else if (key == QLatin1String("key"))
+            edit->setText(value);
+        else
+            edit->setText(stored);
+    }
     if (key == QLatin1String("serialPort") && moduleSerial)
         moduleSerial->setText(QStringLiteral("Module serial TCP port: %1").arg(value.isEmpty() ? QStringLiteral("no reply") : value));
+    if (gatewayNote) {
+        const QString ip = rawNetwork.value(QStringLiteral("aip"));
+        const QString mask = rawNetwork.value(QStringLiteral("anmask"));
+        const QString gate = rawNetwork.value(QStringLiteral("agw"));
+        gatewayNote->setText(Rt21::gatewaySubnetNote(ip, mask.isEmpty() ? rawNetwork.value(QStringLiteral("nmask")) : mask, gate));
+    }
 }
 
 void SetupPanel::setStatus(const QString &text)

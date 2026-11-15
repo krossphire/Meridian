@@ -55,6 +55,7 @@ private:
     QLabel *savedLink = nullptr;
     QLabel *localPorts = nullptr;
     QLabel *moduleSerial = nullptr;
+    QLabel *gatewayNote = nullptr;
 
     QMap<QString, QLineEdit *> values;
     QMap<QString, QString> rawNetwork;

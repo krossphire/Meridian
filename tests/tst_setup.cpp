@@ -8,6 +8,7 @@
 #include "rotor/AppConfig.h"
 #include "rotor/Rt21Driver.h"
 #include "rotor/Rt21Protocol.h"
+#include "rotor/Rt21Finder.h"
 #include "rotor/Rt21Setup.h"
 
 #include <QSignalSpy>
@@ -207,6 +208,14 @@ void TestSetup::firmwareGate()
     QVERIFY(!Rt21::firmwareWritesAllowed(QStringLiteral("RT-21 4.13.2")));
     QVERIFY(!Rt21::firmwareWritesAllowed(QStringLiteral("RT-21 4.14")));
     QVERIFY(!Rt21::setupWritesCompiledIn());
+    QVERIFY(Rt21::gatewaySubnetNote(QStringLiteral("192.168.1.106"), QStringLiteral("255.255.255.0"),
+                                    QStringLiteral("192.168.2.1"))
+                .contains(QStringLiteral("not on the same subnet")));
+    QVERIFY(Rt21::gatewaySubnetNote(QStringLiteral("192.168.1.106"), QStringLiteral("255.255.255.0"),
+                                    QStringLiteral("192.168.1.1"))
+                .isEmpty());
+    QCOMPARE(serialProbeBauds().first(), 4800);
+    QVERIFY(serialProbeBauds().contains(19200));
 }
 
 QTEST_MAIN(TestSetup)

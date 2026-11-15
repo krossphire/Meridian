@@ -37,6 +37,9 @@ bool isVirtualAdapterName(const QString &name);
 // `extra` is a saved or custom port. Order is stable and duplicates are dropped.
 QList<int> networkCandidatePorts(const QList<int> &extra = {});
 
+// 4800, then 9600, then 19200.
+QList<int> serialProbeBauds();
+
 class Rt21Finder
 {
 public:
@@ -45,7 +48,7 @@ public:
 
     static std::optional<FoundRotor> probeTcp(const QString &host, int port, int timeoutMs);
 
-    // Every present serial port, 4800 then 9600. Ports that will not open are skipped.
+    // Every present serial port, including Edgeport COM1–COM8. Ports that will not open are skipped.
     // `onFound` is called as each rotor answers, including from a worker thread.
     static QList<FoundRotor> scanSerialPorts(int timeoutMs = 650,
                                              const std::function<void(const FoundRotor &)> &onFound = {});

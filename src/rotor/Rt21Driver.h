@@ -96,6 +96,7 @@ private:
         QString expectValue;
         bool moduleOptional = false;
         bool moduleExit = false;
+        bool moduleRetried = false;
     };
 
     void setLink(Link state, const QString &detail);
@@ -122,6 +123,7 @@ private:
     void showNote(const QString &note);
     void finishNetwork(bool ok, const QString &message);
     void enqueueModule(const Rt21::ModuleQuery &query);
+    void startNetworkPass();
     bool moduleLineMatches(const QByteArray &frame) const;
     void startFastPoll();
     void startIdlePoll();
@@ -163,6 +165,7 @@ private:
     int configTimeouts = 0;
     bool configMode = false;
     bool networkMode = false;
+    int networkTries = 0;
     bool writeCompareFailed = false;
     int pollsSinceStatus = 0;
     bool statusDisabled = false;

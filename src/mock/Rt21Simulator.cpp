@@ -118,13 +118,19 @@ void Rt21Simulator::startMotion()
 void Rt21Simulator::feed(const QByteArray &bytes)
 {
     for (unsigned char c : bytes) {
-        if (c == '\n')
-            continue;
         if (c == 0x1b) {
             atMode = false;
             replyLine(QByteArray("OK"));
             buffer.clear();
             sawCr = false;
+            continue;
+        }
+        if (c == '\n') {
+            if (buffer.startsWith("AT")) {
+                handle(buffer, false);
+                buffer.clear();
+                sawCr = false;
+            }
             continue;
         }
         if (c == '\r') {

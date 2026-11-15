@@ -198,4 +198,28 @@ There is no DNS command in the manual or in the utility. There is no AP/client m
 | Write, read back, compare | Implemented behind the read-only switch. Not in this build. |
 | Factory reset, bootloader, module reset, TFTP write, vanity line | Excluded |
 
+## What Andrew's utility showed against the 4.14.g1 read
+
+The setup utility, on the Edgeport COM port at 4800, showed Yaesu G-2800, Admin, Normal, limits 174/174, offset 174, max 10, min 1, ramp 3, motor timeout 8 s, rev/brake 3 s, A/D 0440, 3.58 V on term 4, CCW cal 5, CW cal 705, counter-rotate 10 s, over-travel 60, limit switch 1.4, cal range 360, magnetic variation 0, Auto Dim + Use Encoder + Allow Cal to the CCW limit, brightness 10, knob timer 40, screen saver 1 minute, and both alternate offsets off. Firmware line `RT-21 4.14.g1`.
+
+| Utility | Register | Read earlier | Match |
+| --- | --- | --- | --- |
+| Yaesu G-2800 | J = 10 | 10 | yes |
+| Admin | Q = 1 | 1 | yes |
+| Normal | M = 0 | 0 | yes |
+| Limits 174/174, offset 174 | H, I, D | 174 | yes |
+| Max 10, ramp 3 | G, N | 10, 3 | yes |
+| Min 1 | F | 125 | no. The slider is not the raw register. Meridian shows the raw value. |
+| Motor timeout 8 s, brake 3 s | P, E | 8, 3 | yes |
+| CCW 5, CW 705 | A, B | 5, 705 | yes |
+| Counter-rotate 10, over-travel 60, cal range 360 | V, U, L | 10, 60, 360 | yes |
+| Limit switch 1.4 | X = 14 | 14 | the utility shows tenths. Meridian shows 1.4 and the raw 14. |
+| Auto dim, encoder, allow CCW cal | T = 16+512+2048 | 2576 | yes |
+| Brightness 10, knob 40 | O, Y | 10, 40 | yes |
+| Screen saver 1 min | W | not in that backup | the utility shows 1 minute |
+| Alt offsets off | R, S = 361 | 361 | 361 is the unused sentinel. Meridian shows off. |
+| 3.58 V at A/D 0440 | pot, not an EEPROM letter | pot was 0334 at another moment | not 440/1023×5 V. The utility derives it. |
+
+A later serial open of the module, after one junk attempt, showed name RT-21, static address 192.168.1.106, mask 255.255.255.0, gateway 192.168.2.1, link 0, HTTP 801, UDP 23073, TFTP 69, serial TCP 6555. `AT*DHCP=1` is Static. The current IP shown beside the DHCP control is `AT*IP`, which was also 192.168.1.106. The gateway is on 192.168.2.0, not 192.168.1.0. Meridian says so and does not offer reset-to-defaults. The web password is reported only as set or not set.
+
 `docs/RT21_PROTOCOL.md` is the motion-protocol note. This file is the setup map.

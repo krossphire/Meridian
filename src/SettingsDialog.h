@@ -16,6 +16,7 @@
 #include <QSet>
 
 class QCloseEvent;
+class ControllerColumn;
 class SetupPanel;
 
 class QComboBox;
@@ -80,6 +81,7 @@ private:
     class QTabWidget *tabs = nullptr;
     class QTabWidget *setupTabs = nullptr;
     SetupPanel *setupPanel = nullptr;
+    ControllerColumn *setupColumn = nullptr;
     QLabel *statusLabel = nullptr;
     QMap<QString, QString> eeRaw;
     QLabel *screenSaver = nullptr;

@@ -58,6 +58,7 @@ add_executable(meridian
     src/GlobeWidget.cpp
     src/MainWindow.cpp
     src/SettingsDialog.cpp
+    src/ControllerColumn.cpp
     src/SetupPanel.cpp
     src/AboutDialog.cpp
     resources.qrc
@@ -102,6 +103,7 @@ meridian_test(tst_settings)
 target_sources(tst_settings PRIVATE
     src/MainWindow.cpp
     src/SettingsDialog.cpp
+    src/ControllerColumn.cpp
     src/SetupPanel.cpp
     src/AboutDialog.cpp
     src/GlobeWidget.cpp)

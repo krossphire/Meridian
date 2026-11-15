@@ -7,6 +7,7 @@
 #include "SettingsDialog.h"
 
 #include "AboutDialog.h"
+#include "ControllerColumn.h"
 #include "SetupPanel.h"
 #include "core/Coordinates.h"
 #include "rotor/Rt21Driver.h"
@@ -37,6 +38,7 @@
 #include <QPointer>
 #include <QPushButton>
 #include <QThread>
+#include <QFrame>
 #include <QScrollArea>
 #include <QSerialPortInfo>
 #include <QSpinBox>
@@ -119,8 +121,8 @@ SettingsDialog::SettingsDialog(const AppConfig &config, const ZipDatabase *zipDb
     buildRotors();
     buildController();
     setupPanel = new SetupPanel(this);
-    setupTabs->addTab(setupPanel->portsPage(), QStringLiteral("Ports"));
-    setupTabs->addTab(setupPanel->networkPage(), QStringLiteral("Network"));
+    if (setupColumn)
+        setupColumn->addTail(setupPanel->portsPage(), setupPanel->networkPage());
     tabs->addTab(setupTabs, QStringLiteral("Setup"));
     connect(setupPanel, &SetupPanel::statusMessage, this, [this](const QString &text) { setStatus(text); });
     connect(setupPanel, &SetupPanel::exportRequested, this, [this]() { exportSetup(); });
@@ -158,6 +160,8 @@ void SettingsDialog::setDriver(Rt21Driver *next)
     driverWired = true;
     if (setupPanel)
         setupPanel->setDriver(driver);
+    if (setupColumn)
+        setupColumn->setDriver(driver);
     if (!driver)
         return;
     connect(driver, &Rt21Driver::configField, this,
@@ -251,13 +255,9 @@ void SettingsDialog::refreshDisplayCallout()
 {
     if (!displayCallout)
         return;
+    const QString raw = eeRaw.value(QStringLiteral("W"));
     QString saver = QStringLiteral("Screen saver has not been read yet.");
-    for (const FieldRow &field : fields) {
-        if (field.id != QLatin1Char('W') || !field.raw)
-            continue;
-        const QString raw = field.raw->text();
-        if (raw == QLatin1String("…") || raw == QLatin1String("—"))
-            break;
+    if (!raw.isEmpty() && raw != QLatin1String("…") && raw != QLatin1String("—")) {
         bool numeric = false;
         const int minutes = raw.toInt(&numeric);
         if (!numeric)
@@ -266,7 +266,6 @@ void SettingsDialog::refreshDisplayCallout()
             saver = QStringLiteral("Screen saver is off. The heading stays on the display.");
         else
             saver = QStringLiteral("Screen saver is %1 minutes.").arg(minutes);
-        break;
     }
     displayCallout->setText(saver + QLatin1Char(' ') + Rt21::screenSaverRecommendation());
 }
@@ -628,6 +627,8 @@ void SettingsDialog::loadRotor(int index)
     baudCombo->setCurrentText(QString::number(rotor.baud == 9600 ? 9600 : 4800));
     if (setupPanel)
         setupPanel->setEndpoint(rotor);
+    if (setupColumn)
+        setupColumn->setLink(rotor);
     styleFindButton();
 }
 
@@ -828,227 +829,15 @@ void SettingsDialog::refreshPorts()
 
 void SettingsDialog::buildController()
 {
-    auto *page = new QWidget;
-    auto *layout = new QVBoxLayout(page);
-    auto *banner = new QLabel(
-#if MERIDIAN_ALPHA_READONLY
-        QStringLiteral(
-            "Read-only in this alpha. Reads and backups work. Apply, EEPROM writes, and calibration "
-            "commands stay off until they have been checked against a real RT-21.")
-#else
-        QStringLiteral(
-            "Reads use the commands in the RT-21 manual, Appendix F, and the version 4 addendum. "
-            "Writes use the documented WXn form with n = 1 (store, do not reboot). "
-            "The exact digits on the wire have not been checked against a real controller. "
-            "Apply saves a backup first and will not send a factory reset.")
-#endif
-    );
-    banner->setWordWrap(true);
-    versionLabel = new QLabel(QStringLiteral("Not read yet."));
-    versionLabel->setObjectName(QStringLiteral("versionLabel"));
-    versionLabel->setWordWrap(true);
-    displayCallout = new QLabel(Rt21::screenSaverRecommendation());
-    displayCallout->setObjectName(QStringLiteral("displayCallout"));
-    displayCallout->setWordWrap(true);
-
-    auto *read = new QPushButton(QStringLiteral("Read from rotor"));
-    auto *backup = new QPushButton(QStringLiteral("Backup…"));
-    auto *apply = new QPushButton(QStringLiteral("Apply"));
-    auto *actions = new QHBoxLayout;
-    actions->addWidget(read);
-    actions->addWidget(backup);
-    actions->addWidget(apply);
-    actions->addStretch();
-
-    auto *formHost = new QWidget;
-    auto *form = new QFormLayout(formHost);
-    form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
-    for (const FieldDef &def : kFields) {
-        auto *raw = new QLabel(QStringLiteral("—"));
-        raw->setMinimumWidth(72);
-        FieldRow row;
-        row.id = def.id;
-        row.writable = def.writable;
-        row.raw = raw;
-        if (def.writable) {
-            auto *spin = new QSpinBox;
-            spin->setRange(def.minValue, def.maxValue);
-            spin->setEnabled(false);
-            spin->setToolTip(QString::fromUtf8(def.hint));
-            row.spin = spin;
-            auto *pair = new QHBoxLayout;
-            auto *wrap = new QWidget;
-            pair->addWidget(spin);
-            pair->addWidget(raw, 1);
-            wrap->setLayout(pair);
-            form->addRow(QString::fromUtf8(def.label), wrap);
-            if (def.id == QLatin1Char('T')) {
-                connect(spin, qOverload<int>(&QSpinBox::valueChanged), this, [this](int value) {
-                    if (fillingBits)
-                        return;
-                    fillingBits = true;
-                    for (int bit = 0; bit < 12; ++bit)
-                        bits[bit]->setChecked(value & (1 << bit));
-                    fillingBits = false;
-                });
-            }
-        } else {
-            form->addRow(QString::fromUtf8(def.label), raw);
-        }
-        fields.append(row);
-    }
-
-    screenSaver = new QLabel(QStringLiteral("Screen saver: not read yet."));
-    multiplier = new QLabel(QStringLiteral("Multiplier: not read yet."));
-    magnetic = new QLabel(QStringLiteral("Magnetic variation: not read yet."));
-    auto *extra = new QLabel(QStringLiteral(
-        "Screen saver and the multiplier are utility fields on W and Z. Magnetic variation is R[1 / W[0 in utility 4.B12, range −60 to +60. None of these are written yet."));
-    extra->setWordWrap(true);
-
-    auto *bitHost = new QWidget;
-    auto *bitForm = new QFormLayout(bitHost);
-    for (int bit = 0; bit < 12; ++bit) {
-        bits[bit] = new QCheckBox(QString::fromUtf8(kBits[bit]));
-        bits[bit]->setEnabled(false);
-        bitForm->addRow(bits[bit]);
-        connect(bits[bit], &QCheckBox::toggled, this, [this]() {
-            if (fillingBits)
-                return;
-            int value = 0;
-            for (int i = 0; i < 12; ++i) {
-                if (bits[i]->isChecked())
-                    value |= (1 << i);
-            }
-            for (FieldRow &field : fields) {
-                if (field.id == QLatin1Char('T') && field.spin)
-                    field.spin->setValue(value);
-            }
-        });
-    }
-
+    setupColumn = new ControllerColumn;
     auto *scroll = new QScrollArea;
+    scroll->setObjectName(QStringLiteral("setupScroll"));
     scroll->setWidgetResizable(true);
-    auto *scrollBody = new QWidget;
-    auto *scrollLayout = new QVBoxLayout(scrollBody);
-    scrollLayout->addWidget(formHost);
-    scrollLayout->addWidget(screenSaver);
-    scrollLayout->addWidget(multiplier);
-    scrollLayout->addWidget(magnetic);
-    scrollLayout->addWidget(extra);
-    scrollLayout->addWidget(bitHost);
-    scrollLayout->addStretch();
-    scroll->setWidget(scrollBody);
-
-    auto *calRow = new QHBoxLayout;
-    auto *ccw = new QPushButton(QStringLiteral("Cal CCW here"));
-    auto *cw = new QPushButton(QStringLiteral("Cal CW here"));
-    auto *pulse = new QPushButton(QStringLiteral("Set pulse heading"));
-    auto *pulseValue = new QLineEdit;
-    pulseValue->setPlaceholderText(QStringLiteral("123.4"));
-    pulseValue->setMaximumWidth(90);
-    calRow->addWidget(ccw);
-    calRow->addWidget(cw);
-    calRow->addWidget(pulseValue);
-    calRow->addWidget(pulse);
-    calRow->addStretch();
-
-    banner->setText(banner->text() + QStringLiteral(
-        " Designed and tested with firmware 4.14.g1, which is not the public download. "
-        "Posted current firmware is 4.13.2. That line is expected to behave the same, and it has not been tested here."));
-    layout->addWidget(banner);
-    layout->addWidget(versionLabel);
-    layout->addWidget(displayCallout);
-    layout->addLayout(actions);
-#if MERIDIAN_ALPHA_READONLY
-    apply->setEnabled(false);
-    apply->setToolTip(QStringLiteral("Read-only in this alpha"));
-    ccw->setEnabled(false);
-    cw->setEnabled(false);
-    pulse->setEnabled(false);
-    pulseValue->setReadOnly(true);
-#endif
-    layout->addWidget(scroll, 1);
-    layout->addLayout(calRow);
-    setupTabs->addTab(page, QStringLiteral("Controller"));
-
-    connect(read, &QPushButton::clicked, this, [this]() {
-        if (!driver)
-            return;
-        versionLabel->clear();
-        versionReport.clear();
-        potReport.clear();
-        resetReport.clear();
-        for (FieldRow &field : fields) {
-            field.raw->setText(QStringLiteral("…"));
-            field.numeric = false;
-        }
-        driver->readConfiguration();
-    });
-    connect(backup, &QPushButton::clicked, this, [this]() { exportSetup(); });
-    connect(apply, &QPushButton::clicked, this, [this]() {
-        if (!driver)
-            return;
-        QList<QPair<QChar, int>> changes;
-        for (const FieldRow &field : fields) {
-            if (!field.writable || !field.numeric || !field.spin)
-                continue;
-            if (field.spin->value() != field.original)
-                changes.append({field.id, field.spin->value()});
-        }
-        if (changes.isEmpty()) {
-            QMessageBox::information(this, QStringLiteral("Apply"), QStringLiteral("Nothing changed."));
-            return;
-        }
-        const auto answer = QMessageBox::warning(
-            this, QStringLiteral("Apply to the RT-21"),
-            QStringLiteral("This sends %1 EEPROM write%2. A backup file is written first. "
-                           "The write format is inferred from Appendix F and has not been verified on hardware.")
-                .arg(changes.size())
-                .arg(changes.size() == 1 ? QString() : QStringLiteral("s")),
-            QMessageBox::Apply | QMessageBox::Cancel, QMessageBox::Cancel);
-        if (answer != QMessageBox::Apply)
-            return;
-        const QString path = QDir(UserFiles::backupDirectory())
-                                 .filePath(QStringLiteral("meridian-rt21-%1.json")
-                                               .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss"))));
-        const QString error = backupConfig(path);
-        if (!error.isEmpty()) {
-            QMessageBox::warning(this, QStringLiteral("Backup"), error);
-            return;
-        }
-        driver->writeConfiguration(changes);
-    });
-
-    const auto confirmCal = [this](const QString &title, const QString &body, auto send) {
-        if (!driver)
-            return;
-        if (QMessageBox::warning(this, title, body, QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel)
-            != QMessageBox::Yes)
-            return;
-        send();
-    };
-    connect(ccw, &QPushButton::clicked, this, [=]() {
-        confirmCal(QStringLiteral("Calibrate CCW"),
-                   QStringLiteral("Send C01; and set the CCW calibration to the antenna's current position?"),
-                   [this]() { driver->sendCalibrate(false); });
-    });
-    connect(cw, &QPushButton::clicked, this, [=]() {
-        confirmCal(QStringLiteral("Calibrate CW"),
-                   QStringLiteral("Send C11; and set the CW calibration to the antenna's current position?"),
-                   [this]() { driver->sendCalibrate(true); });
-    });
-    connect(pulse, &QPushButton::clicked, this, [this, pulseValue, confirmCal]() {
-        bool ok = false;
-        const double value = pulseValue->text().toDouble(&ok);
-        if (!ok) {
-            QMessageBox::warning(this, QStringLiteral("Pulse heading"), QStringLiteral("Enter a heading in degrees."));
-            return;
-        }
-        confirmCal(QStringLiteral("Pulse calibration"),
-                   QStringLiteral("Send AW1 and set the pulse counter's displayed heading to %1°?")
-                       .arg(value, 0, 'f', 1),
-                   [this, value]() { driver->sendPulseHeading(value); });
-    });
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setWidget(setupColumn);
+    setupTabs->addTab(scroll, QStringLiteral("Setup"));
+    versionLabel = setupColumn->versionLabel();
+    displayCallout = setupColumn->callout();
 }
 
 QString SettingsDialog::backupConfig(const QString &path) const

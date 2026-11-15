@@ -21,6 +21,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QSettings>
 #include <QTabWidget>
 #include <QTimer>
@@ -199,10 +200,10 @@ int runScreenshots(const QString &directory, qreal dpr)
     if (!read || !dialog->grab().save(directory + QStringLiteral("/settings-controller.png")))
         return 12;
 
-    auto *setupTabs = dialog->findChild<QTabWidget *>(QStringLiteral("setupTabs"));
-    if (!setupTabs)
-        return 19;
-    setupTabs->setCurrentIndex(2);
+    auto *scroll = dialog->findChild<QScrollArea *>(QStringLiteral("setupScroll"));
+    auto *networkGroup = dialog->findChild<QWidget *>(QStringLiteral("networkGroup"));
+    if (scroll && networkGroup)
+        scroll->ensureWidgetVisible(networkGroup);
     auto *readNetwork = dialog->findChild<QPushButton *>(QStringLiteral("readNetwork"));
     if (!readNetwork)
         return 20;

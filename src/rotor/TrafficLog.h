@@ -25,6 +25,8 @@ public:
 
     void note(const QString &text);
     void record(const char *direction, const QByteArray &bytes);
+    // Network reads are logged even when the traffic checkbox is off.
+    void recordSession(const char *direction, const QByteArray &bytes);
     void flush();
 
 private:
