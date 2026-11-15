@@ -121,3 +121,11 @@ While the rotor was turning:
 The byte after `01 30` behaves as a moving flag: `00` stopped, `01` rotating, then `>` (`3E`) and the same `NNN.N;` heading. It is not requested by `R21;`. It looks like an unsolicited status frame from the network module, mixed into the `BI1;` replies. Meridian strips leading non-numeric bytes, treats `01 30 xx 3E` as that status header, and uses `xx` as the rotating flag when it is 0–5. A stopped flag is the settled signal.
 
 Replies on that session arrived about every 2 seconds while idle and about every 250 ms while the rotor was moving. Those are the rates the controller was actually answering, not a reason to reconnect.
+
+## Network module TCP port
+
+The Version 4 addendum (rev 4, November 2022), section “WiFi/LAN Operation”, says SETUP’s **Ports (Advanced and Optional)** chooses ports “other than the defaults.” It describes the HTTP port as the one a browser uses, and says that choosing 80 means the browser URL needs no port. The only numeric HTTP example in that section is `http://192.168.1.4:8080`. The same paragraph says **Serial – TCP Operation** sets the TCP port for serial-over-TCP programs such as GH Everyware and PST Rotator, on firmware 4.13 and later. It does not print a factory number for that serial-TCP port.
+
+Hamlib’s RT-21 backend (`rotators/rotorez/rotorez.c`, `rt21_rot_caps`, version string 20230507.0) is `RIG_PORT_SERIAL` at 4800 8N1. It has no TCP port.
+
+**Unverified:** a factory default for the serial-TCP port. 6555 is a port some stations, including the original Meridian default, were configured to use. It is not printed in the addendum or in Hamlib. Find RT-21 does not assume it. It probes 23, 4001, 5000, 6555, 8080, and 10001, plus any port already saved and an optional custom port, and lists a host only when `BI1;` parses as a heading.

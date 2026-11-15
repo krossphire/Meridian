@@ -43,6 +43,7 @@ public:
     void sendPulseHeading(double azimuth);
 
     Link link() const { return link_; }
+    RotorEndpoint linkEndpoint() const { return endpoint; }
     std::optional<double> heading() const { return heading_; }
     std::optional<double> target() const { return target_; }
     QString detail() const { return detail_; }

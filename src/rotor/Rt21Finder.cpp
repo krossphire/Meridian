@@ -8,6 +8,7 @@
 
 #include "Rt21Protocol.h"
 
+#include <QElapsedTimer>
 #include <QEventLoop>
 #include <QHostAddress>
 #include <QNetworkAddressEntry>
@@ -81,7 +82,32 @@ QString foundRotorLabel(const QString &place, const QString &kind, int baud, dou
     if (baud > 0) {
         return QStringLiteral("RT-21 on %1 (%2, %3), heading %4°").arg(place, kind).arg(baud).arg(text);
     }
-    return QStringLiteral("RT-21 at %1, heading %2°").arg(place, text);
+    return QStringLiteral("RT-21 at %1 (network), heading %2°").arg(place, text);
+}
+
+bool isVirtualAdapterName(const QString &name)
+{
+    const QString folded = name.toLower();
+    const QStringList markers = {QStringLiteral("virtual"), QStringLiteral("vpn"),  QStringLiteral("tun"),
+                                 QStringLiteral("tap"),     QStringLiteral("wsl"),  QStringLiteral("hyper-v"),
+                                 QStringLiteral("vbox"),    QStringLiteral("vmware"), QStringLiteral("bluetooth"),
+                                 QStringLiteral("loopback"), QStringLiteral("npcap"), QStringLiteral("pseudo"),
+                                 QStringLiteral("teredo"),  QStringLiteral("isatap"), QStringLiteral("docker")};
+    for (const QString &marker : markers) {
+        if (folded.contains(marker))
+            return true;
+    }
+    return false;
+}
+
+QList<int> networkCandidatePorts(const QList<int> &extra)
+{
+    QList<int> ports = {23, 4001, 5000, 6555, 8080, 10001};
+    for (int port : extra) {
+        if (port > 0 && port <= 65535 && !ports.contains(port))
+            ports.append(port);
+    }
+    return ports;
 }
 
 std::optional<FoundRotor> Rt21Finder::probeSerial(const QString &portName, const QString &kind, int baud, int timeoutMs)
@@ -140,7 +166,7 @@ std::optional<FoundRotor> Rt21Finder::probeTcp(const QString &host, int port, in
     return found;
 }
 
-QList<FoundRotor> Rt21Finder::scanSerialPorts(int timeoutMs)
+QList<FoundRotor> Rt21Finder::scanSerialPorts(int timeoutMs, const std::function<void(const FoundRotor &)> &onFound)
 {
     QList<FoundRotor> found;
     const auto ports = QSerialPortInfo::availablePorts();
@@ -155,6 +181,8 @@ QList<FoundRotor> Rt21Finder::scanSerialPorts(int timeoutMs)
         for (int baud : {4800, 9600}) {
             if (const auto hit = probeSerial(info.portName(), kind, baud, timeoutMs)) {
                 found.append(*hit);
+                if (onFound)
+                    onFound(*hit);
                 break;
             }
         }
@@ -166,7 +194,9 @@ QStringList Rt21Finder::localSubnetHosts()
 {
     QStringList hosts;
     for (const QNetworkInterface &iface : QNetworkInterface::allInterfaces()) {
-        if (!(iface.flags() & QNetworkInterface::IsUp) || (iface.flags() & QNetworkInterface::IsLoopBack))
+        const QString adapter = iface.humanReadableName() + QLatin1Char(' ') + iface.name();
+        if (!(iface.flags() & QNetworkInterface::IsUp) || !(iface.flags() & QNetworkInterface::IsRunning)
+            || (iface.flags() & QNetworkInterface::IsLoopBack) || isVirtualAdapterName(adapter))
             continue;
         for (const QNetworkAddressEntry &entry : iface.addressEntries()) {
             if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol)
@@ -184,19 +214,33 @@ QStringList Rt21Finder::localSubnetHosts()
     return hosts;
 }
 
-QList<FoundRotor> Rt21Finder::scanHosts(const QStringList &hosts, int port, int connectMs)
+QList<FoundRotor> Rt21Finder::scanHosts(const QStringList &hosts, const QList<int> &ports, int connectMs,
+                                       const std::function<void(const FoundRotor &)> &onFound)
 {
+    struct Target {
+        QString host;
+        int port = 0;
+    };
+    QList<Target> targets;
+    for (const QString &host : hosts) {
+        for (int port : ports) {
+            if (port > 0 && port <= 65535)
+                targets.append({host, port});
+        }
+    }
     QList<FoundRotor> found;
-    constexpr int kBatch = 16;
-    for (int start = 0; start < hosts.size(); start += kBatch) {
-        const int end = std::min(start + kBatch, int(hosts.size()));
+    constexpr int kParallel = 32;
+    QElapsedTimer budget;
+    budget.start();
+    for (int start = 0; start < targets.size() && budget.elapsed() < 14000; start += kParallel) {
+        const int end = std::min(start + kParallel, int(targets.size()));
         QEventLoop loop;
         int pending = 0;
         QList<QTcpSocket *> sockets;
         QTimer cap;
         cap.setSingleShot(true);
         QObject::connect(&cap, &QTimer::timeout, &loop, &QEventLoop::quit);
-        cap.start(connectMs + 800);
+        cap.start(connectMs + 350);
         for (int i = start; i < end; ++i) {
             auto *socket = new QTcpSocket;
             sockets.append(socket);
@@ -205,7 +249,8 @@ QList<FoundRotor> Rt21Finder::scanHosts(const QStringList &hosts, int port, int 
             QObject::connect(socket, &QObject::destroyed, [framer]() { delete framer; });
             auto *readTimer = new QTimer(socket);
             readTimer->setSingleShot(true);
-            const QString host = hosts.at(i);
+            const QString host = targets.at(i).host;
+            const int port = targets.at(i).port;
             auto settle = [&, socket]() {
                 if (socket->property("done").toBool())
                     return;
@@ -217,7 +262,7 @@ QList<FoundRotor> Rt21Finder::scanHosts(const QStringList &hosts, int port, int 
             QObject::connect(socket, &QTcpSocket::connected, socket, [=]() {
                 socket->write(Rt21::queryTenths());
                 socket->flush();
-                readTimer->start(600);
+                readTimer->start(250);
             });
             QObject::connect(socket, &QTcpSocket::readyRead, socket, [=, &found]() {
                 framer->append(socket->readAll());
@@ -230,6 +275,8 @@ QList<FoundRotor> Rt21Finder::scanHosts(const QStringList &hosts, int port, int 
                         hit.heading = *heading;
                         hit.label = foundRotorLabel(QStringLiteral("%1:%2").arg(host).arg(port), QString(), 0, *heading);
                         found.append(hit);
+                        if (onFound)
+                            onFound(hit);
                         settle();
                         return;
                     }
@@ -241,7 +288,7 @@ QList<FoundRotor> Rt21Finder::scanHosts(const QStringList &hosts, int port, int 
                 if (socket->state() != QAbstractSocket::ConnectedState)
                     settle();
             });
-            socket->connectToHost(host, quint16(std::clamp(port, 1, 65535)));
+            socket->connectToHost(host, quint16(port));
         }
         if (pending > 0)
             loop.exec();

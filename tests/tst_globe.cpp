@@ -6,7 +6,9 @@
 
 #include "GlobeWidget.h"
 
+#include <QDateTime>
 #include <QFile>
+#include <QImage>
 #include <QLineEdit>
 #include <QSignalSpy>
 #include <QTest>
@@ -18,6 +20,7 @@ class TestGlobe : public QObject
     Q_OBJECT
 private slots:
     void clickEastAndEdit();
+    void sunStaysInsideDisc();
 };
 
 void TestGlobe::clickEastAndEdit()
@@ -58,6 +61,37 @@ void TestGlobe::clickEastAndEdit()
     edit->setText(QStringLiteral("200"));
     QTest::keyClick(edit, Qt::Key_Escape);
     QCOMPARE(edited.size(), 1);
+}
+
+void TestGlobe::sunStaysInsideDisc()
+{
+    GlobeWidget globe;
+    globe.resize(420, 420);
+    globe.setHome(36.4, -94.2);
+    globe.setHeading(1.2);
+    globe.setShowSun(true);
+    globe.setSolarPreview(QDateTime(QDate(2024, 6, 21), QTime(18, 0), Qt::UTC));
+    globe.show();
+    QTest::qWait(50);
+    const QImage shot = globe.grab().toImage();
+    const double side = std::max(2.0, std::min(shot.width(), shot.height()) - 2.0);
+    const double radius = side / 2.0;
+    const double cx = shot.width() / 2.0;
+    const double cy = shot.height() / 2.0;
+    for (int y = 0; y < shot.height(); ++y) {
+        for (int x = 0; x < shot.width(); ++x) {
+            const double distance = std::hypot(x + 0.5 - cx, y + 0.5 - cy);
+            if (distance <= radius + 1.5)
+                continue;
+            if (y > shot.height() - 32)
+                continue;
+            if (x > shot.width() - 36 && y > shot.height() - 36)
+                continue;
+            const QColor pixel = shot.pixelColor(x, y);
+            QVERIFY2(pixel.red() < 40 && pixel.green() < 40 && pixel.blue() < 48,
+                     qPrintable(QStringLiteral("%1,%2 rgb %3 %4 %5").arg(x).arg(y).arg(pixel.red()).arg(pixel.green()).arg(pixel.blue())));
+        }
+    }
 }
 
 QTEST_MAIN(TestGlobe)

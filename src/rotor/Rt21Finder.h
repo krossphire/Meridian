@@ -14,6 +14,7 @@
 #include <QString>
 #include <QStringList>
 
+#include <functional>
 #include <optional>
 
 struct FoundRotor {
@@ -26,8 +27,15 @@ struct FoundRotor {
 // Empty when it is not a known USB UART.
 QString usbChipName(const QString &manufacturer, const QString &description);
 
-// "RT-21 on COM6 (USB, 4800), heading 132°" or "RT-21 at 192.168.1.20, heading 132°".
+// "RT-21 on COM6 (USB, 4800), heading 132°" or "RT-21 at 192.168.1.20:6555 (network), heading 1°".
 QString foundRotorLabel(const QString &place, const QString &kind, int baud, double heading);
+
+// True for VPN, virtual, and tunnel adapters that should not be swept.
+bool isVirtualAdapterName(const QString &name);
+
+// Ports to try on each host. Factory numeric defaults are not published; see the protocol note.
+// `extra` is a saved or custom port. Order is stable and duplicates are dropped.
+QList<int> networkCandidatePorts(const QList<int> &extra = {});
 
 class Rt21Finder
 {
@@ -38,11 +46,15 @@ public:
     static std::optional<FoundRotor> probeTcp(const QString &host, int port, int timeoutMs);
 
     // Every present serial port, 4800 then 9600. Ports that will not open are skipped.
-    static QList<FoundRotor> scanSerialPorts(int timeoutMs = 650);
+    // `onFound` is called as each rotor answers, including from a worker thread.
+    static QList<FoundRotor> scanSerialPorts(int timeoutMs = 650,
+                                             const std::function<void(const FoundRotor &)> &onFound = {});
 
-    // IPv4 hosts on local /24s, excluding this machine. Capped so a scan stays short.
+    // IPv4 hosts on local /24s of physical adapters, excluding this machine.
     static QStringList localSubnetHosts();
 
-    // Rate-limited. `connectMs` is the handshake budget per batch, not per host.
-    static QList<FoundRotor> scanHosts(const QStringList &hosts, int port, int connectMs = 400);
+    // Probes host × port with `connectMs` handshakes, 32 at a time, and stops
+    // launching new probes after about 14 s. A hit is kept only when BI1; parses.
+    static QList<FoundRotor> scanHosts(const QStringList &hosts, const QList<int> &ports, int connectMs = 300,
+                                       const std::function<void(const FoundRotor &)> &onFound = {});
 };

@@ -759,7 +759,7 @@ void GlobeWidget::ensureSun()
             row[x] = qPremultiply(qRgba(red, green, blue, alpha));
         }
     }
-    overlay.setDevicePixelRatio(dpr * drawScale);
+    overlay.setDevicePixelRatio(std::max(qreal(1), dpr * drawScale));
     sunOverlay = overlay;
 }
 
@@ -784,10 +784,18 @@ void GlobeWidget::paintScene(QPainter &painter)
         painter.drawEllipse(disk());
     }
 
+    const QRectF globe = disk();
+    const QPointF center = globe.center();
+    const qreal radius = globe.width() / 2.0;
+    QPainterPath discClip;
+    discClip.addEllipse(globe);
+
     if (showSun && detailLevel() >= 1 && !sunOverlay.isNull()) {
+        painter.save();
+        painter.setClipPath(discClip);
         painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-        painter.drawImage(QPointF(0, 0), sunOverlay);
-        painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+        painter.drawImage(globe, sunOverlay);
+        painter.restore();
     }
     if (!cacheLines.isNull() && cacheMatches)
         painter.drawImage(QPointF(0, 0), cacheLines);
@@ -797,9 +805,6 @@ void GlobeWidget::paintScene(QPainter &painter)
         painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
     }
 
-    const QRectF globe = disk();
-    const QPointF center = globe.center();
-    const qreal radius = globe.width() / 2.0;
     const int lod = detailLevel();
 
     if (lod >= 1 && hoverIndex >= 0) {
@@ -851,10 +856,16 @@ void GlobeWidget::paintScene(QPainter &painter)
     if (lod >= 2 && highProjected)
         drawCountryLabels(painter, *highProjected, globe);
 
+    painter.save();
+    painter.setClipPath(discClip);
+
     if (showSun && haveHome) {
         const UnitPoint spot = projectAzimuthal(homeLat_, homeLon_, sunNow.subsolarLatitude, sunNow.subsolarLongitude);
-        const QPointF at(center.x() + spot.x * radius, center.y() - spot.y * radius);
         const qreal mark = std::clamp(radius * 0.028, 3.5, 7.0);
+        const qreal limit = std::max(0.0, 1.0 - (mark + 1.5) / std::max(qreal(1), radius));
+        const qreal rho = spot.rho <= 1e-6 ? 0.0 : std::min(spot.rho, limit);
+        const qreal scale = spot.rho <= 1e-6 ? 0.0 : rho / spot.rho;
+        const QPointF at(center.x() + spot.x * scale * radius, center.y() - spot.y * scale * radius);
         const bool below = sunNow.elevation < 0.0;
         painter.setBrush(below ? Qt::NoBrush : QColor(232, 196, 120, 210));
         painter.setPen(QPen(QColor(232, 196, 120, below ? 90 : 220), below ? 1.2 : 1.0));
@@ -875,14 +886,15 @@ void GlobeWidget::paintScene(QPainter &painter)
     if (heading) {
         if (lod > 0) {
             painter.setPen(QPen(QColor(255, 191, 0, 46), beamWidth() + 3.2, Qt::SolidLine, Qt::RoundCap));
-            painter.drawLine(pointOn(*heading, 0.03), pointOn(*heading, 0.97));
+            painter.drawLine(pointOn(*heading, 0.03), pointOn(*heading, 1.0));
         }
         painter.setPen(QPen(kBeam, beamWidth(), Qt::SolidLine, Qt::RoundCap));
-        painter.drawLine(pointOn(*heading, 0.025), pointOn(*heading, 0.97));
+        painter.drawLine(pointOn(*heading, 0.0), pointOn(*heading, 1.0));
         painter.setPen(Qt::NoPen);
         painter.setBrush(kBeam);
         painter.drawEllipse(center, std::max(2.4, beamWidth() * 0.85), std::max(2.4, beamWidth() * 0.85));
     }
+    painter.restore();
 
     if (!editor->isVisible()) {
         const QString text = heading ? QString::number(*heading, 'f', 1) + QStringLiteral("°") : QStringLiteral("—");

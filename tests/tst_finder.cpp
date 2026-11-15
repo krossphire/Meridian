@@ -49,8 +49,17 @@ void TestFinder::labelText()
              QStringLiteral("RT-21 on COM6 (USB, 4800), heading 132°"));
     QCOMPARE(foundRotorLabel(QStringLiteral("COM4"), QStringLiteral("FTDI"), 9600, 12.5),
              QStringLiteral("RT-21 on COM4 (FTDI, 9600), heading 12.5°"));
-    QCOMPARE(foundRotorLabel(QStringLiteral("192.168.1.20:6555"), QString(), 0, 90),
-             QStringLiteral("RT-21 at 192.168.1.20:6555, heading 90°"));
+    QCOMPARE(foundRotorLabel(QStringLiteral("192.168.1.106:6555"), QString(), 0, 1),
+             QStringLiteral("RT-21 at 192.168.1.106:6555 (network), heading 1°"));
+    const QList<int> ports = networkCandidatePorts({6555, 7000});
+    QVERIFY(ports.contains(23));
+    QVERIFY(ports.contains(6555));
+    QVERIFY(ports.contains(8080));
+    QVERIFY(ports.contains(10001));
+    QCOMPARE(ports.count(6555), 1);
+    QVERIFY(ports.contains(7000));
+    QVERIFY(isVirtualAdapterName(QStringLiteral("WireGuard VPN")));
+    QVERIFY(!isVirtualAdapterName(QStringLiteral("Ethernet")));
 }
 
 void TestFinder::freshRotorHasNoAddress()
@@ -75,7 +84,11 @@ void TestFinder::tcpProbe()
     QCOMPARE(found->endpoint.host, QStringLiteral("127.0.0.1"));
     QCOMPARE(found->endpoint.tcpPort, int(server.port()));
     QVERIFY(std::abs(found->heading - 132.0) < 0.2);
+    QVERIFY(found->label.contains(QStringLiteral("(network)")));
     QVERIFY(found->label.contains(QStringLiteral("heading 132")));
+    const auto swept = Rt21Finder::scanHosts({QStringLiteral("127.0.0.1")}, {int(server.port())}, 300);
+    QCOMPARE(swept.size(), 1);
+    QVERIFY(Rt21Finder::scanHosts({QStringLiteral("127.0.0.1")}, {9}, 200).isEmpty());
     QVERIFY(!Rt21Finder::probeTcp(QStringLiteral("192.0.2.1"), 9, 300));
 }
 

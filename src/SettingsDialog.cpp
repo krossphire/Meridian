@@ -385,10 +385,20 @@ void SettingsDialog::buildRotors()
     networkButton->setObjectName(QStringLiteral("scanNetwork"));
     networkButton->setFlat(true);
     networkButton->setCursor(Qt::PointingHandCursor);
+    customHostEdit = new QLineEdit;
+    customHostEdit->setObjectName(QStringLiteral("customHost"));
+    customHostEdit->setPlaceholderText(QStringLiteral("Host (optional)"));
+    customPortEdit = new QLineEdit;
+    customPortEdit->setObjectName(QStringLiteral("customPort"));
+    customPortEdit->setPlaceholderText(QStringLiteral("Custom port"));
+    auto *customRow = new QHBoxLayout;
+    customRow->addWidget(customHostEdit);
+    customRow->addWidget(customPortEdit);
     layout->addWidget(findButton);
     layout->addWidget(findNote);
     layout->addWidget(resultsHost);
     layout->addWidget(networkButton);
+    layout->addLayout(customRow);
     connect(findButton, &QPushButton::clicked, this, [this]() { startFind(false); });
     connect(networkButton, &QPushButton::clicked, this, [this]() { startFind(true); });
 
@@ -487,6 +497,12 @@ void SettingsDialog::presentFound(const FoundRotor &found)
 {
     if (!findResults)
         return;
+    const QString key = found.endpoint.transport == RotorEndpoint::Transport::Tcp
+                            ? QStringLiteral("%1:%2").arg(found.endpoint.host).arg(found.endpoint.tcpPort)
+                            : found.endpoint.serialPort + QLatin1Char(':') + QString::number(found.endpoint.baud);
+    if (foundKeys.contains(key))
+        return;
+    foundKeys.append(key);
     auto *button = new QPushButton(found.label);
     button->setObjectName(QStringLiteral("findResult"));
     button->setCursor(Qt::PointingHandCursor);
@@ -513,31 +529,79 @@ void SettingsDialog::applyFound(const FoundRotor &found)
         findNote->setText(found.label);
 }
 
-void SettingsDialog::startFind(bool network)
+void SettingsDialog::startFind(bool networkOnly)
 {
     if (findThread)
         return;
     findButton->setEnabled(false);
     networkButton->setEnabled(false);
-    if (!network) {
+    if (!networkOnly) {
         while (QLayoutItem *item = findResults->takeAt(0)) {
             delete item->widget();
             delete item;
         }
+        foundKeys.clear();
         findNote->setText(QStringLiteral("Checking USB and COM ports…"));
     } else {
-        findNote->setText(QStringLiteral("Scanning the local network for port 6555…"));
+        findNote->setText(QStringLiteral("Checking the network…"));
+    }
+    QList<int> extra;
+    bool portOk = false;
+    const int customPort = customPortEdit ? customPortEdit->text().trimmed().toInt(&portOk) : 0;
+    if (portOk)
+        extra.append(customPort);
+    for (const RotorEndpoint &rotor : draft.rotors) {
+        if (rotor.transport == RotorEndpoint::Transport::Tcp && rotor.tcpPort > 0)
+            extra.append(rotor.tcpPort);
+    }
+    const QString typedHost = customHostEdit ? customHostEdit->text().trimmed() : QString();
+    FoundRotor held;
+    bool haveHeld = false;
+    if (driver && (driver->link() == Rt21Driver::Link::On || driver->link() == Rt21Driver::Link::Moving)
+        && driver->heading()) {
+        const RotorEndpoint endpoint = driver->linkEndpoint();
+        if (endpoint.transport == RotorEndpoint::Transport::Tcp && endpoint.configured()) {
+            held.endpoint = endpoint;
+            held.heading = *driver->heading();
+            held.label = foundRotorLabel(QStringLiteral("%1:%2").arg(endpoint.host).arg(endpoint.tcpPort), QString(), 0,
+                                         held.heading);
+            haveHeld = true;
+        }
     }
     QPointer<SettingsDialog> self(this);
-    auto *thread = QThread::create([self, network]() {
-        const QList<FoundRotor> found = network ? Rt21Finder::scanHosts(Rt21Finder::localSubnetHosts(), 6555, 400)
-                                                : Rt21Finder::scanSerialPorts(650);
+    auto *thread = QThread::create([self, networkOnly, extra, typedHost, held, haveHeld]() {
+        auto post = [self](const FoundRotor &hit) {
+            if (!self)
+                return;
+            QMetaObject::invokeMethod(
+                self.data(), [self, hit]() {
+                    if (self)
+                        self->presentFound(hit);
+                },
+                Qt::QueuedConnection);
+        };
+        if (!networkOnly)
+            Rt21Finder::scanSerialPorts(650, post);
         if (!self)
             return;
         QMetaObject::invokeMethod(
-            self.data(), [self, found, network]() {
+            self.data(), [self]() {
+                if (self && self->findNote)
+                    self->findNote->setText(QStringLiteral("Checking the network…"));
+            },
+            Qt::QueuedConnection);
+        if (haveHeld)
+            post(held);
+        QStringList hosts = Rt21Finder::localSubnetHosts();
+        if (!typedHost.isEmpty() && !hosts.contains(typedHost))
+            hosts.prepend(typedHost);
+        Rt21Finder::scanHosts(hosts, networkCandidatePorts(extra), 300, post);
+        if (!self)
+            return;
+        QMetaObject::invokeMethod(
+            self.data(), [self]() {
                 if (self)
-                    self->finishFind(found, network);
+                    self->finishFind({}, false);
             },
             Qt::QueuedConnection);
     });
@@ -552,17 +616,16 @@ void SettingsDialog::startFind(bool network)
 
 void SettingsDialog::finishFind(const QList<FoundRotor> &found, bool network)
 {
+    Q_UNUSED(network);
     findButton->setEnabled(true);
     networkButton->setEnabled(true);
     for (const FoundRotor &hit : found)
         presentFound(hit);
     const bool any = findResults && findResults->count() > 0;
     if (!any) {
-        findNote->setText(network
-                              ? QStringLiteral("No RT-21 answered on the network.")
-                              : QStringLiteral(
-                                    "Nothing found. Check the USB cable or driver, power, and close other apps using the port."));
-    } else if (!found.isEmpty()) {
+        findNote->setText(QStringLiteral(
+            "Nothing found. Check the USB cable or driver, power, and close other apps using the port."));
+    } else {
         findNote->setText(QStringLiteral("Pick the RT-21 to use."));
     }
 }

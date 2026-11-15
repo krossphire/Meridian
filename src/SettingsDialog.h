@@ -79,6 +79,8 @@ private:
     QComboBox *transport = nullptr;
     QStackedWidget *transportPages = nullptr;
     QLineEdit *hostEdit = nullptr;
+    QLineEdit *customHostEdit = nullptr;
+    QLineEdit *customPortEdit = nullptr;
     QSpinBox *portSpin = nullptr;
     QComboBox *portCombo = nullptr;
     QComboBox *baudCombo = nullptr;
@@ -87,6 +89,7 @@ private:
     QLabel *findNote = nullptr;
     class QVBoxLayout *findResults = nullptr;
     class QThread *findThread = nullptr;
+    QStringList foundKeys;
     QLabel *versionLabel = nullptr;
     QVector<FieldRow> fields;
     class QCheckBox *bits[12] = {};
