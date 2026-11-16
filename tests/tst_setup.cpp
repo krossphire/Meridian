@@ -244,6 +244,16 @@ void TestSetup::serialPortsStayOnTheSavedName()
     const QList<SerialPortChoice> missing = arrangeSerialPorts(messy, QStringLiteral("COM4"));
     QCOMPARE(missing.last().port, QStringLiteral("COM4"));
     QVERIFY(missing.last().label.contains(QStringLiteral("(missing)")));
+    const QList<SerialPortChoice> mac = {
+        {QStringLiteral("cu.usbserial-110"), QStringLiteral("cu.usbserial-110")},
+        {QStringLiteral("cu.usbserial-2"), QStringLiteral("cu.usbserial-2")},
+        {QStringLiteral("cu.usbserial-10"), QStringLiteral("cu.usbserial-10")},
+    };
+    QStringList macNames;
+    for (const SerialPortChoice &choice : arrangeSerialPorts(mac, QString()))
+        macNames.append(choice.port);
+    QCOMPARE(macNames, QStringList({QStringLiteral("cu.usbserial-2"), QStringLiteral("cu.usbserial-10"),
+                                    QStringLiteral("cu.usbserial-110")}));
 }
 
 void TestSetup::silentPortSkipsSetupReads()

@@ -10,6 +10,7 @@
 #include "rotor/Rt21Finder.h"
 #include "rotor/UsbHint.h"
 
+#include <QAtomicInt>
 #include <QDialog>
 #include <QList>
 #include <QMap>
@@ -113,6 +114,7 @@ private:
     QSet<QString> usbSeen;
     class QVBoxLayout *findResults = nullptr;
     class QThread *findThread = nullptr;
+    QAtomicInt findCancel = 0;
     QStringList foundKeys;
     QLabel *versionLabel = nullptr;
     QLabel *displayCallout = nullptr;

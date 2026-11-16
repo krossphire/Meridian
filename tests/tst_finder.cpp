@@ -86,6 +86,7 @@ void TestFinder::tcpProbe()
     QVERIFY(std::abs(found->heading - 132.0) < 0.2);
     QVERIFY(found->label.contains(QStringLiteral("(network)")));
     QVERIFY(found->label.contains(QStringLiteral("heading 132")));
+    QVERIFY(found->label.contains(QStringLiteral("4.13.2")));
     const auto swept = Rt21Finder::scanHosts({QStringLiteral("127.0.0.1")}, {int(server.port())}, 300);
     QCOMPARE(swept.size(), 1);
     QVERIFY(Rt21Finder::scanHosts({QStringLiteral("127.0.0.1")}, {9}, 200).isEmpty());

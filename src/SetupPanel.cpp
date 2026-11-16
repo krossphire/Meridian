@@ -7,6 +7,7 @@
 #include "SetupPanel.h"
 
 #include "rotor/Rt21Driver.h"
+#include "rotor/Rt21Finder.h"
 #include "rotor/Rt21Setup.h"
 
 #include <QFile>
@@ -37,17 +38,21 @@ QLineEdit *roField(const QString &name)
 
 QString localSerialPorts()
 {
-    QStringList lines;
+    QList<SerialPortChoice> choices;
     const auto ports = QSerialPortInfo::availablePorts();
     for (const QSerialPortInfo &info : ports) {
         QString line = info.portName();
         if (!info.description().isEmpty())
             line += QStringLiteral(" — ") + info.description();
-        lines.append(line);
+        choices.append(SerialPortChoice{info.portName(), line});
     }
-    if (lines.isEmpty())
+    choices = arrangeSerialPorts(choices, QString());
+    if (choices.isEmpty())
         return QStringLiteral("No serial or USB ports are visible on this computer.");
-    return lines.join(QStringLiteral("\n"));
+    QStringList lines;
+    for (const SerialPortChoice &choice : choices)
+        lines.append(choice.label);
+    return lines.join(QLatin1Char('\n'));
 }
 
 QList<int> busyTcpPorts()
@@ -193,13 +198,17 @@ void SetupPanel::buildNetwork()
     scroll->setWidgetResizable(true);
     scroll->setWidget(formHost);
 
-    auto *read = new QPushButton(QStringLiteral("Read network"));
-    read->setObjectName(QStringLiteral("readNetwork"));
+    readNetwork = new QPushButton(QStringLiteral("Read network"));
+    readNetwork->setObjectName(QStringLiteral("readNetwork"));
+    networkLinkNote = new QLabel;
+    networkLinkNote->setObjectName(QStringLiteral("networkLinkNote"));
+    networkLinkNote->setWordWrap(true);
+    networkLinkNote->setVisible(false);
     auto *save = new QPushButton(QStringLiteral("Save a copy"));
     auto *guide = new QPushButton(QStringLiteral("Guide me"));
     guide->setObjectName(QStringLiteral("openWizard"));
     auto *actions = new QHBoxLayout;
-    actions->addWidget(read);
+    actions->addWidget(readNetwork);
     actions->addWidget(save);
     actions->addWidget(guide);
     actions->addStretch();
@@ -229,6 +238,7 @@ void SetupPanel::buildNetwork()
     auto *formLayout = new QVBoxLayout(formPage);
     formLayout->setContentsMargins(0, 0, 0, 0);
     formLayout->addLayout(actions);
+    formLayout->addWidget(networkLinkNote);
     formLayout->addWidget(scroll, 1);
 
     stack = new QStackedWidget;
@@ -239,15 +249,16 @@ void SetupPanel::buildNetwork()
     layout->addWidget(banner);
     layout->addWidget(stack, 1);
 
-    connect(read, &QPushButton::clicked, this, [this]() {
+    connect(readNetwork, &QPushButton::clicked, this, [this]() {
         if (!driver) {
             setStatus(QStringLiteral("Connect to a rotor before reading the network module."));
             return;
         }
-        if (endpoint.transport == RotorEndpoint::Transport::Tcp && endpoint.configured())
-            setStatus(QStringLiteral("Reading over IP. T11 can drop this link. USB is safer."));
-        else
-            setStatus(QStringLiteral("Reading the network module."));
+        if (ipOnlyLink()) {
+            setStatus(QStringLiteral("Needs a USB or serial connection; reading over IP drops the link."));
+            return;
+        }
+        setStatus(QStringLiteral("Reading the network module."));
         driver->readNetwork();
     });
     connect(save, &QPushButton::clicked, this, [this]() { emit exportRequested(); });
@@ -265,6 +276,8 @@ void SetupPanel::setDriver(Rt21Driver *next)
     wired = true;
     if (!driver)
         return;
+    connect(driver, &Rt21Driver::linkChanged, this, [this](Rt21Driver::Link, const QString &) { refreshNetworkRead(); });
+    refreshNetworkRead();
     connect(driver, &Rt21Driver::configField, this, [this](QChar id, const QString &, bool numeric, int value) {
         if (id != QLatin1Char('T') || !numeric || !controllerSpeed)
             return;
@@ -294,13 +307,44 @@ void SetupPanel::setEndpoint(const RotorEndpoint &next)
         return;
     if (!endpoint.configured()) {
         savedLink->setText(QStringLiteral("No rotor address is saved."));
+        refreshNetworkRead();
+        refreshLocalPorts();
         return;
     }
     if (endpoint.transport == RotorEndpoint::Transport::Serial) {
         savedLink->setText(QStringLiteral("Meridian is using %1 at %2.").arg(endpoint.serialPort).arg(endpoint.baud));
-        return;
+    } else {
+        savedLink->setText(QStringLiteral("Meridian is using %1 port %2.").arg(endpoint.host).arg(endpoint.tcpPort));
     }
-    savedLink->setText(QStringLiteral("Meridian is using %1 port %2.").arg(endpoint.host).arg(endpoint.tcpPort));
+    refreshNetworkRead();
+    refreshLocalPorts();
+}
+
+void SetupPanel::refreshLocalPorts()
+{
+    if (localPorts)
+        localPorts->setText(localSerialPorts());
+}
+
+bool SetupPanel::ipOnlyLink() const
+{
+    if (driver && driver->link() != Rt21Driver::Link::Off) {
+        const RotorEndpoint live = driver->linkEndpoint();
+        return live.transport == RotorEndpoint::Transport::Tcp && live.configured();
+    }
+    return endpoint.transport == RotorEndpoint::Transport::Tcp && endpoint.configured();
+}
+
+void SetupPanel::refreshNetworkRead()
+{
+    const bool ip = ipOnlyLink();
+    if (readNetwork)
+        readNetwork->setEnabled(!ip);
+    if (!networkLinkNote)
+        return;
+    networkLinkNote->setVisible(ip);
+    networkLinkNote->setText(ip ? QStringLiteral("Needs a USB or serial connection; reading over IP drops the link.")
+                                : QString());
 }
 
 QMap<QString, QString> SetupPanel::networkValues() const

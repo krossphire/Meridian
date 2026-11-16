@@ -37,7 +37,7 @@
 
 namespace {
 
-const QColor kWindow(11, 15, 18);
+const QColor kWindow(6, 9, 12);
 const QColor kOcean(16, 22, 27);
 const QColor kLand(36, 49, 54);
 const QColor kHover(62, 96, 98);

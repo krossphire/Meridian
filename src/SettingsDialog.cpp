@@ -266,6 +266,12 @@ void SettingsDialog::setDriver(Rt21Driver *next)
             }
             if (continueToNetwork && driver) {
                 continueToNetwork = false;
+                const RotorEndpoint live = driver->linkEndpoint();
+                if (live.transport == RotorEndpoint::Transport::Tcp && live.configured()) {
+                    setStatus(QStringLiteral(
+                        "Needs a USB or serial connection; reading over IP drops the link."));
+                    return;
+                }
                 setStatus(QStringLiteral("Reading the network module…"));
                 driver->readNetwork();
                 return;
@@ -612,8 +618,11 @@ void SettingsDialog::buildRotors()
     connect(ports, &QTimer::timeout, this, [this]() {
         if (isVisible() && transport->currentIndex() == 2)
             refreshPorts();
-        if (isVisible())
+        if (isVisible()) {
             refreshUsbHints();
+            if (setupPanel)
+                setupPanel->refreshLocalPorts();
+        }
     });
     ports->start();
     refreshPorts();
@@ -731,9 +740,14 @@ void SettingsDialog::applyFound(const FoundRotor &found)
 
 void SettingsDialog::startFind(bool networkOnly)
 {
-    if (findThread)
+    if (findThread) {
+        findCancel.storeRelaxed(1);
+        if (findNote)
+            findNote->setText(QStringLiteral("Cancelling…"));
         return;
-    findButton->setEnabled(false);
+    }
+    findCancel.storeRelaxed(0);
+    findButton->setText(QStringLiteral("Cancel"));
     networkButton->setEnabled(false);
     if (!networkOnly) {
         while (QLayoutItem *item = findResults->takeAt(0)) {
@@ -754,33 +768,18 @@ void SettingsDialog::startFind(bool networkOnly)
             }
         }
     } else {
-        findNote->setText(QStringLiteral("Checking the network…"));
+        while (QLayoutItem *item = findResults->takeAt(0)) {
+            delete item->widget();
+            delete item;
+        }
+        foundKeys.clear();
+        findNote->setText(QStringLiteral("Scanning local network…"));
     }
-    QList<int> extra;
     bool portOk = false;
     const int customPort = customPortEdit ? customPortEdit->text().trimmed().toInt(&portOk) : 0;
-    if (portOk)
-        extra.append(customPort);
-    for (const RotorEndpoint &rotor : draft.rotors) {
-        if (rotor.transport == RotorEndpoint::Transport::Tcp && rotor.tcpPort > 0)
-            extra.append(rotor.tcpPort);
-    }
     const QString typedHost = customHostEdit ? customHostEdit->text().trimmed() : QString();
-    FoundRotor held;
-    bool haveHeld = false;
-    if (driver && (driver->link() == Rt21Driver::Link::On || driver->link() == Rt21Driver::Link::Moving)
-        && driver->heading()) {
-        const RotorEndpoint endpoint = driver->linkEndpoint();
-        if (endpoint.transport == RotorEndpoint::Transport::Tcp && endpoint.configured()) {
-            held.endpoint = endpoint;
-            held.heading = *driver->heading();
-            held.label = foundRotorLabel(QStringLiteral("%1:%2").arg(endpoint.host).arg(endpoint.tcpPort), QString(), 0,
-                                         held.heading);
-            haveHeld = true;
-        }
-    }
     QPointer<SettingsDialog> self(this);
-    auto *thread = QThread::create([self, networkOnly, extra, typedHost, held, haveHeld]() {
+    auto *thread = QThread::create([self, networkOnly, portOk, customPort, typedHost]() {
         auto post = [self](const FoundRotor &hit) {
             if (!self)
                 return;
@@ -791,22 +790,35 @@ void SettingsDialog::startFind(bool networkOnly)
                 },
                 Qt::QueuedConnection);
         };
-        if (!networkOnly)
-            Rt21Finder::scanSerialPorts(650, post);
+        auto cancelled = [self]() { return !self || self->findCancel.loadRelaxed() != 0; };
+        int serialHits = 0;
+        if (!networkOnly) {
+            Rt21Finder::scanSerialPorts(650, [&](const FoundRotor &hit) {
+                ++serialHits;
+                post(hit);
+            }, cancelled);
+        }
         if (!self)
             return;
-        QMetaObject::invokeMethod(
-            self.data(), [self]() {
-                if (self && self->findNote)
-                    self->findNote->setText(QStringLiteral("Checking the network…"));
-            },
-            Qt::QueuedConnection);
-        if (haveHeld)
-            post(held);
-        QStringList hosts = Rt21Finder::localSubnetHosts();
-        if (!typedHost.isEmpty() && !hosts.contains(typedHost))
-            hosts.prepend(typedHost);
-        Rt21Finder::scanHosts(hosts, networkCandidatePorts(extra), 300, post);
+        const bool scanNetwork = networkOnly || serialHits == 0;
+        if (scanNetwork && !cancelled()) {
+            if (!networkOnly) {
+                QMetaObject::invokeMethod(
+                    self.data(), [self]() {
+                        if (self && self->findNote && self->findCancel.loadRelaxed() == 0)
+                            self->findNote->setText(
+                                QStringLiteral("No USB or COM RT-21 found. Scanning local network..."));
+                    },
+                    Qt::QueuedConnection);
+            }
+            QStringList hosts = Rt21Finder::localSubnetHosts();
+            if (!typedHost.isEmpty() && !hosts.contains(typedHost))
+                hosts.prepend(typedHost);
+            QList<int> ports = {6555};
+            if (networkOnly && portOk && customPort > 0 && customPort != 6555)
+                ports.append(customPort);
+            Rt21Finder::scanHosts(hosts, ports, 300, post, cancelled);
+        }
         if (!self)
             return;
         QMetaObject::invokeMethod(
@@ -829,16 +841,18 @@ void SettingsDialog::finishFind(const QList<FoundRotor> &found, bool network)
 {
     Q_UNUSED(network);
     findButton->setEnabled(true);
+    findButton->setText(QStringLiteral("Find RT-21"));
     networkButton->setEnabled(true);
     for (const FoundRotor &hit : found)
         presentFound(hit);
     const bool any = findResults && findResults->count() > 0;
-    if (!any) {
-        findNote->setText(QStringLiteral(
-            "Nothing found. Check the USB cable or driver, power, and close other apps using the port."));
-    } else {
+    if (findCancel.loadRelaxed() != 0 && !any)
+        findNote->setText(QStringLiteral("Scan cancelled."));
+    else if (!any)
+        findNote->setText(QStringLiteral("No RT-21 found."));
+    else
         findNote->setText(QStringLiteral("Pick the RT-21 to use."));
-    }
+    findCancel.storeRelaxed(0);
     if (resumeSerial && driver) {
         const RotorEndpoint again = resumeEndpoint;
         resumeSerial = false;

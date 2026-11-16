@@ -3,8 +3,8 @@
  * Copyright (C) 2026 Andrew, K5PO
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Find an RT-21. USB and COM ports are checked first. A network scan is
- * separate and only runs when asked. Nothing is selected on its own.
+ * Find an RT-21. USB and COM ports are checked first. A TCP 6555 scan of the
+ * local subnet runs only when those find nothing. Nothing is selected on its own.
  */
 
 #pragma once
@@ -59,13 +59,16 @@ public:
     // Every present serial port, including Edgeport COM1–COM8. Ports that will not open are skipped.
     // `onFound` is called as each rotor answers, including from a worker thread.
     static QList<FoundRotor> scanSerialPorts(int timeoutMs = 650,
-                                             const std::function<void(const FoundRotor &)> &onFound = {});
+                                             const std::function<void(const FoundRotor &)> &onFound = {},
+                                             const std::function<bool()> &cancelled = {});
 
     // IPv4 hosts on local /24s of physical adapters, excluding this machine.
     static QStringList localSubnetHosts();
 
     // Probes host × port with `connectMs` handshakes, 32 at a time, and stops
-    // launching new probes after about 14 s. A hit is kept only when BI1; parses.
+    // launching new probes after about 14 s. A hit needs BI1; and an R11; version.
+    // No AT command is sent.
     static QList<FoundRotor> scanHosts(const QStringList &hosts, const QList<int> &ports, int connectMs = 300,
-                                       const std::function<void(const FoundRotor &)> &onFound = {});
+                                       const std::function<void(const FoundRotor &)> &onFound = {},
+                                       const std::function<bool()> &cancelled = {});
 };

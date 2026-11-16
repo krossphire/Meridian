@@ -220,17 +220,13 @@ int runScreenshots(const QString &directory, qreal dpr)
     if (scroll && networkGroup)
         scroll->ensureWidgetVisible(networkGroup);
     auto *readNetwork = dialog->findChild<QPushButton *>(QStringLiteral("readNetwork"));
-    if (!readNetwork)
-        return 20;
-    readNetwork->click();
-    const bool network = waitUntil([&]() {
-        auto *name = dialog->findChild<QLineEdit *>(QStringLiteral("net-id"));
-        auto *status = dialog->findChild<QLabel *>(QStringLiteral("setupStatus"));
-        return name && name->text() == QStringLiteral("Tower") && status
-               && status->text().contains(QStringLiteral("answered"));
-    }, 8000);
+    auto *ipNote = dialog->findChild<QLabel *>(QStringLiteral("networkLinkNote"));
+    if (scroll && readNetwork)
+        scroll->ensureWidgetVisible(readNetwork);
     QApplication::processEvents();
-    if (!network || !dialog->grab().save(directory + QStringLiteral("/setup-network.png")))
+    if (!readNetwork || readNetwork->isEnabled() || !ipNote
+        || !ipNote->text().contains(QStringLiteral("Needs a USB or serial connection"))
+        || !dialog->grab().save(directory + QStringLiteral("/setup-network.png")))
         return 21;
     auto *guide = dialog->findChild<QPushButton *>(QStringLiteral("openWizard"));
     if (!guide)

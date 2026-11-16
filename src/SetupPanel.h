@@ -16,6 +16,7 @@
 
 class QLabel;
 class QLineEdit;
+class QPushButton;
 class QStackedWidget;
 class QWidget;
 class Rt21Driver;
@@ -30,6 +31,7 @@ public:
     QWidget *networkPage() const { return network; }
     void setDriver(Rt21Driver *driver);
     void setEndpoint(const RotorEndpoint &endpoint);
+    void refreshLocalPorts();
     QMap<QString, QString> networkValues() const;
     void showNetwork();
     void showWizard();
@@ -44,6 +46,8 @@ private:
     void showWizardStep(int step);
     void remember(const QString &key, const QString &value);
     void setStatus(const QString &text);
+    void refreshNetworkRead();
+    bool ipOnlyLink() const;
 
     QWidget *ports = nullptr;
     QWidget *network = nullptr;
@@ -56,6 +60,8 @@ private:
     QLabel *localPorts = nullptr;
     QLabel *moduleSerial = nullptr;
     QLabel *gatewayNote = nullptr;
+    QLabel *networkLinkNote = nullptr;
+    QPushButton *readNetwork = nullptr;
 
     QMap<QString, QLineEdit *> values;
     QMap<QString, QString> rawNetwork;
