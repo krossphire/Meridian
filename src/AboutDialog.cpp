@@ -22,9 +22,11 @@ AboutDialog::AboutDialog(QWidget *parent)
     auto *body = new QLabel(QStringLiteral(
         "<p>A rotator controller for the Green Heron RT-21, written for Andrew, K5PO. "
         "This build is %1.</p>"
-        "<p>Designed and tested with firmware 4.14.g1. That build is not on the public "
-        "download page. The posted current firmware is 4.13.2, which should behave the "
-        "same and has not been tested here.</p>")
+        "<p>Designed and tested with firmware 4.13.2, the current public release. "
+        "4.14 is a pre-release; on 4.14.g1 the screen saver and register writes hang serial. "
+        "Firmware is at "
+        "<a href='https://www.greenheronengineering.com/rotator-controllers-software/'>"
+        "greenheronengineering.com</a>.</p>")
         .arg(QCoreApplication::applicationVersion()) + QStringLiteral(
         "<p>Meridian is free software under the GNU General Public License, "
         "version 3 or any later version.</p>"

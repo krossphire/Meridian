@@ -76,15 +76,31 @@ Defaults in parentheses are the manual’s. Meridian displays the raw reply next
 
 ## Writes Meridian will send
 
-Appendix F writes `WXn(value)`. `n = 0` reboots after the write; any other digit stores it. Meridian sends `n = 1` and the value as decimal ASCII with no extra separator, for example offset 180 is `WD1180;`. That concatenation is the natural reading of `WXn(value)`. Only brightness is sent by this build. Every other location stays compiled out.
+Appendix F writes `WXn(value)` and describes `n = 0` as a reboot. That description is wrong for 4.13.2. See the disassembly section below. Only brightness is sent by this build, and only when `R11` reports 4.13.2. Every other location stays compiled out.
 
 ### Brightness, the one unlocked write
 
-Register O. Read is `RO1;`. Setup Utility 4.B12's brightness combo calls `GetRotorData` with the concatenation of the literal `WO0` and the combo text. `GetRotorData` sends that string with `SerialPort.WriteLine`, and that port's `NewLine` is `\n`. A change to 1 is therefore the bytes `WO01` plus a newline (`57 4F 30 31 0A`). The `0` is `n = 0`, which Appendix F says reboots the controller. That matches the 16 November session: the value persisted, then serial died and the utility sat there. Those exact bytes were not captured on the wire.
+Register O, default 8. The Write button sends `WO0` plus the decimal plus `;`. Brightness 10 is `WO010;` (`57 4F 30 31 30 3B`). The controller answers `06 4F 3B` before it stores. Meridian waits for that ack, pauses 150 ms, sends `RO;`, then watches heading polls for 10 seconds. No line feed is sent. Has no visible effect on OLED RT-21 units (LCD units only, unverified).
 
-Meridian does not send the reboot form. The Write button sends one command, `WO1` plus the decimal plus `;`, then immediately `RO1;`, then ten seconds of the usual heading polls (`BI1;` or `AI1;`). Brightness 1 is `WO11;` (`57 4F 31 31 3B`). Brightness 10 is `WO110;` (`57 4F 31 31 30 3B`). The allowed range in the control is 0 through 15, so 0 is `WO10;`. This `n = 1` form is the utility's file-restore prefix `WO1` plus the semicolon every other Meridian command uses. It has not been confirmed on hardware. Has no visible effect on OLED RT-21 units (LCD units only, unverified).
+The button never writes by itself. A read must already have reported 4.13.2, the poll in flight has to finish, and no `AT` byte may have gone out in the previous 5 seconds. The traffic log records the set and the read-back as `WRITE-TX` and `WRITE-RX` with timestamps, then a note of how many heading replies arrived in the next ten seconds. The status line is one of: `Brightness written and verified`, `Brightness read-back mismatch: wrote X, read Y`, or `RT-21 stopped answering after write. Power-cycle it.`
 
-The button never writes by itself. A read must already have reported 4.14.g1. The traffic log records the set and the read-back as `WRITE-TX` and `WRITE-RX` with timestamps, then a note of how many heading replies arrived in the next ten seconds. The status line is one of: `Brightness written and verified`, `Brightness read-back mismatch: wrote X, read Y`, or `RT-21 stopped answering after write. Power-cycle it.`
+## From 4.13.2 disassembly, static analysis
+
+These points are from a disassembly of the official `RT21_4_13.2.hex` (PIC18F26K22, byte-identical to the Green Heron release). They are static analysis, not a hardware test. The firmware file is the current public release at [greenheronengineering.com/rotator-controllers-software](https://www.greenheronengineering.com/rotator-controllers-software/).
+
+A command runs only when its last byte is `;`. A line feed is never a terminator. A stray line feed after `;` corrupts the next command or poll. Meridian does not send a line feed.
+
+A read is `R` plus a letter plus `;`. The digit after the letter is ignored. The reply is `<letter>` `0x01` `<value>`. `O` is brightness (default 8). `W` is screen-saver minutes.
+
+A write is `W` plus a letter plus a digit 0–9 plus the value plus `;`. The controller replies `0x06` `<letter>` `;` (brightness is `06 4F 3B`) before the EEPROM write. Digit 0 stores and reloads every setting, so the change applies live. That is the form the utility uses. Digits 1–9 store only, and apply at the next reload or power-up. Neither form reboots the controller. `W0...;` is a different command: it displays a message with interrupts off for about 2 seconds. Meridian does not send it.
+
+After the ack, interrupts are off for about 25–30 ms and the receive buffer is cleared. Meridian waits 150 ms, then sends `RO;`.
+
+Any `AT...;` command locks the controller into forwarding serial to the network module. It stops answering headings until 31 seconds of silence or an ESC (`0x1B`). A poll resets that timer, so a poll during the block keeps the lock. Meridian stops polls for the whole network block, sends ESC when the block ends (including when a query fails), waits for one heading reply, and only then resumes polls. One missed reply is retried once, quietly. The traffic log records the network bytes, the ESC, and whether the heading came back.
+
+Firmware delays of 1–250 ms run with interrupts off. Polls stay spaced, and a single missed reply is retried once without changing the status line.
+
+Screen-saver polls do not count as activity. On 4.13.2 the saver blanks the panel and serial keeps answering; a turn command wakes the display. On 4.14.g1 the saver and a register write hang serial until a power cycle. 4.13.2 is the firmware to run, especially on an OLED unit.
 
 Also behind an explicit confirmation:
 
@@ -110,7 +126,7 @@ Also behind an explicit confirmation:
 
 ## Firmware this program is built against
 
-Meridian is designed and tested with Andrew's RT-21, which reports `RT-21 4.14.g1`. That build is not on the public download page. Fetched 15 Nov 2026, [greenheronengineering.com/rotator-controllers-software](https://www.greenheronengineering.com/rotator-controllers-software/) lists RT-21 firmware 4.13.2 as current (version 4, serial numbers 4000 and up). 4.14 is not a download. Setup Utility 4.B12 (beta, December 2023) is the program that mentions it: "Supports 4.14 w/Serial Sensor feedback", "Magnetic Variation with pre-release 4.d14", and "Fixes bug that always cleared the Screen Saver function in RT-21". Utility 4.11 (December 2022) is the non-beta. 4.13.x is expected to speak the same protocol and has not been tested here. A read that is not 4.14.g1 gets a status-line note. The only write in this build is display brightness, and only after a read that reports 4.14.g1. Every other write stays compiled out.
+Meridian is designed and tested with Andrew's RT-21, which reports `RT-21 4.14.g1`. That build is not on the public download page. Fetched 15 Nov 2026, [greenheronengineering.com/rotator-controllers-software](https://www.greenheronengineering.com/rotator-controllers-software/) lists RT-21 firmware 4.13.2 as current (version 4, serial numbers 4000 and up). 4.14 is not a download. Setup Utility 4.B12 (beta, December 2023) is the program that mentions it: "Supports 4.14 w/Serial Sensor feedback", "Magnetic Variation with pre-release 4.d14", and "Fixes bug that always cleared the Screen Saver function in RT-21". Utility 4.11 (December 2022) is the non-beta. 4.13.x is expected to speak the same protocol and has not been tested here. A read that is not 4.13.2 gets a status-line note. 4.14 gets: "Firmware 4.14 is a pre-release; on 4.14.g1 the screen saver and register writes hang serial. 4.13.2 is recommended." The only write in this build is display brightness, and only after a read that reports 4.13.2. Every other write stays compiled out. The public firmware is [4.13.2](https://www.greenheronengineering.com/rotator-controllers-software/).
 
 ## Observed on hardware
 
@@ -168,9 +184,7 @@ Version 4 addendum, rev 4, "Display Screen Saver operation [4.13]": controller f
 
 Utility 4.B12's combo is labeled Minutes. The items are Off, 1, 2, 5, 10, 20, 30, 40, 50, 60. Read is `RW1;`. Zero is shown as Off. There is no 90-second step and no separate full-black versus dim level. The blank is the whole behavior on display firmware 1.3. Auto-dim is a different switch, advanced-options bit 16, and brightness is register O. The addendum says an OLED ignores brightness.
 
-Do not enable this saver as burn-in protection. The 15 November observation above is the reason: on 4.14.g1 a 1-minute saver stops serial and network replies until a power cycle, and a button that wakes the display does not wake the port. The recommended stored value is Off (`W = 0`). Meridian does not write it.
-
-What the addendum counts as a wake: a button, or a remote command. On this firmware that wake is the display only. The port stays silent. Leave the saver Off. There is no idle-dim stand-in: brightness does nothing visible on the OLED unit above.
+On 4.14.g1 a 1-minute saver stops serial and network replies until a power cycle, and a button that wakes the display does not wake the port. That warning is only for 4.14. On 4.13.2, with display firmware 3.1 at boot, the saver blanks the panel and Meridian kept polling (280 RX bytes, heading updates). A turn command woke the screen and turned the beam. The disassembly says polls do not count as saver activity. Meridian shows the Off / minutes control and does not write it. OLED units should run 4.13.2.
 
 The 4.B12 release note says that build fixes a bug that always cleared the screen saver. Utility 4.11's write prefix is the string `WW0` plus two trailing spaces. 4.B12's prefix is `WW0` with the spaces removed. A value glued onto the 4.11 prefix is not a decimal the controller can store, so the saver never engaged. Off is the separate literal `WW00` (`n = 0`, which reboots). Meridian does not write W from any group except Display, so saving speed, limits, or the network cannot clear it.
 

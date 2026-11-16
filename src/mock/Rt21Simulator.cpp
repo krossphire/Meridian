@@ -234,7 +234,7 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
         reply(payload, false);
     };
     if (cmd.startsWith("R1")) {
-        echo('1', QByteArray("RT-21 4.14.g1"));
+        echo('1', QByteArray("RT-21 4.13.2"));
         return;
     }
     if (cmd.startsWith("R0")) {
@@ -249,18 +249,23 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
         echo('[', QByteArray("0"));
         return;
     }
-    if (cmd.size() >= 3 && cmd.at(0) == 'R' && cmd.at(1) >= 'A' && cmd.at(1) <= 'Z') {
+    if (cmd.size() >= 2 && cmd.at(0) == 'R' && cmd.at(1) >= 'A' && cmd.at(1) <= 'Z') {
         const QChar id(cmd.at(1));
         echo(cmd.at(1), QByteArray::number(ee.value(id, 0)));
         return;
     }
-    if (cmd == "W00") {
-        restoreDefaults();
-        moving_ = false;
+    if (cmd.startsWith("W0")) {
+        // W0...; is the message command. Meridian does not send it.
         return;
     }
-    if (cmd.size() >= 4 && cmd.at(0) == 'W' && cmd.at(1) >= 'A' && cmd.at(1) <= 'Z') {
+    if (cmd.size() >= 3 && cmd.at(0) == 'W' && cmd.at(1) >= 'A' && cmd.at(1) <= 'Z'
+        && cmd.at(2) >= '0' && cmd.at(2) <= '9') {
         const QChar id(cmd.at(1));
+        QByteArray ack;
+        ack.append(char(0x06));
+        ack.append(cmd.at(1));
+        ack.append(';');
+        emit output(ack);
         bool ok = false;
         const int value = QString::fromLatin1(cmd.mid(3)).toInt(&ok);
         if (ok)

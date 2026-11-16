@@ -142,6 +142,7 @@ SettingsDialog::SettingsDialog(const AppConfig &config, const ZipDatabase *zipDb
                 setStatus(QStringLiteral("Connect to a rotor before writing brightness."));
                 return;
             }
+            continueToNetwork = false;
             if (versionReport.isEmpty()) {
                 setStatus(QStringLiteral("Read the RT-21 before writing brightness."));
                 return;
@@ -272,7 +273,7 @@ void SettingsDialog::setDriver(Rt21Driver *next)
             QString done = QStringLiteral("Controller settings read. Nothing was written.");
             bool saverOn = false;
             const int saverMinutes = eeRaw.value(QStringLiteral("W")).toInt(&saverOn);
-            if (saverOn && saverMinutes > 0)
+            if (saverOn && saverMinutes > 0 && Rt21::classifyFirmware(versionReport) == Rt21::FirmwareClass::PreRelease)
                 done += QLatin1Char(' ') + Rt21::screenSaverUnsafeNote();
             setStatus(done);
         });
@@ -308,10 +309,14 @@ void SettingsDialog::refreshDisplayCallout()
             saver = QStringLiteral("Screen saver: %1.").arg(raw);
         else if (minutes == 0)
             saver = QStringLiteral("Screen saver is off. The heading stays on the display.");
-        else
+        else if (Rt21::classifyFirmware(versionReport) == Rt21::FirmwareClass::PreRelease)
             saver = QStringLiteral("Screen saver is %1 minutes. %2")
                         .arg(minutes)
                         .arg(Rt21::screenSaverUnsafeNote());
+        else
+            saver = QStringLiteral(
+                        "Screen saver is %1 minutes. On 4.13.2 it blanks the panel and serial keeps answering. Polls do not wake it.")
+                        .arg(minutes);
     }
     displayCallout->setText(saver);
 }

@@ -6,6 +6,7 @@
 
 #include "Rt21Setup.h"
 
+#include "Rt21Protocol.h"
 #include "UserFiles.h"
 
 #include <QDateTime>
@@ -88,26 +89,26 @@ QList<ModuleQuery> networkReadSequence()
     at.token = QStringLiteral("OK");
     rows.append(at);
 
-    // 4.B12 sends these with SerialPort.WriteLine, whose NewLine is "\n".
-    rows.append(query("AT*HWTYPE?\n", "HWTYPE=", "hwtype"));
-    rows.append(query("AT*DHCP?\n", "DHCP=", "dhcp"));
-    rows.append(query("AT*IP?\n", "IP=", "ip"));
-    rows.append(query("AT*AIP?\n", "AIP=", "aip"));
-    rows.append(query("AT*NMASK?\n", "NMASK=", "nmask"));
-    rows.append(query("AT*ANMASK?\n", "ANMASK=", "anmask"));
-    rows.append(query("AT*GW?\n", "GW=", "gw"));
-    rows.append(query("AT*AGW?\n", "AGW=", "agw"));
-    rows.append(query("AT*ID?\n", "ID=", "id"));
-    rows.append(query("AT*HTTP?\n", "HTTP=", "http"));
-    rows.append(query("AT*UDP?\n", "UDP=", "udp"));
-    rows.append(query("AT*TFTP?\n", "TFTP=", "tftp"));
-    rows.append(query("AT*NVREG16_0?\n", "NVREG16_0=", "serialPort"));
-    rows.append(query("AT*WIFI_SECURITY?\n", "SECURITY=", "security"));
-    rows.append(query("AT*WIFI_ASSID?\n", "ASSID=", "ssid"));
-    rows.append(query("AT*WIFI_KEY?\n", "KEY=", "key"));
-    rows.append(query("AT*HTTP_USER?\n", "USER=", "user"));
-    rows.append(query("AT*HTTP_PASS?\n", "PASS=", "pass"));
-    rows.append(query("AT*LINK?\n", "LINK=", "link"));
+    // 4.13.2 runs a command only when it ends in ';'. A line feed is not a terminator.
+    rows.append(query("AT*HWTYPE?;", "HWTYPE=", "hwtype"));
+    rows.append(query("AT*DHCP?;", "DHCP=", "dhcp"));
+    rows.append(query("AT*IP?;", "IP=", "ip"));
+    rows.append(query("AT*AIP?;", "AIP=", "aip"));
+    rows.append(query("AT*NMASK?;", "NMASK=", "nmask"));
+    rows.append(query("AT*ANMASK?;", "ANMASK=", "anmask"));
+    rows.append(query("AT*GW?;", "GW=", "gw"));
+    rows.append(query("AT*AGW?;", "AGW=", "agw"));
+    rows.append(query("AT*ID?;", "ID=", "id"));
+    rows.append(query("AT*HTTP?;", "HTTP=", "http"));
+    rows.append(query("AT*UDP?;", "UDP=", "udp"));
+    rows.append(query("AT*TFTP?;", "TFTP=", "tftp"));
+    rows.append(query("AT*NVREG16_0?;", "NVREG16_0=", "serialPort"));
+    rows.append(query("AT*WIFI_SECURITY?;", "SECURITY=", "security"));
+    rows.append(query("AT*WIFI_ASSID?;", "ASSID=", "ssid"));
+    rows.append(query("AT*WIFI_KEY?;", "KEY=", "key"));
+    rows.append(query("AT*HTTP_USER?;", "USER=", "user"));
+    rows.append(query("AT*HTTP_PASS?;", "PASS=", "pass"));
+    rows.append(query("AT*LINK?;", "LINK=", "link"));
 
     ModuleQuery esc;
     esc.command = QByteArray("\x1b");
@@ -200,8 +201,14 @@ QString planGroup(const QString &group, const QMap<QString, QString> &fields, QL
         // Brightness (O) and screen saver (W) only. No other group may write W.
         bool any = false;
         if (fields.contains(QStringLiteral("brightness"))) {
-            if (!ee({{QStringLiteral("brightness"), QLatin1Char('O')}}))
+            int level = 0;
+            if (!takeInt(fields, QStringLiteral("brightness"), &level, &error))
                 return error;
+            PlannedWrite step;
+            step.command = brightnessWriteCommand(level);
+            step.readBack = brightnessReadCommand();
+            step.expectValue = QString::number(level);
+            out->append(step);
             any = true;
         }
         if (fields.contains(QStringLiteral("screenSaver"))) {
@@ -325,7 +332,7 @@ QString formatSetupBackup(const QMap<QString, QString> &controller, const QMap<Q
     QString text;
     text += QStringLiteral("Meridian RT-21 setup copy\n");
     text += QStringLiteral("Saved %1\n").arg(QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
-    text += QStringLiteral("Designed and tested with firmware 4.14.g1. That build is not on the public download page. Posted current firmware is 4.13.2, expected compatible, untested.\n");
+    text += QStringLiteral("Designed and tested with firmware 4.13.2. 4.14 is a pre-release; its screen saver and register writes hang serial.\n");
     text += QStringLiteral("This file is what was read. Nothing was written back.\n");
     text += QStringLiteral("The Wi-Fi key and the web password are included so a later restore has them.\n\n");
     if (controller.contains(QStringLiteral("version")))
@@ -541,10 +548,10 @@ bool setupWritesCompiledIn()
 
 FirmwareClass classifyFirmware(const QString &report)
 {
-    if (report.contains(QStringLiteral("4.14.g1")))
+    if (report.contains(QStringLiteral("4.13.2")))
         return FirmwareClass::Tested;
-    if (report.contains(QStringLiteral("4.13")))
-        return FirmwareClass::ExpectedCompatible;
+    if (report.contains(QStringLiteral("4.14")))
+        return FirmwareClass::PreRelease;
     return FirmwareClass::Untested;
 }
 
@@ -553,10 +560,11 @@ QString firmwareNotice(const QString &report)
     const FirmwareClass kind = classifyFirmware(report);
     if (kind == FirmwareClass::Tested)
         return {};
+    if (kind == FirmwareClass::PreRelease)
+        return QStringLiteral(
+            "Firmware 4.14 is a pre-release; on 4.14.g1 the screen saver and register writes hang serial. 4.13.2 is recommended.");
     const QString shown = report.trimmed().isEmpty() ? QStringLiteral("nothing") : report.trimmed();
-    if (kind == FirmwareClass::ExpectedCompatible)
-        return QStringLiteral("Designed and tested with 4.14.g1. This unit reports %1. 4.13.x is the public current firmware and should behave the same; it has not been tested here. Writes stay off.").arg(shown);
-    return QStringLiteral("Designed and tested with 4.14.g1. This unit reports %1. Writes stay off for firmware that has not been tested.").arg(shown);
+    return QStringLiteral("Writes stay off. 4.13.2 is the tested firmware. This unit reports %1.").arg(shown);
 }
 
 bool firmwareWritesAllowed(const QString &report)
@@ -598,9 +606,8 @@ QString screenSaverUnsafeNote()
 QString screenSaverRecommendation()
 {
     return QStringLiteral(
-        "Leave the rotor's screen saver Off. On firmware 4.14.g1, with it set to 1 minute, "
-        "serial and network replies stop about a minute after the controller goes idle and stay stopped until a power cycle. "
-        "Pressing Setup or Cancel wakes the display and not the port. With the saver off, polling ran 22 minutes with no timeouts.");
+        "On 4.13.2 the screen saver blanks the panel and serial keeps answering. Polls do not count as activity, and a turn command wakes the display. "
+        "On 4.14.g1 the same 1-minute saver stops serial until a power cycle. 4.13.2 is the firmware to run, especially on an OLED unit. Off leaves the heading on the display. Meridian does not write this register.");
 }
 
 QString advancedOptionsText(int value)
@@ -638,7 +645,7 @@ QString formatEeLine(const QString &id, const QString &raw)
         else if (!screenSaverMinuteAllowed(value))
             extra = QStringLiteral(". That is not one of the utility's steps.");
         else if (value > recommendedScreenSaverMinutes())
-            extra = QStringLiteral(". On firmware 4.14.g1 this stops serial and network replies after the timeout. Set it to Off.");
+            extra = QStringLiteral(". On 4.13.2 this blanks the panel and serial keeps answering. On 4.14.x it stops serial until a power cycle.");
         return named(QStringLiteral("Screen saver"), state + extra);
     }
     if (id == QLatin1String("J"))

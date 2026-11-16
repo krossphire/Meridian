@@ -69,9 +69,8 @@ StaticAdvice adviseStaticAddress(const QString &localIp, int prefixLength, const
 
 bool setupWritesCompiledIn();
 
-// Tested firmware is Andrew's 4.14.g1, which is not on the public download page.
-// 4.13.x is the posted current build and is expected to behave the same, untested.
-enum class FirmwareClass { Tested, ExpectedCompatible, Untested };
+// Tested firmware is the public 4.13.2. 4.14 is a pre-release; writes stay off.
+enum class FirmwareClass { Tested, PreRelease, Untested };
 FirmwareClass classifyFirmware(const QString &report);
 QString firmwareNotice(const QString &report);
 bool firmwareWritesAllowed(const QString &report);

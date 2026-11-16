@@ -49,8 +49,8 @@ void TestSetup::commandsMatchTheUtility()
     fields.insert(QStringLiteral("brightness"), QStringLiteral("8"));
     QVERIFY(Rt21::planGroup(QStringLiteral("display"), fields, &plan).isEmpty());
     QCOMPARE(plan.size(), 1);
-    QCOMPARE(plan.first().command, QByteArray("WO18;"));
-    QCOMPARE(plan.first().readBack, QByteArray("RO1;"));
+    QCOMPARE(plan.first().command, QByteArray("WO08;"));
+    QCOMPARE(plan.first().readBack, QByteArray("RO;"));
     QCOMPARE(plan.first().expectValue, QStringLiteral("8"));
 
     fields.insert(QStringLiteral("dhcp"), QStringLiteral("0"));
@@ -165,7 +165,7 @@ void TestSetup::screenSaverIsOnlyInTheDisplayGroup()
     for (const auto &step : plan)
         joined += step.command;
     QVERIFY(joined.contains("WW11;"));
-    QVERIFY(joined.contains("WO18;"));
+    QVERIFY(joined.contains("WO08;"));
 
     fields.insert(QStringLiteral("screenSaver"), QStringLiteral("90"));
     QVERIFY(Rt21::planGroup(QStringLiteral("display"), fields, &plan).contains(QStringLiteral("90")));
@@ -204,13 +204,13 @@ void TestSetup::screenSaverIsOnlyInTheDisplayGroup()
 
 void TestSetup::firmwareGate()
 {
-    QCOMPARE(Rt21::classifyFirmware(QStringLiteral("RT-21 4.14.g1")), Rt21::FirmwareClass::Tested);
-    QCOMPARE(Rt21::classifyFirmware(QStringLiteral("RT-21 4.13.2")), Rt21::FirmwareClass::ExpectedCompatible);
+    QCOMPARE(Rt21::classifyFirmware(QStringLiteral("RT-21 4.13.2")), Rt21::FirmwareClass::Tested);
+    QCOMPARE(Rt21::classifyFirmware(QStringLiteral("RT-21 4.14.g1")), Rt21::FirmwareClass::PreRelease);
     QCOMPARE(Rt21::classifyFirmware(QStringLiteral("RT-21 3.08")), Rt21::FirmwareClass::Untested);
-    QVERIFY(Rt21::firmwareNotice(QStringLiteral("RT-21 4.14.g1")).isEmpty());
-    QVERIFY(Rt21::firmwareNotice(QStringLiteral("RT-21 4.13.2")).contains(QStringLiteral("4.13.2")));
-    QVERIFY(Rt21::firmwareWritesAllowed(QStringLiteral("RT-21 4.14.g1")));
-    QVERIFY(!Rt21::firmwareWritesAllowed(QStringLiteral("RT-21 4.13.2")));
+    QVERIFY(Rt21::firmwareNotice(QStringLiteral("RT-21 4.13.2")).isEmpty());
+    QVERIFY(Rt21::firmwareNotice(QStringLiteral("RT-21 4.14.g1")).contains(QStringLiteral("pre-release")));
+    QVERIFY(Rt21::firmwareWritesAllowed(QStringLiteral("RT-21 4.13.2")));
+    QVERIFY(!Rt21::firmwareWritesAllowed(QStringLiteral("RT-21 4.14.g1")));
     QVERIFY(!Rt21::firmwareWritesAllowed(QStringLiteral("RT-21 4.14")));
     QVERIFY(!Rt21::setupWritesCompiledIn());
     QVERIFY(Rt21::gatewaySubnetNote(QStringLiteral("192.168.1.106"), QStringLiteral("255.255.255.0"),
@@ -296,9 +296,10 @@ void TestSetup::silentModuleSkipsQueries()
 
 void TestSetup::brightnessWriteReadsBack()
 {
-    QCOMPARE(Rt21::writeEe(QLatin1Char('O'), 1), QByteArray("WO11;"));
-    QCOMPARE(Rt21::writeEe(QLatin1Char('O'), 10), QByteArray("WO110;"));
-    QCOMPARE(Rt21::writeEe(QLatin1Char('O'), 0), QByteArray("WO10;"));
+    QCOMPARE(Rt21::brightnessWriteCommand(10), QByteArray("WO010;"));
+    QCOMPARE(Rt21::brightnessWriteCommand(1), QByteArray("WO01;"));
+    QCOMPARE(Rt21::brightnessReadCommand(), QByteArray("RO;"));
+    QVERIFY(!Rt21::brightnessWriteCommand(10).contains('\n'));
 
     MockRt21Server server;
     server.sim()->setHeading(20);
@@ -316,8 +317,8 @@ void TestSetup::brightnessWriteReadsBack()
     QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 15000);
     QCOMPARE(done.at(0).at(0).toBool(), true);
     QCOMPARE(done.at(0).at(1).toString(), QStringLiteral("Brightness written and verified"));
-    QVERIFY(server.sim()->trace().contains(QByteArray("WO11")));
-    QVERIFY(server.sim()->trace().contains(QByteArray("RO1")));
+    QVERIFY(server.sim()->trace().contains(QByteArray("WO01")));
+    QVERIFY(server.sim()->trace().contains(QByteArray("RO")));
 
     server.sim()->setIgnoreQueries(true);
     driver.writeBrightness(2);

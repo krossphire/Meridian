@@ -35,7 +35,7 @@ Do not enable a second group in the same session.
 | `W00;` | Loads default EEPROM and resets the CPU. The utility sends this for factory reset and when the rotor type changes. | Excluded |
 | `R3n;` | CPU and display reset. Same as power cycle. | Excluded |
 | `B2n;` / `BUn;` | Bootloader on RS-232 or USB. | Excluded |
-| `W` with `n = 0` | Appendix F: the controller reboots after the write. The utility's live sliders use this (`WO0`, `WG0`, `WD0180`). | Not sent. A later write uses `n = 1` (`WO18;`), which is what the utility's file restore uses. Still Unverified. |
+| `W` with digit `0` | Appendix F called this a reboot. The 4.13.2 disassembly says digit 0 stores and reloads the setup, and does not reboot. The utility's live brightness control is `WO0` plus the value plus `;`. | Brightness only, after a 4.13.2 read: `WO010;` for 10. |
 | `T1n;` (`T11;`) | Addendum: leaves TCP mode so AT commands work. Sent over an IP connection, this can drop the link you are using. | Sent only while reading the module. `T01;` is sent afterward to put TCP mode back. Prefer USB. Unverified whether `T01;` recovers a socket that already died. |
 | `AT*RESET=1` | Utility button "Re-Connect". Reboots the module. | Excluded |
 | Utility "RESET to DEFAULTS" | Writes DHCP static, `192.168.2.100`, gateway `192.168.2.1`, serial port `6555`, SSID `NETGEAR24`, a passphrase, and an adhoc name `RT-21`. The link will not come back on the old address. The passphrase is a known string in the program. | Excluded |
@@ -83,7 +83,7 @@ The `.ghr` restore file uses these names: `ccwcal`, `cwcal`, `caloffset`, `rever
 | L | Cal range | 360 | `RL1;` | `WL0` / `WL1` | medium | Unverified. Read-only |
 | M | Mode | Normal | `RM1;` | `WM00` … `WM05`. See below. | high | Unverified. Read-only |
 | N | Ramp | 3 | `RN1;` | `WN0` / `WN1` | medium | Unverified. Read-only |
-| O | Brightness | 8 | `RO1;` | Live combo sends `WO0` plus the text and a newline (`n = 0`, reboot). Meridian's Write button sends `WO1` plus the decimal plus `;` (`WO11;` for 1). Unverified on hardware. OLED shows no change. | the only write | Write button only. Other groups stay locked. |
+| O | Brightness | 8 | `RO;` (the digit is ignored) | `WO0<n>;`. Brightness 10 is `WO010;`. Ack `06 4F 3B`, then 150 ms, then the read. Digit 0 reloads; it does not reboot on 4.13.2. OLED shows no change. | the only write | Write button only, and only when the read says 4.13.2. |
 | P | No-motion timeout | 4 | `RP1;` | `WP0` / `WP1` | low | Unverified. Read-only |
 | Q | Security | Admin | `RQ1;` | `WQ00` user, `WQ01` admin | high | Unverified. Read-only |
 | R | Alt offset 1 | 361 | `RR1;` | `WR0` / `WR1`. Unused is the literal `WR0361`. | medium | Unverified. Read-only |

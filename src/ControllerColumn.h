@@ -14,6 +14,7 @@
 #include <QWidget>
 
 class QCheckBox;
+class QComboBox;
 class QLabel;
 class QSpinBox;
 class QVBoxLayout;
@@ -44,6 +45,7 @@ private:
     QLabel *version = nullptr;
     QLabel *displayCallout = nullptr;
     QSpinBox *brightnessSpin = nullptr;
+    QComboBox *saverCombo = nullptr;
     QLabel *heading = nullptr;
     QLabel *linkLabel = nullptr;
     QLabel *analog = nullptr;

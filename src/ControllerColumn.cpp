@@ -11,6 +11,7 @@
 
 #include <QButtonGroup>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -259,7 +260,18 @@ ControllerColumn::ControllerColumn(QWidget *parent)
         displayForm->addRow(name, label);
     };
     addReadRow(QLatin1Char('Y'), QStringLiteral("Knob timer"));
-    addReadRow(QLatin1Char('W'), QStringLiteral("Screen saver"));
+    saverCombo = new QComboBox;
+    saverCombo->setObjectName(QStringLiteral("screenSaver"));
+    saverCombo->setEnabled(false);
+    saverCombo->addItem(QStringLiteral("Off"), 0);
+    for (int minutes : {1, 2, 5, 10, 20, 30, 40, 50, 60})
+        saverCombo->addItem(QStringLiteral("%1 min").arg(minutes), minutes);
+    displayForm->addRow(QStringLiteral("Screen saver"), saverCombo);
+    auto *saverNote = new QLabel(QStringLiteral(
+        "Not written. On 4.13.2 it blanks the panel and serial keeps answering. Polls do not wake it. "
+        "On 4.14.x the same setting stops serial until a power cycle."));
+    saverNote->setWordWrap(true);
+    displayForm->addRow(QString(), saverNote);
     addReadRow(QLatin1Char('R'), QStringLiteral("Alt 1"));
     addReadRow(QLatin1Char('S'), QStringLiteral("Alt 2"));
     connect(writeBrightness, &QPushButton::clicked, this, [this]() {
@@ -349,8 +361,17 @@ void ControllerColumn::applyField(QChar id, const QString &raw, bool numeric, in
         static_cast<TravelBar *>(limits)->setArc(ccwLimit, cwLimit, offset);
 
     QString shown = raw;
-    if (numeric && id == QLatin1Char('W'))
+    if (numeric && id == QLatin1Char('W')) {
         shown = value == 0 ? QStringLiteral("Off") : QStringLiteral("%1 min").arg(value);
+        if (saverCombo) {
+            int index = saverCombo->findData(value);
+            if (index < 0) {
+                saverCombo->addItem(QStringLiteral("%1 min").arg(value), value);
+                index = saverCombo->findData(value);
+            }
+            saverCombo->setCurrentIndex(index);
+        }
+    }
     else if (numeric && (id == QLatin1Char('R') || id == QLatin1Char('S')))
         shown = value == 361 ? QStringLiteral("off") : QStringLiteral("%1°").arg(value);
     else if (numeric && id == QLatin1Char('O')) {

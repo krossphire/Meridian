@@ -14,6 +14,7 @@
 #include "rotor/Rt21Driver.h"
 
 #include <QApplication>
+#include <QComboBox>
 #include <QDateTime>
 #include <QDir>
 #include <QEvent>
@@ -193,7 +194,7 @@ int runScreenshots(const QString &directory, qreal dpr)
     const bool read = waitUntil([&]() {
         auto *label = dialog->findChild<QLabel *>(QStringLiteral("versionLabel"));
         auto *callout = dialog->findChild<QLabel *>(QStringLiteral("displayCallout"));
-        return label && label->text().contains(QStringLiteral("4.14.g1")) && callout
+        return label && label->text().contains(QStringLiteral("4.13.2")) && callout
                && callout->text().contains(QStringLiteral("Screen saver is off"));
     }, 8000);
     QApplication::processEvents();
@@ -203,8 +204,13 @@ int runScreenshots(const QString &directory, qreal dpr)
     auto *scroll = dialog->findChild<QScrollArea *>(QStringLiteral("setupScroll"));
     auto *writeBrightness = dialog->findChild<QPushButton *>(QStringLiteral("writeBrightness"));
     auto *brightnessNote = dialog->findChild<QLabel *>(QStringLiteral("brightnessNote"));
-    if (scroll && writeBrightness)
+    auto *saver = dialog->findChild<QComboBox *>(QStringLiteral("screenSaver"));
+    if (scroll && saver)
+        scroll->ensureWidgetVisible(saver);
+    else if (scroll && writeBrightness)
         scroll->ensureWidgetVisible(writeBrightness);
+    if (!saver || saver->isEnabled() || saver->findText(QStringLiteral("Off")) < 0)
+        return 26;
     QApplication::processEvents();
     if (!writeBrightness || !brightnessNote || !brightnessNote->text().contains(QStringLiteral("OLED"))
         || !dialog->grab().save(directory + QStringLiteral("/settings-brightness.png")))

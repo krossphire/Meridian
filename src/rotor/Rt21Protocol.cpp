@@ -100,11 +100,23 @@ QByteArray readEe(QChar location)
 
 QByteArray writeEe(QChar location, int value)
 {
-    // Inferred from Appendix F "WXn(value)" with n ≠ 0 (write, do not reboot):
-    // 'W' + location + '1' + decimal ASCII + ';'. Not verified on hardware.
+    // 4.13.2 disassembly: W<letter><digit><value>;
+    // Digit 0 stores and reloads the whole setup. Digits 1–9 store only,
+    // applied at the next reload. Neither reboots. This helper is the
+    // store-only form and is not what the brightness button sends.
     const QChar letter = location.toUpper();
     return QByteArray("W") + QByteArray(1, letter.toLatin1()) + QByteArray("1")
            + QByteArray::number(value) + QByteArray(";");
+}
+
+QByteArray brightnessWriteCommand(int value)
+{
+    return QByteArray("WO0") + QByteArray::number(value) + QByteArray(";");
+}
+
+QByteArray brightnessReadCommand()
+{
+    return QByteArray("RO;");
 }
 
 QByteArray calibrateEndpoint(bool clockwise)

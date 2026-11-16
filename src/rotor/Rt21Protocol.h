@@ -28,6 +28,9 @@ QByteArray preset(double azimuth);
 QByteArray executeMove();
 QByteArray readEe(QChar location);
 QByteArray writeEe(QChar location, int value);
+// 4.13.2 disassembly: WO0<n>; digit 0 stores and reloads. Brightness 10 is WO010;
+QByteArray brightnessWriteCommand(int value);
+QByteArray brightnessReadCommand();
 QByteArray calibrateEndpoint(bool clockwise);
 QByteArray setPulseHeading(double azimuth);
 
