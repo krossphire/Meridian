@@ -42,6 +42,7 @@ public:
     void readConfiguration();
     void readNetwork();
     void writeConfiguration(const QList<QPair<QChar, int>> &changes);
+    void writeBrightness(int value);
     void applySetupGroup(const QString &group, const QMap<QString, QString> &fields, const QString &backupPath);
     void sendCalibrate(bool clockwise);
     void sendPulseHeading(double azimuth);
@@ -97,6 +98,7 @@ private:
         bool moduleOptional = false;
         bool moduleExit = false;
         bool moduleRetried = false;
+        bool brightness = false;
     };
 
     void setLink(Link state, const QString &detail);
@@ -128,6 +130,8 @@ private:
     void enqueueConfiguration();
     void enqueueNetworkQueries();
     void sendNetworkExit();
+    void beginBrightnessWatch(bool sawRead, bool matched, const QString &readText);
+    void finishBrightnessWatch(bool portClosed);
     QString noReplyMessage() const;
     bool moduleLineMatches(const QByteArray &frame) const;
     void startFastPoll();
@@ -176,6 +180,15 @@ private:
     bool countingHandshakeBytes = false;
     bool handshakeSawBytes = false;
     bool writeCompareFailed = false;
+    bool brightnessCapture = false;
+    bool brightnessWatching = false;
+    int brightnessWrote = 0;
+    bool brightnessSawRead = false;
+    bool brightnessMatched = false;
+    QString brightnessReadText;
+    int brightnessPollReplies = 0;
+    QTimer *brightnessWatchTimer = nullptr;
+    QTimer *brightnessPollTimer = nullptr;
     int pollsSinceStatus = 0;
     bool statusDisabled = false;
     std::optional<double> heading_;

@@ -76,7 +76,15 @@ Defaults in parentheses are the manual’s. Meridian displays the raw reply next
 
 ## Writes Meridian will send
 
-Appendix F writes `WXn(value)`. `n = 0` reboots after the write; any other digit stores it. Meridian sends `n = 1` and the value as decimal ASCII with no extra separator, for example offset 180 is `WD1180;`. That concatenation is the natural reading of `WXn(value)` and **has not been checked on a real RT-21**. Apply refuses to run until a backup file has been written, and the Controller page says so.
+Appendix F writes `WXn(value)`. `n = 0` reboots after the write; any other digit stores it. Meridian sends `n = 1` and the value as decimal ASCII with no extra separator, for example offset 180 is `WD1180;`. That concatenation is the natural reading of `WXn(value)`. Only brightness is sent by this build. Every other location stays compiled out.
+
+### Brightness, the one unlocked write
+
+Register O. Read is `RO1;`. Setup Utility 4.B12's brightness combo calls `GetRotorData` with the concatenation of the literal `WO0` and the combo text. `GetRotorData` sends that string with `SerialPort.WriteLine`, and that port's `NewLine` is `\n`. A change to 1 is therefore the bytes `WO01` plus a newline (`57 4F 30 31 0A`). The `0` is `n = 0`, which Appendix F says reboots the controller. That matches the 16 November session: the value persisted, then serial died and the utility sat there. Those exact bytes were not captured on the wire.
+
+Meridian does not send the reboot form. The Write button sends one command, `WO1` plus the decimal plus `;`, then immediately `RO1;`, then ten seconds of the usual heading polls (`BI1;` or `AI1;`). Brightness 1 is `WO11;` (`57 4F 31 31 3B`). Brightness 10 is `WO110;` (`57 4F 31 31 30 3B`). The allowed range in the control is 0 through 15, so 0 is `WO10;`. This `n = 1` form is the utility's file-restore prefix `WO1` plus the semicolon every other Meridian command uses. It has not been confirmed on hardware. Has no visible effect on OLED RT-21 units (LCD units only, unverified).
+
+The button never writes by itself. A read must already have reported 4.14.g1. The traffic log records the set and the read-back as `WRITE-TX` and `WRITE-RX` with timestamps, then a note of how many heading replies arrived in the next ten seconds. The status line is one of: `Brightness written and verified`, `Brightness read-back mismatch: wrote X, read Y`, or `RT-21 stopped answering after write. Power-cycle it.`
 
 Also behind an explicit confirmation:
 
@@ -102,11 +110,13 @@ Also behind an explicit confirmation:
 
 ## Firmware this program is built against
 
-Meridian is designed and tested with Andrew's RT-21, which reports `RT-21 4.14.g1`. That build is not on the public download page. Fetched 15 Nov 2026, [greenheronengineering.com/rotator-controllers-software](https://www.greenheronengineering.com/rotator-controllers-software/) lists RT-21 firmware 4.13.2 as current (version 4, serial numbers 4000 and up). 4.14 is not a download. Setup Utility 4.B12 (beta, December 2023) is the program that mentions it: "Supports 4.14 w/Serial Sensor feedback", "Magnetic Variation with pre-release 4.d14", and "Fixes bug that always cleared the Screen Saver function in RT-21". Utility 4.11 (December 2022) is the non-beta. 4.13.x is expected to speak the same protocol and has not been tested here. A read that is not 4.14.g1 gets a status-line note. Writes stay compiled out, and the write path still refuses anything that is not 4.14.g1.
+Meridian is designed and tested with Andrew's RT-21, which reports `RT-21 4.14.g1`. That build is not on the public download page. Fetched 15 Nov 2026, [greenheronengineering.com/rotator-controllers-software](https://www.greenheronengineering.com/rotator-controllers-software/) lists RT-21 firmware 4.13.2 as current (version 4, serial numbers 4000 and up). 4.14 is not a download. Setup Utility 4.B12 (beta, December 2023) is the program that mentions it: "Supports 4.14 w/Serial Sensor feedback", "Magnetic Variation with pre-release 4.d14", and "Fixes bug that always cleared the Screen Saver function in RT-21". Utility 4.11 (December 2022) is the non-beta. 4.13.x is expected to speak the same protocol and has not been tested here. A read that is not 4.14.g1 gets a status-line note. The only write in this build is display brightness, and only after a read that reports 4.14.g1. Every other write stays compiled out.
 
 ## Observed on hardware
 
-On 15 November 2026, firmware 4.14.g1 on COM6 through a Digi Edgeport/8, the controller's own screen saver was set to 1 minute. About a minute after the rotor went idle it stopped answering serial. Meridian, Find RT-21, and the Green Heron setup utility all received zero bytes until the unit was power-cycled. Pressing Setup or Cancel woke the display and did not wake the serial port. With the saver off, Meridian polled for 22 minutes with no timeouts. Treat the hardware screen saver as unsafe on this firmware. Leave it Off. Meridian's replacement is an idle dim: after 90 seconds with no user interaction, drop display brightness to 1 and restore it on the next click or typed heading. Heading polls do not count as activity. That needs a brightness write, so it stays compiled out until writes are verified.
+On 15 November 2026, firmware 4.14.g1 on COM6 through a Digi Edgeport/8, the controller's own screen saver was set to 1 minute. About a minute after the rotor went idle it stopped answering serial. Meridian, Find RT-21, and the Green Heron setup utility all received zero bytes until the unit was power-cycled. Pressing Setup or Cancel woke the display and did not wake the serial port. With the saver off, Meridian polled for 22 minutes with no timeouts. Treat the hardware screen saver as unsafe on this firmware. Leave it Off.
+
+On 16 November 2026 the same firmware, on an OLED unit, had its brightness changed from 10 to 1 by Setup Utility 4.B12. Meridian's next read was 1, and the value was still 1 after a power cycle, so the write was stored. The OLED panel did not look any different. Brightness on this hardware is treated as an LCD-only control; that is unverified on an LCD unit. After the utility wrote the value it froze, and the RT-21 stopped answering serial until it was power-cycled. It is not clear whether the write itself or the utility's wait caused that.
 
 ## Earlier hardware notes
 
@@ -160,7 +170,7 @@ Utility 4.B12's combo is labeled Minutes. The items are Off, 1, 2, 5, 10, 20, 30
 
 Do not enable this saver as burn-in protection. The 15 November observation above is the reason: on 4.14.g1 a 1-minute saver stops serial and network replies until a power cycle, and a button that wakes the display does not wake the port. The recommended stored value is Off (`W = 0`). Meridian does not write it.
 
-What the addendum counts as a wake: a button, or a remote command. On this firmware that wake is the display only. The port stays silent. The planned replacement is Meridian's idle dim, described under Observed on hardware. It is not compiled in.
+What the addendum counts as a wake: a button, or a remote command. On this firmware that wake is the display only. The port stays silent. Leave the saver Off. There is no idle-dim stand-in: brightness does nothing visible on the OLED unit above.
 
 The 4.B12 release note says that build fixes a bug that always cleared the screen saver. Utility 4.11's write prefix is the string `WW0` plus two trailing spaces. 4.B12's prefix is `WW0` with the spaces removed. A value glued onto the 4.11 prefix is not a decimal the controller can store, so the saver never engaged. Off is the separate literal `WW00` (`n = 0`, which reboots). Meridian does not write W from any group except Display, so saving speed, limits, or the network cannot clear it.
 

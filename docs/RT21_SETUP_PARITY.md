@@ -83,7 +83,7 @@ The `.ghr` restore file uses these names: `ccwcal`, `cwcal`, `caloffset`, `rever
 | L | Cal range | 360 | `RL1;` | `WL0` / `WL1` | medium | Unverified. Read-only |
 | M | Mode | Normal | `RM1;` | `WM00` … `WM05`. See below. | high | Unverified. Read-only |
 | N | Ramp | 3 | `RN1;` | `WN0` / `WN1` | medium | Unverified. Read-only |
-| O | Brightness | 8 | `RO1;` | `WO0` / `WO1` | low | Unverified. Read-only. First group to try on hardware. |
+| O | Brightness | 8 | `RO1;` | Live combo sends `WO0` plus the text and a newline (`n = 0`, reboot). Meridian's Write button sends `WO1` plus the decimal plus `;` (`WO11;` for 1). Unverified on hardware. OLED shows no change. | the only write | Write button only. Other groups stay locked. |
 | P | No-motion timeout | 4 | `RP1;` | `WP0` / `WP1` | low | Unverified. Read-only |
 | Q | Security | Admin | `RQ1;` | `WQ00` user, `WQ01` admin | high | Unverified. Read-only |
 | R | Alt offset 1 | 361 | `RR1;` | `WR0` / `WR1`. Unused is the literal `WR0361`. | medium | Unverified. Read-only |

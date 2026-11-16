@@ -137,6 +137,22 @@ SettingsDialog::SettingsDialog(const AppConfig &config, const ZipDatabase *zipDb
             driver->readConfiguration();
         });
         connect(setupColumn, &ControllerColumn::backupRequested, this, [this]() { exportSetup(); });
+        connect(setupColumn, &ControllerColumn::brightnessWriteRequested, this, [this](int value) {
+            if (!driver) {
+                setStatus(QStringLiteral("Connect to a rotor before writing brightness."));
+                return;
+            }
+            if (versionReport.isEmpty()) {
+                setStatus(QStringLiteral("Read the RT-21 before writing brightness."));
+                return;
+            }
+            if (!Rt21::firmwareWritesAllowed(versionReport)) {
+                setStatus(Rt21::firmwareNotice(versionReport));
+                return;
+            }
+            setStatus(QStringLiteral("Writing brightness %1…").arg(value));
+            driver->writeBrightness(value);
+        });
     }
     statusLabel = new QLabel;
     statusLabel->setObjectName(QStringLiteral("setupStatus"));
@@ -264,7 +280,9 @@ void SettingsDialog::setDriver(Rt21Driver *next)
             const QString fallback = ok ? QStringLiteral("Read back the same value.")
                                          : QStringLiteral("The write did not stick.");
             setStatus(message.isEmpty() ? fallback : message);
-            if (ok && driver)
+            const bool brightnessNote = message.startsWith(QStringLiteral("Brightness"))
+                                        || message.startsWith(QStringLiteral("RT-21 stopped answering after write"));
+            if (ok && driver && !brightnessNote)
                 driver->readConfiguration();
         });
 }

@@ -18,6 +18,7 @@
 #include <QPainter>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QSpinBox>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -95,7 +96,7 @@ ControllerColumn::ControllerColumn(QWidget *parent)
     connect(read, &QPushButton::clicked, this, &ControllerColumn::readRequested);
     connect(backup, &QPushButton::clicked, this, &ControllerColumn::backupRequested);
     auto *note = new QLabel(QStringLiteral(
-        "Read-only in this alpha. The groups follow the setup utility. Nothing here is written."));
+        "Only display brightness can be written, and only from its Write button. Everything else stays read-only."));
     note->setWordWrap(true);
     note->setObjectName(QStringLiteral("hint"));
     column->addWidget(note);
@@ -226,19 +227,45 @@ ControllerColumn::ControllerColumn(QWidget *parent)
                 {QLatin1Char('L'), QStringLiteral("Cal range")},
                 {QLatin1Char('['), QStringLiteral("Magnetic variation")}});
 
-    valueGroup(QStringLiteral("Display"),
-               {{QLatin1Char('O'), QStringLiteral("Brightness")},
-                {QLatin1Char('Y'), QStringLiteral("Knob timer")},
-                {QLatin1Char('W'), QStringLiteral("Screen saver")},
-                {QLatin1Char('R'), QStringLiteral("Alt 1")},
-                {QLatin1Char('S'), QStringLiteral("Alt 2")}});
-    auto *idle = new QCheckBox(QStringLiteral("Idle dim after 90 seconds"));
-    idle->setEnabled(false);
-    idle->setToolTip(QStringLiteral(
-        "Planned. After 90 seconds with no click or typed heading, Meridian drops display brightness "
-        "to 1 and restores it on the next interaction. Heading polls do not count. "
-        "The brightness write stays off until it has been checked on a real rotor."));
-    column->addWidget(idle);
+    auto *display = makeGroup(QStringLiteral("Display"), column);
+    auto *displayForm = new QFormLayout(display);
+    auto *brightRow = new QWidget;
+    auto *brightLay = new QHBoxLayout(brightRow);
+    brightLay->setContentsMargins(0, 0, 0, 0);
+    auto *brightNow = new QLabel(QStringLiteral("—"));
+    brightNow->setWordWrap(true);
+    values[QLatin1Char('O').unicode() - QLatin1Char('A').unicode()] = brightNow;
+    brightnessSpin = new QSpinBox;
+    brightnessSpin->setObjectName(QStringLiteral("brightnessSpin"));
+    brightnessSpin->setRange(0, 15);
+    brightnessSpin->setValue(8);
+    auto *writeBrightness = new QPushButton(QStringLiteral("Write"));
+    writeBrightness->setObjectName(QStringLiteral("writeBrightness"));
+    brightLay->addWidget(brightNow);
+    brightLay->addWidget(brightnessSpin);
+    brightLay->addWidget(writeBrightness);
+    brightLay->addStretch();
+    displayForm->addRow(QStringLiteral("Brightness"), brightRow);
+    auto *oled = new QLabel(QStringLiteral(
+        "Has no visible effect on OLED RT-21 units (LCD units only, unverified)."));
+    oled->setObjectName(QStringLiteral("brightnessNote"));
+    oled->setWordWrap(true);
+    displayForm->addRow(QString(), oled);
+    auto addReadRow = [&](QChar id, const QString &name) {
+        auto *label = new QLabel(QStringLiteral("—"));
+        label->setWordWrap(true);
+        if (id >= QLatin1Char('A') && id <= QLatin1Char('Z'))
+            values[id.unicode() - QLatin1Char('A').unicode()] = label;
+        displayForm->addRow(name, label);
+    };
+    addReadRow(QLatin1Char('Y'), QStringLiteral("Knob timer"));
+    addReadRow(QLatin1Char('W'), QStringLiteral("Screen saver"));
+    addReadRow(QLatin1Char('R'), QStringLiteral("Alt 1"));
+    addReadRow(QLatin1Char('S'), QStringLiteral("Alt 2"));
+    connect(writeBrightness, &QPushButton::clicked, this, [this]() {
+        if (brightnessSpin)
+            emit brightnessWriteRequested(brightnessSpin->value());
+    });
 
     column->addStretch();
 }
@@ -326,7 +353,11 @@ void ControllerColumn::applyField(QChar id, const QString &raw, bool numeric, in
         shown = value == 0 ? QStringLiteral("Off") : QStringLiteral("%1 min").arg(value);
     else if (numeric && (id == QLatin1Char('R') || id == QLatin1Char('S')))
         shown = value == 361 ? QStringLiteral("off") : QStringLiteral("%1°").arg(value);
-    else if (numeric && id == QLatin1Char('X'))
+    else if (numeric && id == QLatin1Char('O')) {
+        shown = QString::number(value);
+        if (brightnessSpin)
+            brightnessSpin->setValue(std::clamp(value, brightnessSpin->minimum(), brightnessSpin->maximum()));
+    } else if (numeric && id == QLatin1Char('X'))
         shown = QStringLiteral("%1 (raw %2)").arg(value / 10.0, 0, 'f', 1).arg(value);
     else if (numeric && (id == QLatin1Char('P') || id == QLatin1Char('E') || id == QLatin1Char('V')))
         shown = QStringLiteral("%1 s").arg(value);

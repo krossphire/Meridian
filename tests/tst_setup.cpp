@@ -28,6 +28,7 @@ private slots:
     void serialPortsStayOnTheSavedName();
     void silentPortSkipsSetupReads();
     void silentModuleSkipsQueries();
+    void brightnessWriteReadsBack();
 };
 
 void TestSetup::commandsMatchTheUtility()
@@ -291,6 +292,43 @@ void TestSetup::silentModuleSkipsQueries()
             sawExit = true;
     }
     QVERIFY(sawExit);
+}
+
+void TestSetup::brightnessWriteReadsBack()
+{
+    QCOMPARE(Rt21::writeEe(QLatin1Char('O'), 1), QByteArray("WO11;"));
+    QCOMPARE(Rt21::writeEe(QLatin1Char('O'), 10), QByteArray("WO110;"));
+    QCOMPARE(Rt21::writeEe(QLatin1Char('O'), 0), QByteArray("WO10;"));
+
+    MockRt21Server server;
+    server.sim()->setHeading(20);
+    QVERIFY(server.listenTcp(0));
+    Rt21Driver driver;
+    RotorEndpoint endpoint;
+    endpoint.transport = RotorEndpoint::Transport::Tcp;
+    endpoint.host = QStringLiteral("127.0.0.1");
+    endpoint.tcpPort = int(server.port());
+    driver.connectEndpoint(endpoint);
+    QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::On, 3000);
+
+    QSignalSpy done(&driver, &Rt21Driver::writeFinished);
+    driver.writeBrightness(1);
+    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 15000);
+    QCOMPARE(done.at(0).at(0).toBool(), true);
+    QCOMPARE(done.at(0).at(1).toString(), QStringLiteral("Brightness written and verified"));
+    QVERIFY(server.sim()->trace().contains(QByteArray("WO11")));
+    QVERIFY(server.sim()->trace().contains(QByteArray("RO1")));
+
+    server.sim()->setIgnoreQueries(true);
+    driver.writeBrightness(2);
+    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 2, 15000);
+    QCOMPARE(done.at(1).at(0).toBool(), false);
+    QCOMPARE(done.at(1).at(1).toString(),
+             QStringLiteral("RT-21 stopped answering after write. Power-cycle it."));
+
+    driver.applySetupGroup(QStringLiteral("motion"), {}, QString());
+    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 3, 1000);
+    QVERIFY(done.at(2).at(1).toString().contains(QStringLiteral("off in this alpha")));
 }
 
 QTEST_MAIN(TestSetup)

@@ -98,6 +98,7 @@ Rt21Driver::Rt21Driver(QObject *parent)
         const QString expectToken = inflight->expectToken;
         const QByteArray bytes = inflight->bytes;
         const QString note = inflight->note;
+        const bool brightnessJob = inflight->brightness;
         inflight.reset();
         if (kind == Kind::Probe) {
             queue.clear();
@@ -173,6 +174,10 @@ Rt21Driver::Rt21Driver(QObject *parent)
             pump();
             return;
         }
+        if (kind == Kind::Read && brightnessJob) {
+            beginBrightnessWatch(false, false, QString());
+            return;
+        }
         if (kind == Kind::Read || kind == Kind::Note) {
             ++configTimeouts;
             if (kind == Kind::Read)
@@ -192,6 +197,10 @@ Rt21Driver::Rt21Driver(QObject *parent)
                 emit configFinished(true, QString());
                 startPoll();
             }
+            return;
+        }
+        if (brightnessWatching && (kind == Kind::Heading || kind == Kind::Status)) {
+            TrafficLog::instance().recordSession("NOTE", QByteArray("brightness watch poll timed out"));
             return;
         }
         ++failures;
@@ -408,6 +417,8 @@ void Rt21Driver::closeIo(const QString &reason)
     ++suppress;
     replyTimer->stop();
     pollTimer->stop();
+    if (brightnessWatching || brightnessCapture)
+        finishBrightnessWatch(true);
     if (gapTimer)
         gapTimer->stop();
     if (commandTimer)
@@ -724,6 +735,8 @@ void Rt21Driver::onReadyRead()
     const QByteArray received = io->readAll();
     if (countingHandshakeBytes && !received.isEmpty())
         handshakeSawBytes = true;
+    if (brightnessCapture && !received.isEmpty())
+        TrafficLog::instance().recordSession("WRITE-RX", received);
     if (serial)
         TrafficLog::instance().recordSession("SER-RX", received);
     else if (networkMode)
@@ -831,6 +844,19 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
         return;
     }
 
+    if (inflight && inflight->kind == Kind::Read && inflight->brightness) {
+        failures = 0;
+        configTimeouts = 0;
+        const QString raw = Rt21::payloadAfterSoh(frame);
+        const auto number = Rt21::parseIntegerPayload(frame);
+        const QString got = number ? QString::number(*number) : raw;
+        const bool matched = number && *number == brightnessWrote;
+        emit configField(inflight->id, raw, number.has_value(), number.value_or(0));
+        finishInflight();
+        beginBrightnessWatch(true, matched, got);
+        return;
+    }
+
     if (inflight && inflight->kind == Kind::Read) {
         failures = 0;
         configTimeouts = 0;
@@ -889,6 +915,8 @@ void Rt21Driver::finishInflight()
 void Rt21Driver::noteArrival(double azimuth, bool haveStatus, int status)
 {
     failures = 0;
+    if (brightnessWatching)
+        ++brightnessPollReplies;
     lastReplyMs = QDateTime::currentMSecsSinceEpoch();
     const bool changed = !heading_ || std::abs(*heading_ - azimuth) > 0.05;
     const bool delta = heading_ && std::abs(*heading_ - azimuth) > 0.15;
@@ -967,6 +995,8 @@ void Rt21Driver::pump()
     if (inflight || queue.isEmpty() || !io)
         return;
     inflight = queue.dequeue();
+    if (inflight->brightness)
+        TrafficLog::instance().recordSession("WRITE-TX", inflight->bytes);
     if (serial)
         TrafficLog::instance().recordSession("SER-TX", inflight->bytes);
     else if (networkMode)
@@ -1189,6 +1219,101 @@ void Rt21Driver::readNetwork()
 {
     TrafficLog::instance().recordSession("NOTE", QByteArray("network read start"));
     beginGuardedRead(true);
+}
+
+void Rt21Driver::writeBrightness(int value)
+{
+    if (retired)
+        return;
+    if (value < 0 || value > 15) {
+        emit writeFinished(false, QStringLiteral("Brightness is 0 through 15."));
+        return;
+    }
+    if (!transportOpen()) {
+        emit writeFinished(false, QStringLiteral("Connect to a rotor before writing brightness."));
+        return;
+    }
+    if (brightnessWatching || brightnessCapture) {
+        emit writeFinished(false, QStringLiteral("A brightness write is already running."));
+        return;
+    }
+    if (configMode || networkMode) {
+        emit writeFinished(false, QStringLiteral("Wait until the setup read finishes."));
+        return;
+    }
+    brightnessWrote = value;
+    brightnessCapture = true;
+    pollTimer->stop();
+    Job write;
+    write.kind = Kind::Write;
+    write.brightness = true;
+    write.bytes = Rt21::writeEe(QLatin1Char('O'), value);
+    Job read;
+    read.kind = Kind::Read;
+    read.brightness = true;
+    read.id = QLatin1Char('O');
+    read.bytes = Rt21::readEe(QLatin1Char('O'));
+    read.expectValue = QString::number(value);
+    queue.enqueue(write);
+    queue.enqueue(read);
+    pump();
+}
+
+void Rt21Driver::beginBrightnessWatch(bool sawRead, bool matched, const QString &readText)
+{
+    brightnessCapture = false;
+    brightnessWatching = true;
+    brightnessSawRead = sawRead;
+    brightnessMatched = matched;
+    brightnessReadText = readText;
+    brightnessPollReplies = 0;
+    QByteArray note = QByteArray("brightness watch start wrote ") + QByteArray::number(brightnessWrote);
+    note += sawRead ? QByteArray(" read ") + readText.toLatin1() : QByteArray(" no read-back");
+    TrafficLog::instance().recordSession("NOTE", note);
+    if (!brightnessWatchTimer) {
+        brightnessWatchTimer = new QTimer(this);
+        brightnessWatchTimer->setSingleShot(true);
+        connect(brightnessWatchTimer, &QTimer::timeout, this, [this]() { finishBrightnessWatch(false); });
+        brightnessPollTimer = new QTimer(this);
+        connect(brightnessPollTimer, &QTimer::timeout, this, [this]() { sendQuery(); });
+    }
+    brightnessWatchTimer->start(10000);
+    brightnessPollTimer->start(2000);
+    sendQuery();
+}
+
+void Rt21Driver::finishBrightnessWatch(bool portClosed)
+{
+    if (!brightnessWatching && !brightnessCapture)
+        return;
+    const int replies = brightnessPollReplies;
+    const bool sawRead = brightnessSawRead;
+    const bool matched = brightnessMatched;
+    const int wrote = brightnessWrote;
+    const QString readText = brightnessReadText;
+    brightnessWatching = false;
+    brightnessCapture = false;
+    if (brightnessWatchTimer)
+        brightnessWatchTimer->stop();
+    if (brightnessPollTimer)
+        brightnessPollTimer->stop();
+    TrafficLog::instance().recordSession(
+        "NOTE", QByteArray("brightness watch heading replies ") + QByteArray::number(replies));
+    QString message;
+    bool ok = false;
+    if (portClosed || replies <= 0) {
+        message = QStringLiteral("RT-21 stopped answering after write. Power-cycle it.");
+    } else if (!sawRead || !matched) {
+        message = QStringLiteral("Brightness read-back mismatch: wrote %1, read %2")
+                      .arg(wrote)
+                      .arg(sawRead ? readText : QStringLiteral("timeout"));
+    } else {
+        message = QStringLiteral("Brightness written and verified");
+        ok = true;
+    }
+    if (!portClosed && io)
+        startPoll();
+    emit writeFinished(ok, message);
 }
 
 void Rt21Driver::applySetupGroup(const QString &group, const QMap<QString, QString> &fields, const QString &backupPath)

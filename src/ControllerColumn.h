@@ -15,6 +15,7 @@
 
 class QCheckBox;
 class QLabel;
+class QSpinBox;
 class QVBoxLayout;
 class Rt21Driver;
 
@@ -33,6 +34,7 @@ public:
 signals:
     void readRequested();
     void backupRequested();
+    void brightnessWriteRequested(int value);
 
 private:
     void applyField(QChar id, const QString &raw, bool numeric, int value);
@@ -41,6 +43,7 @@ private:
     QVBoxLayout *column = nullptr;
     QLabel *version = nullptr;
     QLabel *displayCallout = nullptr;
+    QSpinBox *brightnessSpin = nullptr;
     QLabel *heading = nullptr;
     QLabel *linkLabel = nullptr;
     QLabel *analog = nullptr;

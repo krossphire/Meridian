@@ -600,8 +600,7 @@ QString screenSaverRecommendation()
     return QStringLiteral(
         "Leave the rotor's screen saver Off. On firmware 4.14.g1, with it set to 1 minute, "
         "serial and network replies stop about a minute after the controller goes idle and stay stopped until a power cycle. "
-        "Pressing Setup or Cancel wakes the display and not the port. With the saver off, polling ran 22 minutes with no timeouts. "
-        "Meridian's own idle dim, after 90 seconds without a click or a typed heading, is planned and is not in this build. Polls do not count as activity.");
+        "Pressing Setup or Cancel wakes the display and not the port. With the saver off, polling ran 22 minutes with no timeouts.");
 }
 
 QString advancedOptionsText(int value)

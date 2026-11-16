@@ -201,6 +201,15 @@ int runScreenshots(const QString &directory, qreal dpr)
         return 12;
 
     auto *scroll = dialog->findChild<QScrollArea *>(QStringLiteral("setupScroll"));
+    auto *writeBrightness = dialog->findChild<QPushButton *>(QStringLiteral("writeBrightness"));
+    auto *brightnessNote = dialog->findChild<QLabel *>(QStringLiteral("brightnessNote"));
+    if (scroll && writeBrightness)
+        scroll->ensureWidgetVisible(writeBrightness);
+    QApplication::processEvents();
+    if (!writeBrightness || !brightnessNote || !brightnessNote->text().contains(QStringLiteral("OLED"))
+        || !dialog->grab().save(directory + QStringLiteral("/settings-brightness.png")))
+        return 25;
+
     auto *networkGroup = dialog->findChild<QWidget *>(QStringLiteral("networkGroup"));
     if (scroll && networkGroup)
         scroll->ensureWidgetVisible(networkGroup);
