@@ -11,6 +11,7 @@
 
 #include "rotor/AppConfig.h"
 
+#include <QHash>
 #include <QWidget>
 
 class QCheckBox;
@@ -36,6 +37,7 @@ signals:
     void readRequested();
     void backupRequested();
     void brightnessWriteRequested(int value);
+    void registerWriteRequested(QChar id, int value);
 
 private:
     void applyField(QChar id, const QString &raw, bool numeric, int value);
@@ -45,6 +47,7 @@ private:
     QLabel *version = nullptr;
     QLabel *displayCallout = nullptr;
     QSpinBox *brightnessSpin = nullptr;
+    QHash<QChar, QSpinBox *> editors;
     QComboBox *saverCombo = nullptr;
     QLabel *heading = nullptr;
     QLabel *linkLabel = nullptr;

@@ -13,6 +13,7 @@
 
 #include <QDateTime>
 #include <QFileInfo>
+#include <QHostAddress>
 #include <QSerialPort>
 #include <QTcpSocket>
 #include <QTimer>
@@ -37,6 +38,17 @@ namespace {
 int g_alive = 0;
 int g_transports = 0;
 int g_transportHighWater = 0;
+
+QString hexOf(const QByteArray &bytes)
+{
+    QString out;
+    for (unsigned char c : bytes) {
+        if (!out.isEmpty())
+            out += QLatin1Char(' ');
+        out += QString::asprintf("%02X", c);
+    }
+    return out;
+}
 
 void trackTransport(int delta)
 {
@@ -820,10 +832,13 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
 
     if (inflight && inflight->kind == Kind::Write && inflight->brightness) {
         const bool ack = frame.size() >= 2 && static_cast<unsigned char>(frame.at(0)) == 0x06
-                         && frame.at(1) == 'O';
+                         && frame.at(1) == writeLetter.toLatin1();
         if (!ack)
             return;
-        TrafficLog::instance().recordSession("NOTE", QByteArray("brightness ack 06 4F 3B"));
+        writeAck = QByteArray(1, char(0x06)) + QByteArray(1, writeLetter.toLatin1()) + QByteArray(";");
+        const qint64 latency = writeSentMs < 0 ? -1 : QDateTime::currentMSecsSinceEpoch() - writeSentMs;
+        TrafficLog::instance().recordSession(
+            "WRITE", QByteArray("ack ") + hexOf(writeAck).toLatin1() + " latency " + QByteArray::number(latency) + " ms");
         replyTimer->stop();
         inflight.reset();
         QTimer::singleShot(150, this, [this]() { sendBrightnessRead(); });
@@ -886,6 +901,8 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
             countingHandshakeBytes = false;
             enqueueNetworkQueries();
         }
+        if (matched && inflight->note == QLatin1String("netwrite"))
+            networkWriteOk = true;
         if (!inflight->expectValue.isEmpty() && value != inflight->expectValue) {
             writeCompareFailed = true;
             for (int i = queue.size() - 1; i >= 0; --i) {
@@ -911,6 +928,8 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
         const auto number = Rt21::parseIntegerPayload(frame);
         const QString got = number ? QString::number(*number) : raw;
         const bool matched = number && *number == brightnessWrote;
+        TrafficLog::instance().recordSession(
+            "WRITE", QByteArray("read-back ") + (number ? QByteArray::number(*number) : raw.toLatin1()));
         emit configField(inflight->id, raw, number.has_value(), number.value_or(0));
         finishInflight();
         beginBrightnessWatch(true, matched, got);
@@ -1060,8 +1079,12 @@ void Rt21Driver::pump()
     if (inflight || queue.isEmpty() || !io)
         return;
     inflight = queue.dequeue();
-    if (inflight->brightness)
+    if (inflight->brightness) {
+        writeSentMs = QDateTime::currentMSecsSinceEpoch();
+        writeTx = inflight->bytes;
+        TrafficLog::instance().recordSession("WRITE", QByteArray("tx ") + hexOf(inflight->bytes).toLatin1());
         TrafficLog::instance().recordSession("WRITE-TX", inflight->bytes);
+    }
     if (inflight->kind == Kind::Module || inflight->bytes.contains("AT")) {
         lastModuleTxMs = QDateTime::currentMSecsSinceEpoch();
         TrafficLog::instance().recordSession("NOTE", QByteArray("network tx ") + inflight->bytes);
@@ -1239,6 +1262,18 @@ void Rt21Driver::enqueueModule(const Rt21::ModuleQuery &query)
 
 void Rt21Driver::finishNetwork(bool ok, const QString &message)
 {
+    if (!networkWriteName.isEmpty()) {
+        const QString name = networkWriteName;
+        const bool wrote = networkWriteOk;
+        networkWriteName.clear();
+        networkWriteOk = false;
+        networkMode = false;
+        configMode = false;
+        framer.setLineMode(false);
+        writeSettingName = name;
+        beginBrightnessWatch(wrote, wrote, wrote ? QStringLiteral("OK") : QString());
+        return;
+    }
     const bool compared = writeCompareFailed;
     networkMode = false;
     configMode = false;
@@ -1304,32 +1339,55 @@ void Rt21Driver::readNetwork()
 
 void Rt21Driver::writeBrightness(int value)
 {
+    writeRegister(QLatin1Char('O'), value, QStringLiteral("Brightness"));
+}
+
+void Rt21Driver::writeRegister(QChar letter, int value, const QString &settingName)
+{
     if (retired)
         return;
-    if (value < 0 || value > 15) {
+    const QChar upper = letter.toUpper();
+    const QString allowed = QStringLiteral("DEGHIKLNOPRSUVWY");
+    if (!allowed.contains(upper) || Rt21::registerWriteCommand(upper, value).isEmpty()) {
+        emit writeFinished(false, QStringLiteral("Write not confirmed: %1").arg(settingName));
+        return;
+    }
+    if (upper == QLatin1Char('O') && (value < 0 || value > 15)) {
         emit writeFinished(false, QStringLiteral("Brightness is 0 through 15."));
         return;
     }
+    if (upper == QLatin1Char('W') && !Rt21::screenSaverMinuteAllowed(value)) {
+        emit writeFinished(false, QStringLiteral("Screen saver is Off or 1, 2, 5, 10, 20, 30, 40, 50, or 60 minutes."));
+        return;
+    }
+    if (firmwareReport.contains(QStringLiteral("4.14"))
+        || (!firmwareReport.isEmpty() && !firmwareReport.contains(QStringLiteral("4.13.2")))) {
+        emit writeFinished(false, Rt21::firmwareNotice(firmwareReport));
+        return;
+    }
     if (!transportOpen()) {
-        emit writeFinished(false, QStringLiteral("Connect to a rotor before writing brightness."));
+        emit writeFinished(false, QStringLiteral("Connect to a rotor before writing."));
         return;
     }
-    if (brightnessWatching || brightnessCapture || brightnessHold || brightnessQueued >= 0) {
-        emit writeFinished(false, QStringLiteral("A brightness write is already running."));
+    if (brightnessWatching || brightnessCapture || brightnessHold || brightnessQueued >= 0 || networkWritePending) {
+        emit writeFinished(false, QStringLiteral("A write is already running."));
         return;
     }
+    writeLetter = upper;
+    writeSettingName = settingName;
     brightnessQueued = value;
-    TrafficLog::instance().recordSession("NOTE", QByteArray("brightness write requested, waiting for an idle poll"));
+    TrafficLog::instance().recordSession("NOTE", QByteArray("write requested, waiting for an idle poll"));
     scheduleBrightnessWrite();
 }
 
 void Rt21Driver::scheduleBrightnessWrite()
 {
-    if (brightnessQueued < 0 || brightnessCapture || brightnessWatching || brightnessHold || retired)
+    if ((brightnessQueued < 0 && !networkWritePending) || brightnessCapture || brightnessWatching || brightnessHold || retired)
         return;
     if (!transportOpen()) {
         brightnessQueued = -1;
-        emit writeFinished(false, QStringLiteral("Connect to a rotor before writing brightness."));
+        networkWritePending = false;
+        emit writeFinished(false, QStringLiteral("Connect to a rotor before writing."));
         return;
     }
     if (configMode || networkMode || awaitHeadingAfterNetwork || inflight) {
@@ -1355,22 +1413,124 @@ void Rt21Driver::scheduleBrightnessWrite()
         brightnessDeferTimer->start(wait);
         return;
     }
+    if (networkWritePending) {
+        networkWritePending = false;
+        networkWriteOk = false;
+        networkMode = true;
+        framer.setLineMode(true);
+        pollTimer->stop();
+        writeSettingName = networkWriteName;
+        Job enter;
+        enter.kind = Kind::Module;
+        enter.bytes = QByteArray("T11;");
+        enter.expectToken = QStringLiteral("OK");
+        enter.moduleOptional = true;
+        queue.enqueue(enter);
+        Job at;
+        at.kind = Kind::Module;
+        at.bytes = networkWriteCommand.toLatin1();
+        at.expectToken = QStringLiteral("OK");
+        at.note = QStringLiteral("netwrite");
+        queue.enqueue(at);
+        Job esc;
+        esc.kind = Kind::Module;
+        esc.bytes = QByteArray("\x1b");
+        esc.expectToken = QStringLiteral("OK");
+        esc.moduleOptional = true;
+        esc.moduleExit = true;
+        queue.enqueue(esc);
+        Job back;
+        back.kind = Kind::Module;
+        back.bytes = QByteArray("T01;");
+        back.expectToken = QStringLiteral("OK");
+        back.moduleOptional = true;
+        back.moduleExit = true;
+        queue.enqueue(back);
+        TrafficLog::instance().recordSession("WRITE", QByteArray("tx ") + hexOf(at.bytes).toLatin1());
+        pump();
+        return;
+    }
     const int value = brightnessQueued;
     brightnessQueued = -1;
     brightnessWrote = value;
     brightnessCapture = true;
     brightnessHold = true;
     pollTimer->stop();
-    const QByteArray command = Rt21::brightnessWriteCommand(value);
-    TrafficLog::instance().recordSession(
-        "NOTE", QByteArray("brightness write ") + command
-                    + " then ack 06 4F 3B, 150 ms, RO; . Digit 0 stores and reloads on 4.13.2. Not a reboot. Static analysis, unverified on the wire.");
+    const QByteArray command = Rt21::registerWriteCommand(writeLetter, value);
     Job write;
     write.kind = Kind::Write;
     write.brightness = true;
     write.bytes = command;
     queue.enqueue(write);
     pump();
+}
+
+void Rt21Driver::writeNetworkSetting(const QString &key, const QString &value, const QString &settingName)
+{
+    if (retired)
+        return;
+    if (endpoint.transport == RotorEndpoint::Transport::Tcp && endpoint.configured()) {
+        emit writeFinished(false, QStringLiteral(
+            "Needs a USB or serial connection; changing network settings over IP can drop the link."));
+        return;
+    }
+    if (firmwareReport.contains(QStringLiteral("4.14"))
+        || (!firmwareReport.isEmpty() && !firmwareReport.contains(QStringLiteral("4.13.2")))) {
+        emit writeFinished(false, Rt21::firmwareNotice(firmwareReport));
+        return;
+    }
+    QString command;
+    const QString trimmed = value.trimmed();
+    if (key == QLatin1String("dhcp")) {
+        QString code;
+        if (trimmed == QLatin1String("0") || trimmed.startsWith(QStringLiteral("DHCP"), Qt::CaseInsensitive))
+            code = QStringLiteral("0");
+        else if (trimmed == QLatin1String("1") || trimmed.startsWith(QStringLiteral("Static"), Qt::CaseInsensitive))
+            code = QStringLiteral("1");
+        else {
+            emit writeFinished(false, QStringLiteral("DHCP is 0 or 1."));
+            return;
+        }
+        command = QStringLiteral("AT*DHCP=%1;").arg(code);
+    } else if (key == QLatin1String("aip") || key == QLatin1String("anmask") || key == QLatin1String("agw")) {
+        QHostAddress address;
+        if (!address.setAddress(trimmed) || address.protocol() != QAbstractSocket::IPv4Protocol) {
+            emit writeFinished(false, QStringLiteral("%1 needs an IPv4 address.").arg(settingName));
+            return;
+        }
+        const char *id = key == QLatin1String("aip") ? "AIP" : key == QLatin1String("anmask") ? "ANMASK" : "AGW";
+        command = QStringLiteral("AT*%1=%2;").arg(QLatin1String(id), address.toString());
+    } else if (key == QLatin1String("http") || key == QLatin1String("udp") || key == QLatin1String("serialPort")) {
+        bool ok = false;
+        const int port = trimmed.toInt(&ok);
+        if (!ok || port < 1 || port > 65535) {
+            emit writeFinished(false, QStringLiteral("%1 needs a port from 1 to 65535.").arg(settingName));
+            return;
+        }
+        const char *id = key == QLatin1String("http") ? "HTTP" : key == QLatin1String("udp") ? "UDP" : "NVREG16_0";
+        command = QStringLiteral("AT*%1=%2;").arg(QLatin1String(id)).arg(port);
+    } else {
+        emit writeFinished(false, QStringLiteral("Write not confirmed: %1").arg(settingName));
+        return;
+    }
+    if (command.contains(QLatin1Char('\n')) || command.startsWith(QStringLiteral("W0"))) {
+        emit writeFinished(false, QStringLiteral("Write not confirmed: %1").arg(settingName));
+        return;
+    }
+    if (!transportOpen()) {
+        emit writeFinished(false, QStringLiteral("Connect to a rotor before writing."));
+        return;
+    }
+    if (brightnessWatching || brightnessCapture || brightnessHold || brightnessQueued >= 0 || networkWritePending) {
+        emit writeFinished(false, QStringLiteral("A write is already running."));
+        return;
+    }
+    networkWritePending = true;
+    networkWriteOk = false;
+    networkWriteCommand = command;
+    networkWriteName = settingName;
+    TrafficLog::instance().recordSession("NOTE", QByteArray("network write requested, waiting for an idle poll"));
+    scheduleBrightnessWrite();
 }
 
 void Rt21Driver::sendBrightnessRead()
@@ -1381,8 +1541,8 @@ void Rt21Driver::sendBrightnessRead()
     Job read;
     read.kind = Kind::Read;
     read.brightness = true;
-    read.id = QLatin1Char('O');
-    read.bytes = Rt21::brightnessReadCommand();
+    read.id = writeLetter;
+    read.bytes = Rt21::registerReadCommand(writeLetter);
     read.expectValue = QString::number(brightnessWrote);
     queue.enqueue(read);
     pump();
@@ -1458,14 +1618,12 @@ void Rt21Driver::finishBrightnessWatch(bool portClosed)
         "NOTE", QByteArray("brightness watch heading replies ") + QByteArray::number(replies));
     QString message;
     bool ok = false;
-    if (portClosed || replies <= 0) {
-        message = QStringLiteral("RT-21 stopped answering after write. Power-cycle it.");
-    } else if (!sawRead || !matched) {
-        message = QStringLiteral("Brightness read-back mismatch: wrote %1, read %2")
-                      .arg(wrote)
-                      .arg(sawRead ? readText : QStringLiteral("timeout"));
-    } else {
-        message = QStringLiteral("Brightness written and verified");
+    Q_UNUSED(wrote);
+    Q_UNUSED(readText);
+    if (portClosed || replies <= 0 || !sawRead || !matched)
+        message = QStringLiteral("Write not confirmed: %1").arg(writeSettingName);
+    else {
+        message = QStringLiteral("Saved %1").arg(writeSettingName);
         ok = true;
     }
     if (!portClosed && io)

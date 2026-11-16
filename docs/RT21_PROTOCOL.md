@@ -76,7 +76,7 @@ Defaults in parentheses are the manual’s. Meridian displays the raw reply next
 
 ## Writes Meridian will send
 
-Appendix F writes `WXn(value)` and describes `n = 0` as a reboot. That description is wrong for 4.13.2. See the disassembly section below. Only brightness is sent by this build, and only when `R11` reports 4.13.2. Every other location stays compiled out.
+Appendix F writes `WXn(value)` and describes `n = 0` as a reboot. That description is wrong for 4.13.2. See the disassembly section below. On 4.13.2, each confirmed register is sent as `W<letter>0<value>;` from its own Write button, then read back with `R<letter>;`. 4.14 stays locked. Min speed, rotor type, mode, security, the advanced bitfield, the limit switch, magnetic variation, and the multiplier stay locked because their encodings are not in the disassembly notes.
 
 ### Brightness, the one unlocked write
 

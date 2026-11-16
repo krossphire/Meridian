@@ -11,6 +11,7 @@
 
 #include "rotor/AppConfig.h"
 
+#include <QList>
 #include <QMap>
 #include <QObject>
 
@@ -39,6 +40,7 @@ public:
 signals:
     void statusMessage(const QString &text);
     void exportRequested();
+    void networkWriteRequested(const QString &key, const QString &value, const QString &settingName);
 
 private:
     void buildPorts();
@@ -62,6 +64,7 @@ private:
     QLabel *gatewayNote = nullptr;
     QLabel *networkLinkNote = nullptr;
     QPushButton *readNetwork = nullptr;
+    QList<QWidget *> networkWrites;
 
     QMap<QString, QLineEdit *> values;
     QMap<QString, QString> rawNetwork;

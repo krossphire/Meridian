@@ -164,7 +164,7 @@ void TestSetup::screenSaverIsOnlyInTheDisplayGroup()
     QByteArray joined;
     for (const auto &step : plan)
         joined += step.command;
-    QVERIFY(joined.contains("WW11;"));
+    QVERIFY(joined.contains("WW01;"));
     QVERIFY(joined.contains("WO08;"));
 
     fields.insert(QStringLiteral("screenSaver"), QStringLiteral("90"));
@@ -306,6 +306,9 @@ void TestSetup::silentModuleSkipsQueries()
 
 void TestSetup::brightnessWriteReadsBack()
 {
+    QCOMPARE(Rt21::registerWriteCommand(QLatin1Char('D'), 180), QByteArray("WD0180;"));
+    QCOMPARE(Rt21::registerWriteCommand(QLatin1Char('W'), 1), QByteArray("WW01;"));
+    QVERIFY(Rt21::registerWriteCommand(QLatin1Char('0'), 1).isEmpty());
     QCOMPARE(Rt21::brightnessWriteCommand(10), QByteArray("WO010;"));
     QCOMPARE(Rt21::brightnessWriteCommand(1), QByteArray("WO01;"));
     QCOMPARE(Rt21::brightnessReadCommand(), QByteArray("RO;"));
@@ -326,7 +329,7 @@ void TestSetup::brightnessWriteReadsBack()
     driver.writeBrightness(1);
     QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 15000);
     QCOMPARE(done.at(0).at(0).toBool(), true);
-    QCOMPARE(done.at(0).at(1).toString(), QStringLiteral("Brightness written and verified"));
+    QCOMPARE(done.at(0).at(1).toString(), QStringLiteral("Saved Brightness"));
     QVERIFY(server.sim()->trace().contains(QByteArray("WO01")));
     QVERIFY(server.sim()->trace().contains(QByteArray("RO")));
 
@@ -334,8 +337,7 @@ void TestSetup::brightnessWriteReadsBack()
     driver.writeBrightness(2);
     QTRY_COMPARE_WITH_TIMEOUT(done.count(), 2, 15000);
     QCOMPARE(done.at(1).at(0).toBool(), false);
-    QCOMPARE(done.at(1).at(1).toString(),
-             QStringLiteral("RT-21 stopped answering after write. Power-cycle it."));
+    QCOMPARE(done.at(1).at(1).toString(), QStringLiteral("Write not confirmed: Brightness"));
 
     driver.applySetupGroup(QStringLiteral("motion"), {}, QString());
     QTRY_COMPARE_WITH_TIMEOUT(done.count(), 3, 1000);

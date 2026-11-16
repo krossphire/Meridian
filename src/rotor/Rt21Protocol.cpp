@@ -109,14 +109,31 @@ QByteArray writeEe(QChar location, int value)
            + QByteArray::number(value) + QByteArray(";");
 }
 
+QByteArray registerWriteCommand(QChar letter, int value)
+{
+    const QChar upper = letter.toUpper();
+    if (upper < QLatin1Char('A') || upper > QLatin1Char('Z'))
+        return {};
+    return QByteArray("W") + QByteArray(1, upper.toLatin1()) + QByteArray("0") + QByteArray::number(value)
+           + QByteArray(";");
+}
+
+QByteArray registerReadCommand(QChar letter)
+{
+    const QChar upper = letter.toUpper();
+    if (upper < QLatin1Char('A') || upper > QLatin1Char('Z'))
+        return {};
+    return QByteArray("R") + QByteArray(1, upper.toLatin1()) + QByteArray(";");
+}
+
 QByteArray brightnessWriteCommand(int value)
 {
-    return QByteArray("WO0") + QByteArray::number(value) + QByteArray(";");
+    return registerWriteCommand(QLatin1Char('O'), value);
 }
 
 QByteArray brightnessReadCommand()
 {
-    return QByteArray("RO;");
+    return registerReadCommand(QLatin1Char('O'));
 }
 
 QByteArray calibrateEndpoint(bool clockwise)

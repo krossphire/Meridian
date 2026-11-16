@@ -55,8 +55,8 @@ bool takeInt(const QMap<QString, QString> &fields, const QString &key, int *valu
 void addEe(QList<PlannedWrite> *out, QChar letter, int value)
 {
     PlannedWrite step;
-    step.command = eeCommand(letter, value).toLatin1();
-    step.readBack = eeRead(letter).toLatin1();
+    step.command = registerWriteCommand(letter, value);
+    step.readBack = registerReadCommand(letter);
     step.expectValue = QString::number(value);
     out->append(step);
 }

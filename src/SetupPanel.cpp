@@ -184,7 +184,31 @@ void SetupPanel::buildNetwork()
         if (row.first == QLatin1String("mode"))
             edit->setPlaceholderText(QStringLiteral("Not in the setup utility"));
         values.insert(row.first, edit);
-        form->addRow(row.second, edit);
+        const bool canWrite = row.first == QLatin1String("dhcp") || row.first == QLatin1String("aip")
+                              || row.first == QLatin1String("anmask") || row.first == QLatin1String("agw")
+                              || row.first == QLatin1String("http") || row.first == QLatin1String("udp")
+                              || row.first == QLatin1String("serialPort");
+        if (canWrite) {
+            edit->setReadOnly(false);
+            edit->setPlaceholderText(QStringLiteral("Not read"));
+            auto *rowWidget = new QWidget;
+            auto *rowLay = new QHBoxLayout(rowWidget);
+            rowLay->setContentsMargins(0, 0, 0, 0);
+            auto *write = new QPushButton(QStringLiteral("Write"));
+            write->setObjectName(QStringLiteral("write-net-") + row.first);
+            rowLay->addWidget(edit, 1);
+            rowLay->addWidget(write);
+            networkWrites.append(edit);
+            networkWrites.append(write);
+            const QString key = row.first;
+            const QString setting = row.second;
+            connect(write, &QPushButton::clicked, this, [this, key, setting, edit]() {
+                emit networkWriteRequested(key, edit->text(), setting);
+            });
+            form->addRow(row.second, rowWidget);
+        } else {
+            form->addRow(row.second, edit);
+        }
     }
     gatewayNote = new QLabel;
     gatewayNote->setObjectName(QStringLiteral("gatewayNote"));
@@ -343,8 +367,11 @@ void SetupPanel::refreshNetworkRead()
     if (!networkLinkNote)
         return;
     networkLinkNote->setVisible(ip);
-    networkLinkNote->setText(ip ? QStringLiteral("Needs a USB or serial connection; reading over IP drops the link.")
+    networkLinkNote->setText(ip ? QStringLiteral(
+                                    "Needs a USB or serial connection; changing network settings over IP can drop the link.")
                                 : QString());
+    for (QWidget *widget : networkWrites)
+        widget->setEnabled(!ip);
 }
 
 QMap<QString, QString> SetupPanel::networkValues() const
@@ -418,7 +445,7 @@ void SetupPanel::showWizardStep(int step)
         if (endpoint.transport == RotorEndpoint::Transport::Serial && endpoint.configured())
             text = QStringLiteral("You are on %1. A network change from here does not drop Meridian's connection. That is the better way.\n\n").arg(endpoint.serialPort);
         else if (endpoint.transport == RotorEndpoint::Transport::Tcp && endpoint.configured())
-            text = QStringLiteral("You are connected to %1 port %2. Changing the address, DHCP, or the TCP port will drop this connection. When writes are turned on, Meridian can reconnect at the new address. Writes are off in this alpha, so nothing will be sent.\n\n").arg(endpoint.host).arg(endpoint.tcpPort);
+            text = QStringLiteral("You are connected to %1 port %2. Network settings stay greyed out on an IP link, because changing them can drop the connection.\n\n").arg(endpoint.host).arg(endpoint.tcpPort);
         else
             text = QStringLiteral("No rotor connection is saved yet.\n\n");
         text += ports;
@@ -427,7 +454,7 @@ void SetupPanel::showWizardStep(int step)
         return;
     }
     wizardTitle->setText(QStringLiteral("Nothing will be sent"));
-    QString summary = QStringLiteral("Suggested serial TCP port: %1.\nSuggested static address: %2.\n\nWrites are compiled out. Each group has to be read back on your rotor and approved before it can be turned on. A copy of the current settings is saved before any future write.")
+    QString summary = QStringLiteral("Suggested serial TCP port: %1.\nSuggested static address: %2.\n\nThese suggestions are not written into the fields and are not sent. Use a Write button on a serial connection to store one setting.")
                           .arg(suggestedPort > 0 ? QString::number(suggestedPort) : QStringLiteral("none"))
                           .arg(suggestedAddress.isEmpty() ? QStringLiteral("none") : suggestedAddress);
     wizardBody->setText(summary);

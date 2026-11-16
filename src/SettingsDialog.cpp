@@ -125,6 +125,29 @@ SettingsDialog::SettingsDialog(const AppConfig &config, const ZipDatabase *zipDb
         setupColumn->addTail(setupPanel->portsPage(), setupPanel->networkPage());
     tabs->addTab(setupTabs, QStringLiteral("Setup"));
     connect(setupPanel, &SetupPanel::statusMessage, this, [this](const QString &text) { setStatus(text); });
+    connect(setupPanel, &SetupPanel::networkWriteRequested, this,
+            [this](const QString &key, const QString &value, const QString &settingName) {
+                if (!driver) {
+                    setStatus(QStringLiteral("Connect to a rotor before writing."));
+                    return;
+                }
+                if (versionReport.isEmpty()) {
+                    setStatus(QStringLiteral("Read the RT-21 before writing."));
+                    return;
+                }
+                if (!Rt21::firmwareWritesAllowed(versionReport)) {
+                    setStatus(Rt21::firmwareNotice(versionReport));
+                    return;
+                }
+                const RotorEndpoint live = driver->linkEndpoint();
+                if (live.transport == RotorEndpoint::Transport::Tcp && live.configured()) {
+                    setStatus(QStringLiteral(
+                        "Needs a USB or serial connection; changing network settings over IP can drop the link."));
+                    return;
+                }
+                setStatus(QStringLiteral("Writing %1…").arg(settingName));
+                driver->writeNetworkSetting(key, value, settingName);
+            });
     connect(setupPanel, &SetupPanel::exportRequested, this, [this]() { exportSetup(); });
     if (setupColumn) {
         connect(setupColumn, &ControllerColumn::readRequested, this, [this]() {
@@ -153,6 +176,39 @@ SettingsDialog::SettingsDialog(const AppConfig &config, const ZipDatabase *zipDb
             }
             setStatus(QStringLiteral("Writing brightness %1…").arg(value));
             driver->writeBrightness(value);
+        });
+        connect(setupColumn, &ControllerColumn::registerWriteRequested, this, [this](QChar id, int value) {
+            if (!driver) {
+                setStatus(QStringLiteral("Connect to a rotor before writing."));
+                return;
+            }
+            continueToNetwork = false;
+            if (versionReport.isEmpty()) {
+                setStatus(QStringLiteral("Read the RT-21 before writing."));
+                return;
+            }
+            if (!Rt21::firmwareWritesAllowed(versionReport)) {
+                setStatus(Rt21::firmwareNotice(versionReport));
+                return;
+            }
+            const QString name = id == QLatin1Char('W') ? QStringLiteral("Screen saver")
+                               : id == QLatin1Char('D') ? QStringLiteral("Offset")
+                               : id == QLatin1Char('E') ? QStringLiteral("Rev / brake delay")
+                               : id == QLatin1Char('G') ? QStringLiteral("Max speed")
+                               : id == QLatin1Char('H') ? QStringLiteral("CCW limit")
+                               : id == QLatin1Char('I') ? QStringLiteral("CW limit")
+                               : id == QLatin1Char('K') ? QStringLiteral("Divide ratio")
+                               : id == QLatin1Char('L') ? QStringLiteral("Cal range")
+                               : id == QLatin1Char('N') ? QStringLiteral("Ramp")
+                               : id == QLatin1Char('P') ? QStringLiteral("Motor timeout")
+                               : id == QLatin1Char('R') ? QStringLiteral("Alt 1")
+                               : id == QLatin1Char('S') ? QStringLiteral("Alt 2")
+                               : id == QLatin1Char('U') ? QStringLiteral("Over-travel")
+                               : id == QLatin1Char('V') ? QStringLiteral("Counter-rotate delay")
+                               : id == QLatin1Char('Y') ? QStringLiteral("Knob timer")
+                                                        : QString(id);
+            setStatus(QStringLiteral("Writing %1…").arg(name));
+            driver->writeRegister(id, value, name);
         });
     }
     statusLabel = new QLabel;

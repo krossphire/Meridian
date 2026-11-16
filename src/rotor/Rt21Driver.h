@@ -43,6 +43,8 @@ public:
     void readNetwork();
     void writeConfiguration(const QList<QPair<QChar, int>> &changes);
     void writeBrightness(int value);
+    void writeRegister(QChar letter, int value, const QString &settingName);
+    void writeNetworkSetting(const QString &key, const QString &value, const QString &settingName);
     void applySetupGroup(const QString &group, const QMap<QString, QString> &fields, const QString &backupPath);
     void sendCalibrate(bool clockwise);
     void sendPulseHeading(double azimuth);
@@ -189,6 +191,15 @@ private:
     bool brightnessHold = false;
     int brightnessQueued = -1;
     int brightnessWrote = 0;
+    QChar writeLetter = QLatin1Char('O');
+    QString writeSettingName = QStringLiteral("Brightness");
+    qint64 writeSentMs = -1;
+    QByteArray writeTx;
+    QByteArray writeAck;
+    bool networkWritePending = false;
+    bool networkWriteOk = false;
+    QString networkWriteCommand;
+    QString networkWriteName;
     qint64 lastModuleTxMs = -1;
     bool awaitHeadingAfterNetwork = false;
     bool networkHeadingRetried = false;

@@ -97,7 +97,8 @@ ControllerColumn::ControllerColumn(QWidget *parent)
     connect(read, &QPushButton::clicked, this, &ControllerColumn::readRequested);
     connect(backup, &QPushButton::clicked, this, &ControllerColumn::backupRequested);
     auto *note = new QLabel(QStringLiteral(
-        "Only display brightness can be written, and only from its Write button. Everything else stays read-only."));
+        "On firmware 4.13.2 each Write button stores that one setting. 4.14 stays locked. "
+        "Min speed, rotor type, mode, security, advanced bits, limit switch, and magnetic variation are not written."));
     note->setWordWrap(true);
     note->setObjectName(QStringLiteral("hint"));
     column->addWidget(note);
@@ -153,6 +154,26 @@ ControllerColumn::ControllerColumn(QWidget *parent)
     values['H' - 'A'] = limitText;
     limitLay->addWidget(limits);
     limitLay->addWidget(limitText);
+    auto addLimit = [&](QChar id, const QString &name, int maxValue) {
+        auto *row = new QWidget;
+        auto *lay = new QHBoxLayout(row);
+        lay->setContentsMargins(0, 0, 0, 0);
+        auto *spin = new QSpinBox;
+        spin->setRange(0, maxValue);
+        editors.insert(id, spin);
+        auto *write = new QPushButton(QStringLiteral("Write"));
+        lay->addWidget(new QLabel(name));
+        lay->addWidget(spin);
+        lay->addWidget(write);
+        lay->addStretch();
+        connect(write, &QPushButton::clicked, this, [this, id, spin]() {
+            emit registerWriteRequested(id, spin->value());
+        });
+        limitLay->addWidget(row);
+    };
+    addLimit(QLatin1Char('H'), QStringLiteral("CCW limit"), 540);
+    addLimit(QLatin1Char('I'), QStringLiteral("CW limit"), 540);
+    addLimit(QLatin1Char('D'), QStringLiteral("Offset"), 360);
 
     auto valueGroup = [&](const QString &title, const QList<QPair<QChar, QString>> &rows) {
         auto *box = makeGroup(title, column);
@@ -164,7 +185,36 @@ ControllerColumn::ControllerColumn(QWidget *parent)
                 values[row.first.unicode() - QLatin1Char('A').unicode()] = label;
             else
                 magnetic = label;
-            form->addRow(row.second, label);
+            const QString writable = QStringLiteral("DEGHIKLNOPRSUVWY");
+            if (writable.contains(row.first) && row.first != QLatin1Char('O') && row.first != QLatin1Char('W')) {
+                auto *rowWidget = new QWidget;
+                auto *rowLay = new QHBoxLayout(rowWidget);
+                rowLay->setContentsMargins(0, 0, 0, 0);
+                auto *spin = new QSpinBox;
+                const int maxValue = (row.first == QLatin1Char('G') || row.first == QLatin1Char('N')) ? 10
+                                     : (row.first == QLatin1Char('E')) ? 99
+                                     : (row.first == QLatin1Char('P')) ? 60
+                                     : (row.first == QLatin1Char('U')) ? 180
+                                     : (row.first == QLatin1Char('K')) ? 20000
+                                     : (row.first == QLatin1Char('D')) ? 360
+                                                                       : 999;
+                const int minValue = row.first == QLatin1Char('K') ? 1 : 0;
+                spin->setRange(minValue, maxValue);
+                editors.insert(row.first, spin);
+                auto *write = new QPushButton(QStringLiteral("Write"));
+                rowLay->addWidget(label);
+                rowLay->addWidget(spin);
+                rowLay->addWidget(write);
+                const QChar id = row.first;
+                const QString setting = row.second;
+                connect(write, &QPushButton::clicked, this, [this, id, spin]() {
+                    emit registerWriteRequested(id, spin->value());
+                });
+                Q_UNUSED(setting);
+                form->addRow(row.second, rowWidget);
+            } else {
+                form->addRow(row.second, label);
+            }
         }
         return box;
     };
@@ -257,19 +307,38 @@ ControllerColumn::ControllerColumn(QWidget *parent)
         label->setWordWrap(true);
         if (id >= QLatin1Char('A') && id <= QLatin1Char('Z'))
             values[id.unicode() - QLatin1Char('A').unicode()] = label;
-        displayForm->addRow(name, label);
+        auto *rowWidget = new QWidget;
+        auto *rowLay = new QHBoxLayout(rowWidget);
+        rowLay->setContentsMargins(0, 0, 0, 0);
+        auto *spin = new QSpinBox;
+        spin->setRange(0, 999);
+        editors.insert(id, spin);
+        auto *write = new QPushButton(QStringLiteral("Write"));
+        rowLay->addWidget(label);
+        rowLay->addWidget(spin);
+        rowLay->addWidget(write);
+        connect(write, &QPushButton::clicked, this, [this, id, spin]() {
+            emit registerWriteRequested(id, spin->value());
+        });
+        displayForm->addRow(name, rowWidget);
     };
     addReadRow(QLatin1Char('Y'), QStringLiteral("Knob timer"));
     saverCombo = new QComboBox;
     saverCombo->setObjectName(QStringLiteral("screenSaver"));
-    saverCombo->setEnabled(false);
     saverCombo->addItem(QStringLiteral("Off"), 0);
     for (int minutes : {1, 2, 5, 10, 20, 30, 40, 50, 60})
         saverCombo->addItem(QStringLiteral("%1 min").arg(minutes), minutes);
-    displayForm->addRow(QStringLiteral("Screen saver"), saverCombo);
+    auto *saverRow = new QWidget;
+    auto *saverLay = new QHBoxLayout(saverRow);
+    saverLay->setContentsMargins(0, 0, 0, 0);
+    auto *writeSaver = new QPushButton(QStringLiteral("Write"));
+    writeSaver->setObjectName(QStringLiteral("writeScreenSaver"));
+    saverLay->addWidget(saverCombo, 1);
+    saverLay->addWidget(writeSaver);
+    displayForm->addRow(QStringLiteral("Screen saver"), saverRow);
     auto *saverNote = new QLabel(QStringLiteral(
-        "Not written. On 4.13.2 it blanks the panel and serial keeps answering. Polls do not wake it. "
-        "On 4.14.x the same setting stops serial until a power cycle."));
+        "On 4.13.2 it blanks the panel and serial keeps answering. Polls do not wake it. "
+        "On 4.14.x the same setting stops serial until a power cycle, and the write stays locked."));
     saverNote->setWordWrap(true);
     displayForm->addRow(QString(), saverNote);
     addReadRow(QLatin1Char('R'), QStringLiteral("Alt 1"));
@@ -277,6 +346,10 @@ ControllerColumn::ControllerColumn(QWidget *parent)
     connect(writeBrightness, &QPushButton::clicked, this, [this]() {
         if (brightnessSpin)
             emit brightnessWriteRequested(brightnessSpin->value());
+    });
+    connect(writeSaver, &QPushButton::clicked, this, [this]() {
+        if (saverCombo)
+            emit registerWriteRequested(QLatin1Char('W'), saverCombo->currentData().toInt());
     });
 
     column->addStretch();
@@ -378,6 +451,8 @@ void ControllerColumn::applyField(QChar id, const QString &raw, bool numeric, in
         shown = QString::number(value);
         if (brightnessSpin)
             brightnessSpin->setValue(std::clamp(value, brightnessSpin->minimum(), brightnessSpin->maximum()));
+    if (QSpinBox *spin = editors.value(id, nullptr))
+        spin->setValue(std::clamp(value, spin->minimum(), spin->maximum()));
     } else if (numeric && id == QLatin1Char('X'))
         shown = QStringLiteral("%1 (raw %2)").arg(value / 10.0, 0, 'f', 1).arg(value);
     else if (numeric && (id == QLatin1Char('P') || id == QLatin1Char('E') || id == QLatin1Char('V')))

@@ -209,7 +209,7 @@ int runScreenshots(const QString &directory, qreal dpr)
         scroll->ensureWidgetVisible(saver);
     else if (scroll && writeBrightness)
         scroll->ensureWidgetVisible(writeBrightness);
-    if (!saver || saver->isEnabled() || saver->findText(QStringLiteral("Off")) < 0)
+    if (!saver || !saver->isEnabled() || saver->findText(QStringLiteral("Off")) < 0)
         return 26;
     QApplication::processEvents();
     if (!writeBrightness || !brightnessNote || !brightnessNote->text().contains(QStringLiteral("OLED"))
