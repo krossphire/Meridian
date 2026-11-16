@@ -585,18 +585,23 @@ bool screenSaverMinuteAllowed(int minutes)
 
 int recommendedScreenSaverMinutes()
 {
-    // Shortest on-setting. 90 seconds is not a stored step.
-    return 1;
+    // Off. On 4.14.g1 a 1-minute saver stops serial until a power cycle.
+    return 0;
+}
+
+QString screenSaverUnsafeNote()
+{
+    return QStringLiteral(
+        "Screen saver is on. On firmware 4.14.g1 it stops serial and network replies after the timeout. Set it to Off.");
 }
 
 QString screenSaverRecommendation()
 {
     return QStringLiteral(
-        "Screen saver target: full black after 90 seconds, until someone uses the rotor. "
-        "Firmware 4.13 and later stores whole minutes only (Off, 1, 2, 5, 10, 20, 30, 40, 50, 60), and Off is the factory default. "
-        "There is no 90-second step and no separate dim level. On display firmware 1.3 the saver blanks the panel. "
-        "The closest setting Meridian would write, once you approve it, is 1 minute. "
-        "A button or a remote command wakes the panel. Meridian's heading poll is a remote command every 30 seconds, so it may light the display and keep the saver from staying black. That has not been watched on this rotor. Writes stay off.");
+        "Leave the rotor's screen saver Off. On firmware 4.14.g1, with it set to 1 minute, "
+        "serial and network replies stop about a minute after the controller goes idle and stay stopped until a power cycle. "
+        "Pressing Setup or Cancel wakes the display and not the port. With the saver off, polling ran 22 minutes with no timeouts. "
+        "Meridian's own idle dim, after 90 seconds without a click or a typed heading, is planned and is not in this build. Polls do not count as activity.");
 }
 
 QString advancedOptionsText(int value)
@@ -634,7 +639,7 @@ QString formatEeLine(const QString &id, const QString &raw)
         else if (!screenSaverMinuteAllowed(value))
             extra = QStringLiteral(". That is not one of the utility's steps.");
         else if (value > recommendedScreenSaverMinutes())
-            extra = QStringLiteral(". Longer than the 1 minute Meridian would use for an OLED.");
+            extra = QStringLiteral(". On firmware 4.14.g1 this stops serial and network replies after the timeout. Set it to Off.");
         return named(QStringLiteral("Screen saver"), state + extra);
     }
     if (id == QLatin1String("J"))

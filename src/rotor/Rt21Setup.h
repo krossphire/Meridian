@@ -80,6 +80,7 @@ bool firmwareWritesAllowed(const QString &report);
 bool screenSaverMinuteAllowed(int minutes);
 int recommendedScreenSaverMinutes();
 QString screenSaverRecommendation();
+QString screenSaverUnsafeNote();
 QString formatEeLine(const QString &id, const QString &raw);
 QString advancedOptionsText(int value);
 

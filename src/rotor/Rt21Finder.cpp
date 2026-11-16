@@ -7,6 +7,8 @@
 #include "Rt21Finder.h"
 
 #include "Rt21Protocol.h"
+#include "SerialLines.h"
+#include "TrafficLog.h"
 
 #include <QElapsedTimer>
 #include <QEventLoop>
@@ -33,32 +35,37 @@ QString headingText(double heading)
     return QString::number(heading, 'f', 1);
 }
 
-std::optional<double> readHeading(QIODevice *device, int timeoutMs)
+std::optional<double> readHeading(QIODevice *device, int timeoutMs, QByteArray *raw)
 {
     Rt21::Framer framer;
     std::optional<double> heading;
+    auto take = [&]() {
+        const QByteArray chunk = device->readAll();
+        if (raw)
+            raw->append(chunk);
+        framer.append(chunk);
+        for (const QByteArray &frame : framer.take()) {
+            if (const auto parsed = Rt21::parseHeadingFrame(frame)) {
+                heading = parsed;
+                return true;
+            }
+        }
+        return false;
+    };
+    if (device->bytesAvailable() > 0 && take())
+        return heading;
     QEventLoop loop;
     QTimer cap;
     cap.setSingleShot(true);
     QObject::connect(&cap, &QTimer::timeout, &loop, &QEventLoop::quit);
     QObject::connect(device, &QIODevice::readyRead, &loop, [&]() {
-        framer.append(device->readAll());
-        for (const QByteArray &frame : framer.take()) {
-            if (const auto parsed = Rt21::parseHeadingFrame(frame)) {
-                heading = parsed;
-                loop.quit();
-                return;
-            }
-        }
+        if (take())
+            loop.quit();
     });
-    if (device->bytesAvailable() > 0)
-        framer.append(device->readAll());
-    for (const QByteArray &frame : framer.take()) {
-        if (const auto parsed = Rt21::parseHeadingFrame(frame))
-            return parsed;
-    }
     cap.start(timeoutMs);
     loop.exec();
+    if (device->bytesAvailable() > 0)
+        take();
     return heading;
 }
 
@@ -124,12 +131,23 @@ std::optional<FoundRotor> Rt21Finder::probeSerial(const QString &portName, const
     port.setParity(QSerialPort::NoParity);
     port.setStopBits(QSerialPort::OneStop);
     port.setFlowControl(QSerialPort::NoFlowControl);
+    const QByteArray where = portName.toLatin1() + " " + QByteArray::number(baud);
+    TrafficLog::instance().recordSession("FIND", QByteArray("probe ") + where + " " + kind.toLatin1());
     // In use, missing, or a virtual port another program owns: skip it quietly.
-    if (!port.open(QIODevice::ReadWrite))
+    if (!port.open(QIODevice::ReadWrite)) {
+        TrafficLog::instance().recordSession("FIND", QByteArray("open failed ") + where);
         return std::nullopt;
-    port.write(Rt21::queryTenths());
+    }
+    raiseDtrAndRts(&port);
+    const QByteArray query = Rt21::queryTenths();
+    TrafficLog::instance().recordSession("FIND-TX", query);
+    port.write(query);
     port.flush();
-    const auto heading = readHeading(&port, timeoutMs);
+    QByteArray rx;
+    const auto heading = readHeading(&port, timeoutMs, &rx);
+    TrafficLog::instance().recordSession("FIND-RX", rx);
+    TrafficLog::instance().recordSession(
+        "FIND", heading ? QByteArray("hit ") + where : QByteArray("no reply ") + where);
     port.close();
     if (!heading)
         return std::nullopt;
@@ -155,7 +173,7 @@ std::optional<FoundRotor> Rt21Finder::probeTcp(const QString &host, int port, in
     }
     socket.write(Rt21::queryTenths());
     socket.flush();
-    const auto heading = readHeading(&socket, timeoutMs);
+    const auto heading = readHeading(&socket, timeoutMs, nullptr);
     socket.disconnectFromHost();
     socket.close();
     if (!heading)

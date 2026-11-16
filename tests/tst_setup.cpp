@@ -149,10 +149,11 @@ void TestSetup::mockNetworkRead()
 
 void TestSetup::screenSaverIsOnlyInTheDisplayGroup()
 {
-    QCOMPARE(Rt21::recommendedScreenSaverMinutes(), 1);
+    QCOMPARE(Rt21::recommendedScreenSaverMinutes(), 0);
     QVERIFY(!Rt21::screenSaverMinuteAllowed(90));
-    QVERIFY(Rt21::screenSaverRecommendation().contains(QStringLiteral("90 seconds")));
-    QVERIFY(Rt21::screenSaverRecommendation().contains(QStringLiteral("30 seconds")));
+    QVERIFY(Rt21::screenSaverRecommendation().contains(QStringLiteral("Off")));
+    QVERIFY(Rt21::screenSaverUnsafeNote().contains(QStringLiteral("4.14.g1")));
+    QVERIFY(Rt21::screenSaverUnsafeNote().contains(QStringLiteral("Set it to Off")));
 
     QMap<QString, QString> fields;
     fields.insert(QStringLiteral("screenSaver"), QStringLiteral("1"));

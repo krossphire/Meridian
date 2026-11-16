@@ -127,6 +127,8 @@ private:
     bool haveSerialHold = false;
     QString serialHold;
     bool continueToNetwork = false;
+    bool resumeSerial = false;
+    RotorEndpoint resumeEndpoint;
 
 protected:
     void closeEvent(QCloseEvent *event) override;

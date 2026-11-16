@@ -253,7 +253,12 @@ void SettingsDialog::setDriver(Rt21Driver *next)
                 driver->readNetwork();
                 return;
             }
-            setStatus(QStringLiteral("Controller settings read. Nothing was written."));
+            QString done = QStringLiteral("Controller settings read. Nothing was written.");
+            bool saverOn = false;
+            const int saverMinutes = eeRaw.value(QStringLiteral("W")).toInt(&saverOn);
+            if (saverOn && saverMinutes > 0)
+                done += QLatin1Char(' ') + Rt21::screenSaverUnsafeNote();
+            setStatus(done);
         });
         connect(driver, &Rt21Driver::writeFinished, this, [this](bool ok, const QString &message) {
             const QString fallback = ok ? QStringLiteral("Read back the same value.")
@@ -286,9 +291,11 @@ void SettingsDialog::refreshDisplayCallout()
         else if (minutes == 0)
             saver = QStringLiteral("Screen saver is off. The heading stays on the display.");
         else
-            saver = QStringLiteral("Screen saver is %1 minutes.").arg(minutes);
+            saver = QStringLiteral("Screen saver is %1 minutes. %2")
+                        .arg(minutes)
+                        .arg(Rt21::screenSaverUnsafeNote());
     }
-    displayCallout->setText(saver + QLatin1Char(' ') + Rt21::screenSaverRecommendation());
+    displayCallout->setText(saver);
 }
 
 void SettingsDialog::exportSetup()
@@ -713,6 +720,16 @@ void SettingsDialog::startFind(bool networkOnly)
         foundKeys.clear();
         findNote->setText(QStringLiteral("Checking USB and COM ports…"));
         refreshUsbHints();
+        if (driver) {
+            const RotorEndpoint live = driver->linkEndpoint();
+            if (live.transport == RotorEndpoint::Transport::Serial && live.configured()
+                && driver->link() != Rt21Driver::Link::Off) {
+                resumeEndpoint = live;
+                resumeSerial = true;
+                TrafficLog::instance().recordSession("FIND", QByteArray("release ") + live.serialPort.toLatin1());
+                driver->disconnectLink();
+            }
+        }
     } else {
         findNote->setText(QStringLiteral("Checking the network…"));
     }
@@ -798,6 +815,11 @@ void SettingsDialog::finishFind(const QList<FoundRotor> &found, bool network)
             "Nothing found. Check the USB cable or driver, power, and close other apps using the port."));
     } else {
         findNote->setText(QStringLiteral("Pick the RT-21 to use."));
+    }
+    if (resumeSerial && driver) {
+        const RotorEndpoint again = resumeEndpoint;
+        resumeSerial = false;
+        driver->connectEndpoint(again);
     }
 }
 

@@ -7,6 +7,7 @@
 #include "Rt21Driver.h"
 
 #include "Reconnect.h"
+#include "SerialLines.h"
 #include "TrafficLog.h"
 #include "core/Bearing.h"
 
@@ -199,7 +200,8 @@ Rt21Driver::Rt21Driver(QObject *parent)
             useAiNext = true;
         if (failures >= 3) {
             const QString message = endpoint.transport == RotorEndpoint::Transport::Serial
-                                        ? QStringLiteral("%1 open, no reply from RT-21 — check port/baud or run Find")
+                                        ? QStringLiteral("%1 open, no reply from RT-21 — check port/baud or run Find. "
+                                                         "RT-21 not answering. If its screen saver is on, power-cycle it.")
                                               .arg(endpoint.serialPort)
                                         : QStringLiteral("No reply from the RT-21.");
             failLink(message);
@@ -553,8 +555,9 @@ void Rt21Driver::connectEndpoint(const RotorEndpoint &next)
         failLink(message);
         return;
     }
-    const bool dtr = serial->setDataTerminalReady(true);
-    const bool rts = serial->setRequestToSend(true);
+    bool dtr = false;
+    bool rts = false;
+    raiseDtrAndRts(serial, &dtr, &rts);
     serial->clear(QSerialPort::AllDirections);
     TrafficLog::instance().recordSession(
         "NOTE", QByteArray("serial open ") + endpoint.serialPort.toLatin1()
@@ -1039,7 +1042,9 @@ void Rt21Driver::stopMotion()
 QString Rt21Driver::noReplyMessage() const
 {
     if (endpoint.transport == RotorEndpoint::Transport::Serial)
-        return QStringLiteral("No reply from RT-21 on %1 — check port/baud or run Find").arg(endpoint.serialPort);
+        return QStringLiteral("No reply from RT-21 on %1 — check port/baud or run Find. "
+                              "RT-21 not answering. If its screen saver is on, power-cycle it.")
+            .arg(endpoint.serialPort);
     return QStringLiteral("No reply from RT-21 on %1:%2 — check port/baud or run Find")
         .arg(endpoint.host)
         .arg(endpoint.tcpPort);

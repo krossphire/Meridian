@@ -232,6 +232,13 @@ ControllerColumn::ControllerColumn(QWidget *parent)
                 {QLatin1Char('W'), QStringLiteral("Screen saver")},
                 {QLatin1Char('R'), QStringLiteral("Alt 1")},
                 {QLatin1Char('S'), QStringLiteral("Alt 2")}});
+    auto *idle = new QCheckBox(QStringLiteral("Idle dim after 90 seconds"));
+    idle->setEnabled(false);
+    idle->setToolTip(QStringLiteral(
+        "Planned. After 90 seconds with no click or typed heading, Meridian drops display brightness "
+        "to 1 and restores it on the next interaction. Heading polls do not count. "
+        "The brightness write stays off until it has been checked on a real rotor."));
+    column->addWidget(idle);
 
     column->addStretch();
 }

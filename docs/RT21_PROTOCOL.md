@@ -106,6 +106,10 @@ Meridian is designed and tested with Andrew's RT-21, which reports `RT-21 4.14.g
 
 ## Observed on hardware
 
+On 15 November 2026, firmware 4.14.g1 on COM6 through a Digi Edgeport/8, the controller's own screen saver was set to 1 minute. About a minute after the rotor went idle it stopped answering serial. Meridian, Find RT-21, and the Green Heron setup utility all received zero bytes until the unit was power-cycled. Pressing Setup or Cancel woke the display and did not wake the serial port. With the saver off, Meridian polled for 22 minutes with no timeouts. Treat the hardware screen saver as unsafe on this firmware. Leave it Off. Meridian's replacement is an idle dim: after 90 seconds with no user interaction, drop display brightness to 1 and restore it on the next click or typed heading. Heading polls do not count as activity. That needs a brightness write, so it stays compiled out until writes are verified.
+
+## Earlier hardware notes
+
 A healthy session on 14 November 2026, from 14:06:18 to about 14:12, stayed on one TCP connection the whole time. There were no reconnects and 646 RX frames. The earlier dead session (13:44–14:03, zero RX, then a reconnect that resent the same `AP`) came right after a rapid reconnect loop. That matches the quiet-backoff theory: the network module wedges when Meridian drops the socket and dials straight back.
 
 On that healthy session, replies to `BI1;` were plain ASCII `NNN.N;` with no leading space and no CR/LF. One captured frame:
@@ -154,9 +158,9 @@ Version 4 addendum, rev 4, "Display Screen Saver operation [4.13]": controller f
 
 Utility 4.B12's combo is labeled Minutes. The items are Off, 1, 2, 5, 10, 20, 30, 40, 50, 60. Read is `RW1;`. Zero is shown as Off. There is no 90-second step and no separate full-black versus dim level. The blank is the whole behavior on display firmware 1.3. Auto-dim is a different switch, advanced-options bit 16, and brightness is register O. The addendum says an OLED ignores brightness.
 
-Andrew's target is full black after 90 seconds, until an interaction. The shortest on-setting the firmware stores is 1 minute, which goes dark sooner than 90 seconds. That is the value Meridian would write, with `n = 1` (`WW11;`), after he has watched it on the glass. It is not sent in this build.
+Do not enable this saver as burn-in protection. The 15 November observation above is the reason: on 4.14.g1 a 1-minute saver stops serial and network replies until a power cycle, and a button that wakes the display does not wake the port. The recommended stored value is Off (`W = 0`). Meridian does not write it.
 
-What the addendum counts as a wake: a button, or a remote command. It does not mention the knob, rotor motion, or a poll by name. The knob timer (register Y) is a different control. Serial and TCP carry the same commands, so a remote command is either of them. `BI1;` is a remote command. Nothing in the manual or the utility names a poll that does not count. Meridian asks for the heading every 30 seconds while idle. If the firmware treats that as a remote command, the panel lights on every poll and a 1-minute saver never stays black while Meridian is connected. That has not been watched on this rotor. No write, and no change to the poll, until it has.
+What the addendum counts as a wake: a button, or a remote command. On this firmware that wake is the display only. The port stays silent. The planned replacement is Meridian's idle dim, described under Observed on hardware. It is not compiled in.
 
 The 4.B12 release note says that build fixes a bug that always cleared the screen saver. Utility 4.11's write prefix is the string `WW0` plus two trailing spaces. 4.B12's prefix is `WW0` with the spaces removed. A value glued onto the 4.11 prefix is not a decimal the controller can store, so the saver never engaged. Off is the separate literal `WW00` (`n = 0`, which reboots). Meridian does not write W from any group except Display, so saving speed, limits, or the network cannot clear it.
 
