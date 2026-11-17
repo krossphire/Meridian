@@ -36,7 +36,7 @@ Do not enable a second group in the same session.
 | `R3n;` | CPU and display reset. Same as power cycle. | Excluded |
 | `B2n;` / `BUn;` | Bootloader on RS-232 or USB. | Excluded |
 | `W` with digit `0` | Appendix F called this a reboot. The 4.13.2 disassembly says digit 0 stores and reloads the setup, and does not reboot. The utility's live brightness control is `WO0` plus the value plus `;`. | Brightness only, after a 4.13.2 read: `WO010;` for 10. |
-| `T1n;` (`T11;`) | Addendum: leaves TCP mode so AT commands work. Sent over an IP connection, this can drop the link you are using. | Sent only while reading the module. `T01;` is sent afterward to put TCP mode back. Prefer USB. Unverified whether `T01;` recovers a socket that already died. |
+| `T1n;` (`T11;`) | Addendum: leaves TCP mode so AT commands work. Sent over an IP connection, this can drop the link you are using. On 4.13.2 serial, captured reads that sent `T11;` failed, and `T11;` alone made the controller ignore `R01;` until ESC. | Not sent. Network reads and writes are USB or serial only, and they use the captured `AT;` / port-cycle / LF sequence. |
 | `AT*RESET=1` | Utility button "Re-Connect". Reboots the module. | Excluded |
 | Utility "RESET to DEFAULTS" | Writes DHCP static, `192.168.2.100`, gateway `192.168.2.1`, serial port `6555`, SSID `NETGEAR24`, a passphrase, and an adhoc name `RT-21`. The link will not come back on the old address. The passphrase is a known string in the program. | Excluded |
 | Address, DHCP, or serial-TCP port write | The IP session dies. The new address has to be used afterward. | Not sent. The guide says so, and offers a reconnect only once writes exist. |
@@ -57,9 +57,9 @@ The utility's constructor, then `PollWiFiValues`, then the Wi-Fi form's close:
 8. Escape and `;` leave AT mode (form close)
 9. `T01;` on the main window close — put TCP mode back
 
-Meridian's read is steps 4 through 9, without the echo command and without a second escape. Commands that expect `OK` or a `NAME=` line also finish on a timeout when they are marked optional (`T11;`, escape, `T01;`), because the manual does not promise a reply. Queries wait for their token. The Wi-Fi key and the web password are replaced with `****` in the traffic log. They are kept in the backup file so a later restore has them.
+The list above is the utility's older IL. Captures of 4.B12 on 4.13.2 serial do not use `T11;` or `T01;` for the read. Meridian follows the capture: poll, `AT;` and `<uart2>;`, close and reopen, `AT*SERIAL_ECHO=0` plus LF, then `AT*KEY?` plus LF, then ESC, close and reopen, and a poll. See [RT21_PROTOCOL.md](RT21_PROTOCOL.md). The Wi-Fi key and the web password are replaced with `****` in the traffic log.
 
-`AT*` commands are sent with a carriage return, the way a .NET `WriteLine` sends them. They are not given a semicolon. Semicolon is `AT*Serial_End` (`0x3B`), which the module uses as the end of a forwarded serial frame.
+`AT*` commands in that capture end in a line feed and not a semicolon. A semicolon on those lines failed. Semicolon remains the rotator-command terminator.
 
 ## Controller
 

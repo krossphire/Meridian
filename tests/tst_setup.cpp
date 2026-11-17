@@ -66,16 +66,20 @@ void TestSetup::commandsMatchTheUtility()
     QVERIFY(!Rt21::planGroup(QStringLiteral("tftp"), fields, &plan).isEmpty());
 
     const auto sequence = Rt21::networkReadSequence();
-    QCOMPARE(sequence.first().command, QByteArray("T11;"));
-    QVERIFY(sequence.last().command == QByteArray("T01;"));
-    bool sawKey = false;
+    QCOMPARE(sequence.first().command, QByteArray("AT*HWTYPE?\n"));
+    QCOMPARE(sequence.last().command, QByteArray("AT*LINK?\n"));
+    bool sawUser = false;
     for (const auto &query : sequence) {
-        if (query.key == QLatin1String("key")) {
-            sawKey = true;
-            QCOMPARE(query.token, QStringLiteral("KEY="));
+        QVERIFY(!query.command.contains(';'));
+        QVERIFY(!query.command.contains("T11"));
+        QVERIFY(!query.command.contains("T01"));
+        QVERIFY(query.command.endsWith('\n'));
+        if (query.key == QLatin1String("user")) {
+            sawUser = true;
+            QCOMPARE(query.token, QStringLiteral("HTTP_USER="));
         }
     }
-    QVERIFY(sawKey);
+    QVERIFY(sawUser);
 }
 
 void TestSetup::adviceStaysOffTheConnectionFields()
@@ -147,13 +151,46 @@ void TestSetup::mockNetworkRead()
     driver.readNetwork();
     QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 12000);
     QCOMPARE(status.at(0).at(0).toString(), QStringLiteral("Reading network (try 1 of 8)…"));
-    QCOMPARE(got.value(QStringLiteral("id")), QStringLiteral("Tower"));
+    QCOMPARE(got.value(QStringLiteral("id")), QStringLiteral("RT-21"));
     QCOMPARE(got.value(QStringLiteral("dhcp")), QStringLiteral("0"));
+    QCOMPARE(got.value(QStringLiteral("ip")), QStringLiteral("192.168.1.106"));
+    QCOMPARE(got.value(QStringLiteral("aip")), QStringLiteral("192.168.1.106"));
+    QCOMPARE(got.value(QStringLiteral("nmask")), QStringLiteral("255.255.255.0"));
+    QCOMPARE(got.value(QStringLiteral("gw")), QStringLiteral("192.168.2.1"));
+    QCOMPARE(got.value(QStringLiteral("http")), QStringLiteral("801"));
+    QCOMPARE(got.value(QStringLiteral("udp")), QStringLiteral("23073"));
+    QCOMPARE(got.value(QStringLiteral("tftp")), QStringLiteral("69"));
     QCOMPARE(got.value(QStringLiteral("serialPort")), QStringLiteral("6555"));
-    QCOMPARE(got.value(QStringLiteral("security")), QStringLiteral("6"));
-    QCOMPARE(got.value(QStringLiteral("key")), QStringLiteral("prairie-not-logged"));
+    QCOMPARE(got.value(QStringLiteral("hwtype")), QStringLiteral("2"));
+    QCOMPARE(got.value(QStringLiteral("link")), QStringLiteral("1"));
+    QVERIFY(got.contains(QStringLiteral("user")));
+    QCOMPARE(got.value(QStringLiteral("user")), QString());
+    QCOMPARE(got.value(QStringLiteral("pass")), QString());
     QCOMPARE(done.at(0).at(0).toBool(), true);
     QCOMPARE(done.at(0).at(1).toString(), QStringLiteral("Network module answered. Nothing was written."));
+    QCOMPARE(driver.link(), Rt21Driver::Link::On);
+    bool sawEnter = false;
+    bool sawEcho = false;
+    bool sawEsc = false;
+    bool sawQuery = false;
+    for (const QByteArray &cmd : server.sim()->trace()) {
+        if (cmd == "AT")
+            sawEnter = true;
+        if (cmd == "AT*SERIAL_ECHO=0")
+            sawEcho = true;
+        if (cmd == "ESC")
+            sawEsc = true;
+        if (cmd.startsWith("AT*")) {
+            sawQuery = true;
+            QVERIFY(!cmd.contains(';'));
+        }
+        QVERIFY(cmd != "T11");
+        QVERIFY(cmd != "T01");
+    }
+    QVERIFY(sawEnter);
+    QVERIFY(sawEcho);
+    QVERIFY(sawEsc);
+    QVERIFY(sawQuery);
 }
 
 void TestSetup::networkWriteNeedsAReadThenReadsBack()
@@ -350,18 +387,21 @@ void TestSetup::silentModuleSkipsQueries()
     QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 45000);
     QVERIFY(!done.at(0).at(0).toBool());
     QCOMPARE(done.at(0).at(1).toString(), QStringLiteral("Network module didn't answer after 8 tries"));
+    QCOMPARE(driver.link(), Rt21Driver::Link::On);
     int queries = 0;
     int exits = 0;
     int enters = 0;
     for (const QByteArray &cmd : server.sim()->trace()) {
         if (cmd.startsWith("AT*"))
             ++queries;
-        if (cmd == "T01")
+        if (cmd == "ESC")
             ++exits;
         if (cmd == "AT")
             ++enters;
+        QVERIFY(cmd != "T01");
+        QVERIFY(cmd != "T11");
     }
-    QVERIFY(queries >= 8);
+    QCOMPARE(queries, 0);
     QCOMPARE(exits, 8);
     QCOMPARE(enters, 8);
 }

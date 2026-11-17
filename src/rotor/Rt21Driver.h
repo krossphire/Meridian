@@ -17,6 +17,8 @@
 #include <QObject>
 #include <QQueue>
 
+#include <functional>
+
 #include <optional>
 
 class QIODevice;
@@ -130,7 +132,29 @@ private:
     void showNote(const QString &note);
     void finishNetwork(bool ok, const QString &message);
     void enqueueModule(const Rt21::ModuleQuery &query);
+    enum class NetworkPhase {
+        Idle,
+        WaitUart,
+        AfterUart,
+        WaitEcho,
+        Query,
+        WriteAck,
+        WriteRead,
+        Exiting
+    };
+
     void startNetworkPass();
+    void armNetworkTimer(int ms);
+    void onNetworkTimeout();
+    bool handleNetworkFrame(const QByteArray &frame);
+    void sendNetworkBytes(const QByteArray &bytes);
+    void sendEcho();
+    void sendNextQuery();
+    void sendNetworkWrite();
+    void beginNetworkExit();
+    void finishNetworkExit();
+    void networkReopenFailed();
+    void cycleSerialPort(const std::function<void(bool)> &done);
     void beginGuardedRead(bool network);
     void enqueueConfiguration();
     void enqueueNetworkQueries();
@@ -211,7 +235,13 @@ private:
     bool networkAnotherCycle = false;
     bool networkReadOkThisSession = false;
     bool networkEntered = false;
+    bool networkExitAfterCycle = false;
+    bool portCycling = false;
+    qint64 ignoreSerialErrorUntil = 0;
     int networkCycle = 0;
+    int networkQueryIndex = 0;
+    NetworkPhase networkPhase = NetworkPhase::Idle;
+    QTimer *networkTimer = nullptr;
     QString networkWriteCommand;
     QString networkWriteName;
     QString networkWriteKey;

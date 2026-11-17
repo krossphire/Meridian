@@ -143,8 +143,8 @@ void SetupPanel::buildNetwork()
     network = new QWidget;
     auto *layout = new QVBoxLayout(network);
     auto *banner = new QLabel(QStringLiteral(
-        "Read sends T11 so the module will take AT commands, then T01 to put TCP mode back. "
-        "The manual says T11 leaves TCP mode, so the IP link can drop. USB is the safer read."));
+        "A network read talks to the module over USB or serial: AT;, a port cycle, then AT* lines. "
+        "It stays off on an IP-only link."));
     banner->setWordWrap(true);
 
     auto *formHost = new QWidget;

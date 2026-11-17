@@ -121,9 +121,17 @@ Rt21Driver::Rt21Driver(QObject *parent)
             configMode = false;
             networkMode = false;
             probeForNetwork = false;
-            if (wasNetwork)
-                emit networkFinished(false, message);
-            else
+            networkPhase = NetworkPhase::Idle;
+            if (wasNetwork) {
+                if (networkWriting) {
+                    const QString name = networkWriteName;
+                    networkWriting = false;
+                    networkWriteName.clear();
+                    emit writeFinished(false, QStringLiteral("Write not confirmed: %1").arg(name));
+                } else {
+                    emit networkFinished(false, message);
+                }
+            } else
                 emit configFinished(false, message);
             startPoll();
             return;
@@ -503,6 +511,10 @@ void Rt21Driver::tearDownSocket()
 void Rt21Driver::closeIo(const QString &reason)
 {
     ++suppress;
+    portCycling = false;
+    networkPhase = NetworkPhase::Idle;
+    if (networkTimer)
+        networkTimer->stop();
     const bool networkBusy = networkMode || networkAnotherCycle || networkWriting || networkWritePending;
     const bool networkBusyWrite = networkWriting || networkWritePending;
     const QString networkBusyName = networkWriteName;
@@ -768,6 +780,11 @@ void Rt21Driver::onConnected()
 
 void Rt21Driver::onSocketError()
 {
+    if (serial && (portCycling || networkMode
+                   || QDateTime::currentMSecsSinceEpoch() < ignoreSerialErrorUntil)) {
+        TrafficLog::instance().note(QStringLiteral("serial error during network pass ignored: %1").arg(serial->errorString()));
+        return;
+    }
     if (suppress || retired || !wantLink)
         return;
     QString message;
@@ -853,7 +870,7 @@ void Rt21Driver::scheduleReconnect()
 
 void Rt21Driver::onReadyRead()
 {
-    if (!io)
+    if (!io || (serial && !serial->isOpen()))
         return;
     const QByteArray received = io->readAll();
     if (countingHandshakeBytes && !received.isEmpty())
@@ -876,6 +893,9 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
 {
     const QByteArray upper = frame.toUpper();
     if (upper == "BI1" || upper == "AI1" || upper == "R21" || upper == "R11" || upper == "R01" || upper == "R41")
+        return;
+
+    if (handleNetworkFrame(frame))
         return;
 
     if (inflight && inflight->kind == Kind::Probe) {
@@ -1339,6 +1359,10 @@ void Rt21Driver::finishNetwork(bool ok, const QString &message)
 {
     Q_UNUSED(ok);
     Q_UNUSED(message);
+    networkPhase = NetworkPhase::Idle;
+    networkExitAfterCycle = false;
+    if (networkTimer)
+        networkTimer->stop();
     const bool good = networkWriting ? networkWriteOk : networkGotField;
     const bool stop = networkCancel || good || networkCycle >= 8;
     const QString name = networkWriteName.isEmpty() ? QStringLiteral("network") : networkWriteName;
@@ -1429,6 +1453,12 @@ void Rt21Driver::cancelNetwork()
     networkAnotherCycle = false;
     networkWritePending = false;
     TrafficLog::instance().recordSession("NOTE", QByteArray("network cancelled"));
+    if (networkPhase != NetworkPhase::Idle && networkPhase != NetworkPhase::Exiting) {
+        beginNetworkExit();
+        return;
+    }
+    if (networkPhase == NetworkPhase::Exiting || portCycling)
+        return;
     if (!networkMode) {
         if (!pending)
             return;
@@ -1444,27 +1474,19 @@ void Rt21Driver::cancelNetwork()
             emit networkFinished(false, text);
         return;
     }
-    queue.clear();
-    if (inflight && inflight->kind == Kind::Module)
-        inflight.reset();
-    replyTimer->stop();
-    if (networkEntered)
-        sendNetworkExit();
-    else {
-        networkMode = false;
-        configMode = false;
-        const QString name = networkWriteName;
-        const bool writing = networkWriting;
-        networkWriting = false;
-        networkWriteName.clear();
-        const QString text = writing ? QStringLiteral("Write not confirmed: %1").arg(name)
-                                     : QStringLiteral("Network read cancelled.");
-        if (writing)
-            emit writeFinished(false, text);
-        else
-            emit networkFinished(false, text);
-        startPoll();
-    }
+    networkMode = false;
+    configMode = false;
+    const QString name = networkWriteName;
+    const bool writing = networkWriting;
+    networkWriting = false;
+    networkWriteName.clear();
+    const QString text = writing ? QStringLiteral("Write not confirmed: %1").arg(name)
+                                 : QStringLiteral("Network read cancelled.");
+    if (writing)
+        emit writeFinished(false, text);
+    else
+        emit networkFinished(false, text);
+    startPoll();
 }
 
 void Rt21Driver::enqueueNetworkQueries()
@@ -1502,6 +1524,314 @@ void Rt21Driver::sendNetworkExit()
         pump();
 }
 
+void Rt21Driver::armNetworkTimer(int ms)
+{
+    if (!networkTimer) {
+        networkTimer = new QTimer(this);
+        networkTimer->setSingleShot(true);
+        connect(networkTimer, &QTimer::timeout, this, [this]() { onNetworkTimeout(); });
+    }
+    networkTimer->start(ms);
+}
+
+void Rt21Driver::sendNetworkBytes(const QByteArray &bytes)
+{
+    if (!io || (serial && !serial->isOpen()))
+        return;
+    if (bytes.contains("AT"))
+        lastModuleTxMs = QDateTime::currentMSecsSinceEpoch();
+    TrafficLog::instance().recordSession("NOTE", QByteArray("network tx ") + bytes.toHex(' '));
+    if (serial)
+        TrafficLog::instance().recordSession("SER-TX", bytes);
+    else
+        TrafficLog::instance().recordSession("NET-TX", bytes);
+    io->write(bytes);
+    if (serial)
+        serial->flush();
+}
+
+void Rt21Driver::cycleSerialPort(const std::function<void(bool)> &done)
+{
+    if (!serial) {
+        done(false);
+        return;
+    }
+    portCycling = true;
+    ignoreSerialErrorUntil = QDateTime::currentMSecsSinceEpoch() + 1500;
+    dropDtr(serial);
+    serial->clear(QSerialPort::AllDirections);
+    TrafficLog::instance().recordSession("NOTE", QByteArray("network port cycle: DTR low, purge, close"));
+    serial->close();
+    QTimer::singleShot(200, this, [this, done]() {
+        if (retired || !serial || !wantLink) {
+            portCycling = false;
+            return;
+        }
+        serial->setBaudRate(endpoint.baud > 0 ? endpoint.baud : 4800);
+        serial->setDataBits(QSerialPort::Data8);
+        serial->setParity(QSerialPort::NoParity);
+        serial->setStopBits(QSerialPort::OneStop);
+        serial->setFlowControl(QSerialPort::NoFlowControl);
+        const bool opened = serial->open(QIODevice::ReadWrite);
+        bool dtr = false;
+        bool rts = false;
+        if (opened) {
+            raiseDtrAndRts(serial, &dtr, &rts);
+            serial->clear(QSerialPort::AllDirections);
+        }
+        framer.clear();
+        portCycling = false;
+        ignoreSerialErrorUntil = QDateTime::currentMSecsSinceEpoch() + 1500;
+        TrafficLog::instance().recordSession(
+            "NOTE", opened ? QByteArray("network port reopened DTR ") + (dtr ? "on" : "off") + " RTS " + (rts ? "on" : "off")
+                           : QByteArray("network port reopen failed"));
+        done(opened);
+    });
+}
+
+void Rt21Driver::networkReopenFailed()
+{
+    networkPhase = NetworkPhase::Idle;
+    portCycling = false;
+    networkEntered = false;
+    networkAnotherCycle = false;
+    networkMode = false;
+    configMode = false;
+    const bool writing = networkWriting;
+    const QString name = networkWriteName.isEmpty() ? QStringLiteral("network") : networkWriteName;
+    networkWriting = false;
+    networkWriteName.clear();
+    const QString text = writing ? QStringLiteral("Write not confirmed: %1").arg(name)
+                                 : QStringLiteral("The serial port didn't reopen.");
+    if (writing)
+        emit writeFinished(false, text);
+    else
+        emit networkFinished(false, text);
+    failLink(QStringLiteral("The serial port didn't reopen."));
+}
+
+void Rt21Driver::beginNetworkExit()
+{
+    if (networkPhase == NetworkPhase::Exiting && !portCycling)
+        return;
+    if (networkTimer)
+        networkTimer->stop();
+    if (portCycling) {
+        networkPhase = NetworkPhase::Exiting;
+        networkExitAfterCycle = true;
+        return;
+    }
+    networkPhase = NetworkPhase::Exiting;
+    if (networkEntered && serial && serial->isOpen()) {
+        sendNetworkBytes(QByteArray(1, '\x1b'));
+        networkEntered = false;
+        TrafficLog::instance().recordSession("NOTE", QByteArray("network ESC"));
+        QTimer::singleShot(10, this, [this]() {
+            if (retired || networkPhase != NetworkPhase::Exiting)
+                return;
+            cycleSerialPort([this](bool ok) {
+                if (!ok) {
+                    networkReopenFailed();
+                    return;
+                }
+                finishNetworkExit();
+            });
+        });
+        return;
+    }
+    networkEntered = false;
+    finishNetworkExit();
+}
+
+void Rt21Driver::finishNetworkExit()
+{
+    networkEntered = false;
+    networkExitAfterCycle = false;
+    finishNetwork(false, QString());
+}
+
+void Rt21Driver::sendEcho()
+{
+    if (networkPhase == NetworkPhase::Exiting || networkCancel || retired)
+        return;
+    networkPhase = NetworkPhase::WaitEcho;
+    framer.setLineMode(true);
+    sendNetworkBytes(QByteArray("AT*SERIAL_ECHO=0\n"));
+    armNetworkTimer(700);
+}
+
+void Rt21Driver::sendNextQuery()
+{
+    if (networkCancel || networkPhase == NetworkPhase::Exiting) {
+        beginNetworkExit();
+        return;
+    }
+    const QList<Rt21::ModuleQuery> rows = Rt21::networkReadSequence();
+    if (networkQueryIndex >= rows.size()) {
+        beginNetworkExit();
+        return;
+    }
+    networkPhase = NetworkPhase::Query;
+    framer.setLineMode(true);
+    sendNetworkBytes(rows.at(networkQueryIndex).command);
+    armNetworkTimer(300);
+}
+
+void Rt21Driver::sendNetworkWrite()
+{
+    if (networkCancel) {
+        beginNetworkExit();
+        return;
+    }
+    networkPhase = NetworkPhase::WriteAck;
+    framer.setLineMode(true);
+    sendNetworkBytes(networkWriteCommand.toLatin1());
+    armNetworkTimer(700);
+}
+
+void Rt21Driver::onNetworkTimeout()
+{
+    if (networkPhase == NetworkPhase::WaitUart || networkPhase == NetworkPhase::WaitEcho) {
+        TrafficLog::instance().recordSession(
+            "NOTE", networkPhase == NetworkPhase::WaitUart ? QByteArray("network uart2 timeout")
+                                                          : QByteArray("network echo timeout"));
+        beginNetworkExit();
+        return;
+    }
+    if (networkPhase == NetworkPhase::WriteAck || networkPhase == NetworkPhase::WriteRead) {
+        TrafficLog::instance().recordSession("NOTE", QByteArray("network write timeout"));
+        beginNetworkExit();
+        return;
+    }
+    if (networkPhase == NetworkPhase::Query) {
+        const QList<Rt21::ModuleQuery> rows = Rt21::networkReadSequence();
+        if (networkQueryIndex < rows.size())
+            emit networkField(rows.at(networkQueryIndex).key, QString());
+        ++networkQueryIndex;
+        sendNextQuery();
+    }
+}
+
+bool Rt21Driver::handleNetworkFrame(const QByteArray &frame)
+{
+    if (networkPhase == NetworkPhase::Idle)
+        return false;
+    if (networkPhase == NetworkPhase::Exiting || networkPhase == NetworkPhase::AfterUart)
+        return true;
+
+    QString line;
+    for (unsigned char c : frame) {
+        if (c >= 32 && c < 127)
+            line.append(QChar(c));
+        else if (!line.isEmpty() && !line.endsWith(QLatin1Char(' ')))
+            line.append(QLatin1Char(' '));
+    }
+    line = line.trimmed();
+    if (line.isEmpty())
+        return true;
+
+    if (networkPhase == NetworkPhase::WaitUart) {
+        if (line.compare(QStringLiteral("<uart2>"), Qt::CaseInsensitive) != 0)
+            return true;
+        if (networkTimer)
+            networkTimer->stop();
+        networkPhase = NetworkPhase::AfterUart;
+        TrafficLog::instance().recordSession("NOTE", QByteArray("network uart2"));
+        QTimer::singleShot(520, this, [this]() {
+            if (retired || networkPhase != NetworkPhase::AfterUart)
+                return;
+            cycleSerialPort([this](bool ok) {
+                if (!ok) {
+                    networkReopenFailed();
+                    return;
+                }
+                if (networkExitAfterCycle || networkCancel || networkPhase == NetworkPhase::Exiting) {
+                    networkExitAfterCycle = false;
+                    networkPhase = NetworkPhase::Idle;
+                    beginNetworkExit();
+                    return;
+                }
+                QTimer::singleShot(150, this, [this]() {
+                    if (retired || networkPhase != NetworkPhase::AfterUart)
+                        return;
+                    sendEcho();
+                });
+            });
+        });
+        return true;
+    }
+
+    const bool okLine = line.contains(QStringLiteral("OK"), Qt::CaseInsensitive);
+    if (networkPhase == NetworkPhase::WaitEcho) {
+        if (!okLine)
+            return true;
+        if (networkTimer)
+            networkTimer->stop();
+        TrafficLog::instance().recordSession("NOTE", QByteArray("network echo ok"));
+        if (!networkWriting)
+            networkGotField = true;
+        if (networkWriting)
+            sendNetworkWrite();
+        else {
+            networkQueryIndex = 0;
+            sendNextQuery();
+        }
+        return true;
+    }
+
+    auto takeValue = [&](const QString &token) {
+        const int at = line.indexOf(token, 0, Qt::CaseInsensitive);
+        if (at < 0)
+            return QString();
+        return line.mid(at + token.size()).trimmed().section(QLatin1Char(' '), 0, 0);
+    };
+
+    if (networkPhase == NetworkPhase::Query) {
+        const QList<Rt21::ModuleQuery> rows = Rt21::networkReadSequence();
+        if (networkQueryIndex >= rows.size())
+            return true;
+        const Rt21::ModuleQuery query = rows.at(networkQueryIndex);
+        if (!line.contains(query.token, Qt::CaseInsensitive))
+            return true;
+        if (networkTimer)
+            networkTimer->stop();
+        const QString value = takeValue(query.token);
+        if (!value.isEmpty())
+            networkGotField = true;
+        emit networkField(query.key, value);
+        ++networkQueryIndex;
+        sendNextQuery();
+        return true;
+    }
+
+    if (networkPhase == NetworkPhase::WriteAck) {
+        if (!okLine)
+            return true;
+        if (networkTimer)
+            networkTimer->stop();
+        networkPhase = NetworkPhase::WriteRead;
+        sendNetworkBytes(networkReadBackCommand);
+        armNetworkTimer(300);
+        return true;
+    }
+
+    if (networkPhase == NetworkPhase::WriteRead) {
+        if (!line.contains(networkReadBackToken, Qt::CaseInsensitive))
+            return true;
+        if (networkTimer)
+            networkTimer->stop();
+        const QString value = takeValue(networkReadBackToken);
+        networkWriteOk = value == networkWriteExpect;
+        TrafficLog::instance().recordSession(
+            "NOTE", QByteArray("network read-back ") + value.toLatin1()
+                        + (networkWriteOk ? " match" : " mismatch"));
+        emit networkField(networkWriteKey, value);
+        beginNetworkExit();
+        return true;
+    }
+    return true;
+}
+
 void Rt21Driver::startNetworkPass()
 {
     queue.clear();
@@ -1509,30 +1839,16 @@ void Rt21Driver::startNetworkPass()
         inflight.reset();
     replyTimer->stop();
     framer.clear();
-    framer.setLineMode(true);
-    countingHandshakeBytes = false;
-    // 4.13.2 consumes AT; as the pass-through switch and sends nothing back.
-    // Setup Utility 4.B12 does not wait for a reply: Sleep 500, WriteLine("AT"), Sleep 500, then the queries.
-    TrafficLog::instance().recordSession(
-        "NOTE", QByteArray("network pass-through: 500 ms, AT;, 500 ms, then AT* queries. No reply is expected before the first query."));
-        QTimer::singleShot(500, this, [this]() {
-        if (!networkMode || !io || retired || networkCancel)
-            return;
-        const QByteArray enter("AT;");
-        networkEntered = true;
-        lastModuleTxMs = QDateTime::currentMSecsSinceEpoch();
-        if (serial)
-            TrafficLog::instance().recordSession("SER-TX", enter);
-        else
-            TrafficLog::instance().recordSession("NET-TX", enter);
-        io->write(enter);
-        QTimer::singleShot(500, this, [this]() {
-            if (!networkMode || !io || retired || networkCancel)
-                return;
-            enqueueNetworkQueries();
-            pump();
-        });
-    });
+    networkExitAfterCycle = false;
+    networkQueryIndex = 0;
+    networkGotField = false;
+    networkWriteOk = false;
+    networkPhase = NetworkPhase::WaitUart;
+    const QByteArray enter("AT;");
+    networkEntered = true;
+    TrafficLog::instance().recordSession("NOTE", QByteArray("network enter AT; expecting <uart2>;"));
+    sendNetworkBytes(enter);
+    armNetworkTimer(500);
 }
 
 void Rt21Driver::readNetwork()
@@ -1648,11 +1964,7 @@ void Rt21Driver::scheduleBrightnessWrite()
         networkEntered = false;
         emit networkStatus(networkTryText());
         TrafficLog::instance().recordSession("NOTE", QByteArray("network cycle 1 of 8"));
-        networkMode = true;
-        configMode = true;
-        if (pollTimer)
-            pollTimer->stop();
-        startNetworkPass();
+        beginGuardedRead(true);
         return;
     }
     const int value = brightnessQueued;
@@ -1700,9 +2012,9 @@ void Rt21Driver::writeNetworkSetting(const QString &key, const QString &value, c
             emit writeFinished(false, QStringLiteral("DHCP is 0 or 1."));
             return;
         }
-        command = QStringLiteral("AT*DHCP=%1;").arg(code);
+        command = QStringLiteral("AT*DHCP=%1\n").arg(code);
         networkWriteExpect = code;
-        networkReadBackCommand = QByteArray("AT*DHCP?;");
+        networkReadBackCommand = QByteArray("AT*DHCP?\n");
         networkReadBackToken = QStringLiteral("DHCP=");
     } else if (key == QLatin1String("aip") || key == QLatin1String("anmask") || key == QLatin1String("agw")) {
         QHostAddress address;
@@ -1711,9 +2023,9 @@ void Rt21Driver::writeNetworkSetting(const QString &key, const QString &value, c
             return;
         }
         const char *id = key == QLatin1String("aip") ? "AIP" : key == QLatin1String("anmask") ? "ANMASK" : "AGW";
-        command = QStringLiteral("AT*%1=%2;").arg(QLatin1String(id), address.toString());
+        command = QStringLiteral("AT*%1=%2\n").arg(QLatin1String(id), address.toString());
         networkWriteExpect = address.toString();
-        networkReadBackCommand = QByteArray("AT*") + id + "?;";
+        networkReadBackCommand = QByteArray("AT*") + id + "?\n";
         networkReadBackToken = QString::fromLatin1(id) + QStringLiteral("=");
     } else if (key == QLatin1String("http") || key == QLatin1String("udp") || key == QLatin1String("serialPort")) {
         bool ok = false;
@@ -1723,15 +2035,15 @@ void Rt21Driver::writeNetworkSetting(const QString &key, const QString &value, c
             return;
         }
         const char *id = key == QLatin1String("http") ? "HTTP" : key == QLatin1String("udp") ? "UDP" : "NVREG16_0";
-        command = QStringLiteral("AT*%1=%2;").arg(QLatin1String(id)).arg(port);
+        command = QStringLiteral("AT*%1=%2\n").arg(QLatin1String(id)).arg(port);
         networkWriteExpect = QString::number(port);
-        networkReadBackCommand = QByteArray("AT*") + id + "?;";
+        networkReadBackCommand = QByteArray("AT*") + id + "?\n";
         networkReadBackToken = QString::fromLatin1(id) + QStringLiteral("=");
     } else {
         emit writeFinished(false, QStringLiteral("Write not confirmed: %1").arg(settingName));
         return;
     }
-    if (command.contains(QLatin1Char('\n')) || command.startsWith(QStringLiteral("W0"))) {
+    if (command.contains(QLatin1Char(';')) || command.startsWith(QStringLiteral("W0"))) {
         emit writeFinished(false, QStringLiteral("Write not confirmed: %1").arg(settingName));
         return;
     }

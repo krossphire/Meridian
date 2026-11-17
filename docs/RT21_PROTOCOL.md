@@ -88,7 +88,7 @@ The button never writes by itself. A read must already have reported 4.13.2, the
 
 These points are from a disassembly of the official `RT21_4_13.2.hex` (PIC18F26K22, byte-identical to the Green Heron release). They are static analysis, not a hardware test. The firmware file is the current public release at [greenheronengineering.com/rotator-controllers-software](https://www.greenheronengineering.com/rotator-controllers-software/).
 
-A command runs only when its last byte is `;`. A line feed is never a terminator. A stray line feed after `;` corrupts the next command or poll. Meridian does not send a line feed.
+A rotator command runs only when its last byte is `;`. A line feed is never a terminator for those commands. A stray line feed after `;` corrupts the next command or poll. Meridian does not send a line feed on rotator commands. The network module is different: after the pass-through switch, its AT* lines end in LF and must not end in `;`.
 
 A read is `R` plus a letter plus `;`. The digit after the letter is ignored. The reply is `<letter>` `0x01` `<value>`. `O` is brightness (default 8). `W` is screen-saver minutes.
 
@@ -96,7 +96,7 @@ A write is `W` plus a letter plus a digit 0–9 plus the value plus `;`. The con
 
 After the ack, interrupts are off for about 25–30 ms and the receive buffer is cleared. Meridian waits 150 ms, then sends `RO;`.
 
-Any `AT...;` command locks the controller into forwarding serial to the network module. It stops answering headings until 31 seconds of silence or an ESC (`0x1B`). A poll resets that timer, so a poll during the block keeps the lock. The controller does not answer the mode switch itself. Setup Utility 4.B12 stops polling, waits 500 ms, sends `AT` with its newline (`;` after startup, so the bytes are `AT;`), waits another 500 ms, and only then sends `AT*DHCP?` and the other queries the same way. It does not require a byte back from `AT;` before those queries. `T11;` is not part of that read; the utility sends `T11` only as a short kick at startup and follows it with ESC. On this station the utility itself only reads the module about one try in six, so the pass-through is intermittent. Meridian repeats the whole enter, query, ESC, and `T01;` cycle up to 8 times, waits for a heading between tries, and stops when a query answers. The status line says `Reading network (try n of 8)…` while a try is in progress, `Network module answered. Nothing was written.` when a query answers, and `Network module didn't answer after 8 tries` when none do. A write is allowed only after a read succeeded in the same connection, and it is checked by reading the value back with the same retry. Meridian's serial read matches the utility: 500 ms, `AT;`, 500 ms, the `AT*...?;` queries, then ESC and `T01;`. It does not send a leading `;` or `T11;`. Polls stay stopped until a heading returns. One missed reply is retried once, quietly. The traffic log records the network bytes, the ESC, and whether the heading came back. `R[;` (magnetic variation) is not in 4.13.2; a missing reply is recorded and does not fail the rest of the read.
+The serial network-module sequence below is from two Device Monitoring Studio captures of Setup Utility 4.B12 on COM6, firmware 4.13.2 (two successes and five failures, identical bytes on both successes). It replaces the earlier disassembly guess. `T11;` and a semicolon on an AT* line failed in those captures, and `T11;` alone made the controller ignore `R01;` until ESC. Meridian does not send `T11;` or `T01;` for a network read or write. `R[;` (magnetic variation) is not in 4.13.2; a missing reply is recorded and does not fail the rest of the read, and the setting stays locked.
 
 Firmware delays of 1–250 ms run with interrupts off. Polls stay spaced, and a single missed reply is retried once without changing the status line.
 
@@ -190,7 +190,18 @@ The 4.B12 release note says that build fixes a bug that always cleared the scree
 
 ## Network read on the serial port
 
-4.B12's `PollWiFiValues` sends `T11;` (leave TCP mode, open the module passthrough), then `AT;`, then `AT*DHCP?` and the other queries. Those `AT*` strings do not include a carriage return. The utility writes them with `SerialPort.WriteLine`, and that class's `NewLine` is `\n`. Meridian was sending `\r`. On the Edgeport at 4800 the utility's own window is sometimes junk and sometimes clean, so the failure is not a wrong baud: the CPU is already at 4800, which is the baud the utility used when the window came up. The junk is a timing and framing mix. A heading or status byte still in the UART, or `T11;` not finished switching, lands in the middle of `DHCP=1`. Meridian now sends the queries with `\n`, looks for the token anywhere in the printable text, retries the `AT;` handshake twice and each query once, and always finishes with Escape and `T01;` even when a read fails. Every byte of that session is hex-logged in `logs/` next to the program, whether or not the traffic checkbox is on. No `AT*` write, no `AT*RESET`, and no module defaults are sent.
+Ground truth from Setup Utility 4.B12 on COM6 at 4800 8N1, no flow control, DTR and RTS on, firmware 4.13.2. Reads return on the first byte or at 2 seconds. The utility's close is drop DTR, purge RX and TX, then close, which leaves DTR low for about 190–210 ms.
+
+Both successes followed a register read and polls the controller actually answered. One failure used the same bytes after an unanswered `R11;`. Meridian therefore requires a fresh heading reply immediately before `AT;`.
+
+1. TX `AT;` (`41 54 3b`). Expect `<uart2>;` (`3c 75 61 72 74 32 3e 3b`) in about 50 ms. No leading `;`, no `T11;`, no second `AT;`.
+2. About 520 ms after that reply, close and reopen the port (DTR low about 200 ms, both directions purged).
+3. About 150 ms after reopen, TX `AT*SERIAL_ECHO=0` plus LF only. Expect `OK` CR LF within about 700 ms.
+4. Queries are `AT*KEY?` plus LF, one at a time, read to CR LF before the next. Observed replies are 25–45 ms; Meridian allows 300 ms. Order: HWTYPE, DHCP, IP, AIP, NMASK, GW, ID, HTTP, UDP, TFTP, HTTP_USER, HTTP_PASS, NVREG16_0, LINK. On this station: HWTYPE=2, DHCP=0, IP=AIP=192.168.1.106, NMASK=255.255.255.0, GW=192.168.2.1, ID=RT-21, HTTP=801, UDP=23073, TFTP=69, HTTP_USER empty, HTTP_PASS empty, NVREG16_0=6555, LINK=1.
+5. A write is `AT*KEY=value` plus LF, then `OK` CR LF, then `AT*KEY?` plus LF. The utility did this with `AT*ID=RT-21`. Meridian writes only after a read succeeded on this connection, and only over USB or serial.
+6. Exit is a single ESC (`0x1b`), then close within about 10 ms, reopen, and a normal poll (answered about 440 ms after ESC). No `T01;`.
+
+If `AT*SERIAL_ECHO=0` gets no OK within about 700 ms, Meridian sends ESC, closes and reopens, waits for a heading, and starts again. The cap is 8 tries. Cancel stops the same way. The status line is `Reading network (try n of 8)…`, then `Network module answered. Nothing was written.` or `Network module didn't answer after 8 tries`. The intentional close is not a disconnect and does not turn the status red. An IP-only link still cannot read or write network settings.
 
 ## Network module TCP port
 

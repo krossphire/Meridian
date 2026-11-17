@@ -77,52 +77,23 @@ void addModule(QList<PlannedWrite> *out, const QString &command, const QString &
 
 QList<ModuleQuery> networkReadSequence()
 {
+    // Captured from Setup Utility 4.B12 on 4.13.2. Each query is the key plus '?' plus LF.
+    // No semicolon, no T11, no T01. AT; and ESC are sent around this list, not inside it.
     QList<ModuleQuery> rows;
-    ModuleQuery enter;
-    enter.command = QByteArray("T11;");
-    enter.token = QStringLiteral("OK");
-    enter.optional = true;
-    rows.append(enter);
-
-    ModuleQuery at;
-    at.command = QByteArray("AT;");
-    at.token = QStringLiteral("OK");
-    rows.append(at);
-
-    // 4.13.2 runs a command only when it ends in ';'. A line feed is not a terminator.
-    rows.append(query("AT*HWTYPE?;", "HWTYPE=", "hwtype"));
-    rows.append(query("AT*DHCP?;", "DHCP=", "dhcp"));
-    rows.append(query("AT*IP?;", "IP=", "ip"));
-    rows.append(query("AT*AIP?;", "AIP=", "aip"));
-    rows.append(query("AT*NMASK?;", "NMASK=", "nmask"));
-    rows.append(query("AT*ANMASK?;", "ANMASK=", "anmask"));
-    rows.append(query("AT*GW?;", "GW=", "gw"));
-    rows.append(query("AT*AGW?;", "AGW=", "agw"));
-    rows.append(query("AT*ID?;", "ID=", "id"));
-    rows.append(query("AT*HTTP?;", "HTTP=", "http"));
-    rows.append(query("AT*UDP?;", "UDP=", "udp"));
-    rows.append(query("AT*TFTP?;", "TFTP=", "tftp"));
-    rows.append(query("AT*NVREG16_0?;", "NVREG16_0=", "serialPort"));
-    rows.append(query("AT*WIFI_SECURITY?;", "SECURITY=", "security"));
-    rows.append(query("AT*WIFI_ASSID?;", "ASSID=", "ssid"));
-    rows.append(query("AT*WIFI_KEY?;", "KEY=", "key"));
-    rows.append(query("AT*HTTP_USER?;", "USER=", "user"));
-    rows.append(query("AT*HTTP_PASS?;", "PASS=", "pass"));
-    rows.append(query("AT*LINK?;", "LINK=", "link"));
-
-    ModuleQuery esc;
-    esc.command = QByteArray("\x1b");
-    esc.token = QStringLiteral("OK");
-    esc.optional = true;
-    esc.exitStep = true;
-    rows.append(esc);
-
-    ModuleQuery restore;
-    restore.command = QByteArray("T01;");
-    restore.token = QStringLiteral("OK");
-    restore.optional = true;
-    restore.exitStep = true;
-    rows.append(restore);
+    rows.append(query("AT*HWTYPE?\n", "HWTYPE=", "hwtype"));
+    rows.append(query("AT*DHCP?\n", "DHCP=", "dhcp"));
+    rows.append(query("AT*IP?\n", "IP=", "ip"));
+    rows.append(query("AT*AIP?\n", "AIP=", "aip"));
+    rows.append(query("AT*NMASK?\n", "NMASK=", "nmask"));
+    rows.append(query("AT*GW?\n", "GW=", "gw"));
+    rows.append(query("AT*ID?\n", "ID=", "id"));
+    rows.append(query("AT*HTTP?\n", "HTTP=", "http"));
+    rows.append(query("AT*UDP?\n", "UDP=", "udp"));
+    rows.append(query("AT*TFTP?\n", "TFTP=", "tftp"));
+    rows.append(query("AT*HTTP_USER?\n", "HTTP_USER=", "user"));
+    rows.append(query("AT*HTTP_PASS?\n", "HTTP_PASS=", "pass"));
+    rows.append(query("AT*NVREG16_0?\n", "NVREG16_0=", "serialPort"));
+    rows.append(query("AT*LINK?\n", "LINK=", "link"));
     return rows;
 }
 

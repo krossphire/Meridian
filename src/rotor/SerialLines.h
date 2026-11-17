@@ -36,3 +36,19 @@ inline bool raiseDtrAndRts(QSerialPort *port, bool *dtrOn = nullptr, bool *rtsOn
         *rtsOn = rts;
     return dtr && rts;
 }
+
+// The setup utility drops DTR, purges, and closes. The line stays low for
+// about 200 ms before the next open raises it again.
+inline void dropDtr(QSerialPort *port)
+{
+    if (!port || !port->isOpen())
+        return;
+#if defined(Q_OS_UNIX)
+    const int fd = static_cast<int>(port->handle());
+    int bits = TIOCM_DTR;
+    if (fd >= 0)
+        ::ioctl(fd, TIOCMBIC, &bits);
+#else
+    port->setDataTerminalReady(false);
+#endif
+}

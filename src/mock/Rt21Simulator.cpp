@@ -44,22 +44,22 @@ void Rt21Simulator::restoreDefaults()
     const QList<QPair<QByteArray, QByteArray>> net = {
         {"HWTYPE", "2"},
         {"DHCP", "0"},
-        {"IP", "192.168.1.50"},
-        {"AIP", "192.168.1.50"},
+        {"IP", "192.168.1.106"},
+        {"AIP", "192.168.1.106"},
         {"NMASK", "255.255.255.0"},
         {"ANMASK", "255.255.255.0"},
-        {"GW", "192.168.1.1"},
-        {"AGW", "192.168.1.1"},
-        {"ID", "Tower"},
-        {"HTTP", "80"},
-        {"UDP", "0"},
+        {"GW", "192.168.2.1"},
+        {"AGW", "192.168.2.1"},
+        {"ID", "RT-21"},
+        {"HTTP", "801"},
+        {"UDP", "23073"},
         {"TFTP", "69"},
         {"NVREG16_0", "6555"},
         {"WIFI_SECURITY", "6"},
         {"WIFI_ASSID", "shack-2g"},
         {"WIFI_KEY", "prairie-not-logged"},
-        {"HTTP_USER", "rt21"},
-        {"HTTP_PASS", "webpass"},
+        {"HTTP_USER", ""},
+        {"HTTP_PASS", ""},
         {"LINK", "1"},
     };
     for (const auto &item : net)
@@ -125,7 +125,7 @@ void Rt21Simulator::feed(const QByteArray &bytes)
     for (unsigned char c : bytes) {
         if (c == 0x1b) {
             atMode = false;
-            replyLine(QByteArray("OK"));
+            trace_.append(QByteArray("ESC"));
             buffer.clear();
             sawCr = false;
             continue;
@@ -285,8 +285,11 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
     if (cmd.startsWith("C0") || cmd.startsWith("C1"))
         return;
     if (cmd == "T11" || cmd == "T01" || cmd == "AT") {
-        if (cmd == "AT")
+        if (cmd == "AT") {
             atMode = true;
+            reply(QByteArray("<uart2>"), false);
+            return;
+        }
         if (cmd == "T01")
             atMode = false;
         replyLine(QByteArray("OK"));
@@ -312,10 +315,6 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
             prefix = "ASSID";
         else if (key == "WIFI_KEY")
             prefix = "KEY";
-        else if (key == "HTTP_USER")
-            prefix = "USER";
-        else if (key == "HTTP_PASS")
-            prefix = "PASS";
         replyLine(prefix + "=" + value);
         return;
     }
@@ -435,8 +434,17 @@ QString MockRt21Server::listenPty()
     connect(ptyNotifier, &QSocketNotifier::activated, this, [this]() {
         char buf[512];
         const ssize_t n = ::read(ptyMaster, buf, sizeof buf);
-        if (n > 0)
+        if (n > 0) {
             sim_.feed(QByteArray(buf, int(n)));
+            return;
+        }
+        // Closing the slave makes the master readable with EIO. Park the
+        // notifier briefly so the close/reopen in a network read cannot spin.
+        ptyNotifier->setEnabled(false);
+        QTimer::singleShot(40, this, [this]() {
+            if (ptyNotifier)
+                ptyNotifier->setEnabled(true);
+        });
     });
     return ptyName;
 #else
