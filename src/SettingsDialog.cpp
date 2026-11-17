@@ -6,6 +6,8 @@
 
 #include "SettingsDialog.h"
 
+#include "StatusTone.h"
+
 #include "AboutDialog.h"
 #include "ControllerColumn.h"
 #include "SetupPanel.h"
@@ -352,8 +354,26 @@ void SettingsDialog::setDriver(Rt21Driver *next)
 
 void SettingsDialog::setStatus(const QString &text)
 {
-    if (statusLabel)
-        statusLabel->setText(text);
+    statusPlain = text;
+    statusToneNow = statusTone(text);
+    if (!statusFadeTimer) {
+        statusFadeTimer = new QTimer(this);
+        statusFadeTimer->setSingleShot(true);
+        connect(statusFadeTimer, &QTimer::timeout, this, [this]() {
+            if (!statusLabel || statusToneNow != StatusTone::Success)
+                return;
+            statusToneNow = StatusTone::Neutral;
+            statusLabel->setStyleSheet(QStringLiteral("color: %1;").arg(statusToneColor(StatusTone::Neutral).name()));
+        });
+    }
+    if (statusLabel) {
+        statusLabel->setText(text.isEmpty() ? text : QStringLiteral("●  ") + text);
+        statusLabel->setStyleSheet(QStringLiteral("color: %1;").arg(statusToneColor(statusToneNow).name()));
+    }
+    if (statusToneNow == StatusTone::Success)
+        statusFadeTimer->start(4000);
+    else
+        statusFadeTimer->stop();
     if (driver && !text.isEmpty())
         driver->postNote(text);
 }

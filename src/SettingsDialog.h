@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "StatusTone.h"
 #include "rotor/AppConfig.h"
 #include "rotor/Rt21Finder.h"
 #include "rotor/UsbHint.h"
@@ -85,6 +86,9 @@ private:
     SetupPanel *setupPanel = nullptr;
     ControllerColumn *setupColumn = nullptr;
     QLabel *statusLabel = nullptr;
+    class QTimer *statusFadeTimer = nullptr;
+    QString statusPlain;
+    StatusTone statusToneNow = StatusTone::Neutral;
     QMap<QString, QString> eeRaw;
     QLabel *screenSaver = nullptr;
     QLabel *multiplier = nullptr;

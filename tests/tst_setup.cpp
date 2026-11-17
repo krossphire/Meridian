@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include "StatusTone.h"
 #include "mock/Rt21Simulator.h"
 #include "rotor/AppConfig.h"
 #include "rotor/Rt21Driver.h"
@@ -23,12 +24,14 @@ private slots:
     void secretsStayOutOfTheLog();
     void moduleLinesSplitOnCr();
     void mockNetworkRead();
+    void networkWriteNeedsAReadThenReadsBack();
     void screenSaverIsOnlyInTheDisplayGroup();
     void firmwareGate();
     void serialPortsStayOnTheSavedName();
     void silentPortSkipsSetupReads();
     void silentModuleSkipsQueries();
     void brightnessWriteReadsBack();
+    void statusToneStaysOffThePrimaryInk();
 };
 
 void TestSetup::commandsMatchTheUtility()
@@ -126,26 +129,75 @@ void TestSetup::moduleLinesSplitOnCr()
 void TestSetup::mockNetworkRead()
 {
     MockRt21Server server;
-    QVERIFY(server.listenTcp(0));
+    const QString pty = server.listenPty();
+    if (pty.isEmpty())
+        QSKIP("pty was not available");
     Rt21Driver driver;
     RotorEndpoint endpoint;
-    endpoint.transport = RotorEndpoint::Transport::Tcp;
-    endpoint.host = QStringLiteral("127.0.0.1");
-    endpoint.tcpPort = int(server.port());
+    endpoint.transport = RotorEndpoint::Transport::Serial;
+    endpoint.serialPort = pty;
+    endpoint.baud = 4800;
     driver.connectEndpoint(endpoint);
     QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::On, 3000);
 
     QMap<QString, QString> got;
     connect(&driver, &Rt21Driver::networkField, &driver, [&](const QString &key, const QString &value) { got.insert(key, value); });
     QSignalSpy done(&driver, &Rt21Driver::networkFinished);
+    QSignalSpy status(&driver, &Rt21Driver::networkStatus);
     driver.readNetwork();
-    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 8000);
+    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 12000);
+    QCOMPARE(status.at(0).at(0).toString(), QStringLiteral("Reading network (try 1 of 8)…"));
     QCOMPARE(got.value(QStringLiteral("id")), QStringLiteral("Tower"));
     QCOMPARE(got.value(QStringLiteral("dhcp")), QStringLiteral("0"));
     QCOMPARE(got.value(QStringLiteral("serialPort")), QStringLiteral("6555"));
     QCOMPARE(got.value(QStringLiteral("security")), QStringLiteral("6"));
     QCOMPARE(got.value(QStringLiteral("key")), QStringLiteral("prairie-not-logged"));
     QCOMPARE(done.at(0).at(0).toBool(), true);
+    QCOMPARE(done.at(0).at(1).toString(), QStringLiteral("Network module answered. Nothing was written."));
+}
+
+void TestSetup::networkWriteNeedsAReadThenReadsBack()
+{
+    MockRt21Server server;
+    const QString pty = server.listenPty();
+    if (pty.isEmpty())
+        QSKIP("pty was not available");
+    Rt21Driver driver;
+    RotorEndpoint endpoint;
+    endpoint.transport = RotorEndpoint::Transport::Serial;
+    endpoint.serialPort = pty;
+    endpoint.baud = 4800;
+    driver.connectEndpoint(endpoint);
+    QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::On, 3000);
+
+    QSignalSpy wrote(&driver, &Rt21Driver::writeFinished);
+    driver.writeNetworkSetting(QStringLiteral("dhcp"), QStringLiteral("1"), QStringLiteral("DHCP"));
+    QTRY_COMPARE_WITH_TIMEOUT(wrote.count(), 1, 1000);
+    QVERIFY(!wrote.at(0).at(0).toBool());
+    QVERIFY(wrote.at(0).at(1).toString().contains(QStringLiteral("Read the network module")));
+
+    QSignalSpy read(&driver, &Rt21Driver::networkFinished);
+    driver.readNetwork();
+    QTRY_COMPARE_WITH_TIMEOUT(read.count(), 1, 12000);
+    QVERIFY(read.at(0).at(0).toBool());
+    QVERIFY(driver.networkReadOk());
+
+    QSignalSpy status(&driver, &Rt21Driver::networkStatus);
+    driver.writeNetworkSetting(QStringLiteral("dhcp"), QStringLiteral("Static"), QStringLiteral("DHCP"));
+    QTRY_COMPARE_WITH_TIMEOUT(wrote.count(), 2, 20000);
+    QVERIFY(wrote.at(1).at(0).toBool());
+    QCOMPARE(wrote.at(1).at(1).toString(), QStringLiteral("Saved DHCP"));
+    QCOMPARE(status.at(0).at(0).toString(), QStringLiteral("Writing DHCP (try 1 of 8)…"));
+    bool sawSet = false;
+    bool sawQuery = false;
+    for (const QByteArray &cmd : server.sim()->trace()) {
+        if (cmd.contains("AT*DHCP=1"))
+            sawSet = true;
+        if (cmd.contains("AT*DHCP?"))
+            sawQuery = true;
+    }
+    QVERIFY(sawSet);
+    QVERIFY(sawQuery);
 }
 
 void TestSetup::screenSaverIsOnlyInTheDisplayGroup()
@@ -283,25 +335,35 @@ void TestSetup::silentModuleSkipsQueries()
 {
     MockRt21Server server;
     server.sim()->setIgnoreModule(true);
-    QVERIFY(server.listenTcp(0));
+    const QString pty = server.listenPty();
+    if (pty.isEmpty())
+        QSKIP("pty was not available");
     Rt21Driver driver;
     RotorEndpoint endpoint;
-    endpoint.transport = RotorEndpoint::Transport::Tcp;
-    endpoint.host = QStringLiteral("127.0.0.1");
-    endpoint.tcpPort = int(server.port());
+    endpoint.transport = RotorEndpoint::Transport::Serial;
+    endpoint.serialPort = pty;
+    endpoint.baud = 4800;
     driver.connectEndpoint(endpoint);
     QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::On, 3000);
     QSignalSpy done(&driver, &Rt21Driver::networkFinished);
     driver.readNetwork();
-    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 12000);
+    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 45000);
     QVERIFY(!done.at(0).at(0).toBool());
-    bool sawExit = false;
+    QCOMPARE(done.at(0).at(1).toString(), QStringLiteral("Network module didn't answer after 8 tries"));
+    int queries = 0;
+    int exits = 0;
+    int enters = 0;
     for (const QByteArray &cmd : server.sim()->trace()) {
-        QVERIFY(!cmd.contains("AT*DHCP"));
-        if (cmd.startsWith("T01"))
-            sawExit = true;
+        if (cmd.startsWith("AT*"))
+            ++queries;
+        if (cmd == "T01")
+            ++exits;
+        if (cmd == "AT")
+            ++enters;
     }
-    QVERIFY(sawExit);
+    QVERIFY(queries >= 8);
+    QCOMPARE(exits, 8);
+    QCOMPARE(enters, 8);
 }
 
 void TestSetup::brightnessWriteReadsBack()
@@ -342,6 +404,34 @@ void TestSetup::brightnessWriteReadsBack()
     driver.applySetupGroup(QStringLiteral("motion"), {}, QString());
     QTRY_COMPARE_WITH_TIMEOUT(done.count(), 3, 1000);
     QVERIFY(done.at(2).at(1).toString().contains(QStringLiteral("off in this alpha")));
+}
+
+void TestSetup::statusToneStaysOffThePrimaryInk()
+{
+    const QColor ink(244, 246, 244);
+    const auto apart = [&](StatusTone tone) {
+        const QColor color = statusToneColor(tone);
+        QVERIFY(color != ink);
+        QVERIFY(color != QColor(232, 236, 234));
+        QVERIFY(color != QColor(Qt::white));
+    };
+    QCOMPARE(statusTone(QStringLiteral("Writing Brightness…")), StatusTone::Busy);
+    QCOMPARE(statusTone(QStringLiteral("Saved Brightness")), StatusTone::Success);
+    QCOMPARE(statusTone(QStringLiteral("Write not confirmed: Brightness")), StatusTone::Failure);
+    QCOMPARE(statusTone(QStringLiteral("Controller settings read. Nothing was written.")), StatusTone::Success);
+    QCOMPARE(statusTone(QStringLiteral("RT-21 not connected")), StatusTone::Failure);
+    QCOMPARE(statusTone(QStringLiteral("Set up your RT-21 in settings")), StatusTone::Neutral);
+    QCOMPARE(statusTone(QStringLiteral("Reading network (try 3 of 8)…")), StatusTone::Busy);
+    QCOMPARE(statusTone(QStringLiteral("Writing DHCP (try 1 of 8)…")), StatusTone::Busy);
+    QCOMPARE(statusTone(QStringLiteral("Network module answered. Nothing was written.")), StatusTone::Success);
+    QCOMPARE(statusTone(QStringLiteral("Network module didn't answer after 8 tries")), StatusTone::Failure);
+    QCOMPARE(statusTone(QStringLiteral("Read the network module before writing it.")), StatusTone::Failure);
+    QCOMPARE(statusTone(QStringLiteral("The link dropped while talking to the network module.")), StatusTone::Failure);
+    apart(StatusTone::Neutral);
+    apart(StatusTone::Busy);
+    apart(StatusTone::Success);
+    apart(StatusTone::Failure);
+    QCOMPARE(statusToneColor(StatusTone::Neutral), QColor(142, 160, 153));
 }
 
 QTEST_MAIN(TestSetup)

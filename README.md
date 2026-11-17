@@ -10,7 +10,7 @@ On 4.13.2 the rotor's screen saver blanks the panel and serial keeps answering. 
 
 On firmware 4.13.2, Setup can write each confirmed register from its own Write button. The command is `W` plus the letter, digit `0`, the value, and `;` (`WO010;` for brightness 10). Meridian waits for an idle poll and five seconds with no AT traffic, waits for the ack `06` plus the letter plus `;`, pauses 150 ms, reads `R` plus the letter plus `;`, then watches heading polls for 10 seconds. The status line says `Saved <setting>` or `Write not confirmed: <setting>`. There are no pop-ups. 4.14 stays locked. Brightness has no visible effect on OLED RT-21 units (LCD units only, unverified).
 
-Network settings (DHCP, static IP, mask, gateway, HTTP port, UDP port, and the serial TCP port) can be written only over USB or serial. On an IP-only link they are greyed out: "Needs a USB or serial connection; changing network settings over IP can drop the link." Read network stays off on that link as well, because `T11` drops TCP mode. Nothing pre-fills an address or a port.
+Network settings (DHCP, static IP, mask, gateway, HTTP port, UDP port, and the serial TCP port) can be read or written only over USB or serial. On an IP-only link they are greyed out: "Needs a USB or serial connection; changing network settings over IP can drop the link." A serial read waits 500 ms, sends `AT;`, waits 500 ms, sends the `AT*` queries, then ESC and `T01;`. On 4.13.2 the module often stays silent, so Meridian repeats that whole cycle up to 8 times, waits for a heading between tries, and stops on the first reply. The status line says `Reading network (try n of 8)…`, then either `Network module answered. Nothing was written.` or `Network module didn't answer after 8 tries`. Write stays off until a read has succeeded on this connection, and a write is checked by reading the value back with the same retry. Nothing pre-fills an address or a port.
 
 Tested with RT-21 firmware 4.13.2 and display firmware 3.1. On 4.13.2 the screen saver is safe over serial and over IP: it blanks the panel and replies keep coming. On 4.14.g1 the saver and register writes hang serial until a power cycle. Users report 4.13.2 feels snappier. That has not been measured.
 
@@ -79,7 +79,7 @@ Each rotor is an RT-21 on TCP (`host` and port) or on a serial / USB-serial port
 
 ### Controller setup
 
-The Controller tab reads the documented queries (`R11;`, `R01;`, `R41;`, and `RA1;` through `RZ1;`) and can write the numeric EEPROM fields from Appendix F. Apply writes a JSON backup first and asks before sending. Factory reset, the bootloader, and the network-module commands are not sent. The on-wire shape of an EEPROM write is documented as inferred in [docs/RT21_PROTOCOL.md](docs/RT21_PROTOCOL.md) and has not been tried on hardware.
+The Controller tab reads the documented queries (`R11;`, `R01;`, `R41;`, and `RA1;` through `RZ1;`) and can write the numeric EEPROM fields from Appendix F. Apply writes a JSON backup first and asks before sending. Factory reset and the bootloader are not sent. Network settings are read and written only over USB or serial, as described above. The on-wire shape of an EEPROM write is documented in [docs/RT21_PROTOCOL.md](docs/RT21_PROTOCOL.md).
 
 ![Controller setup read from the mock](docs/screenshots/settings-controller.png)
 

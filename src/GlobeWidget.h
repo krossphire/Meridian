@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include "StatusTone.h"
 #include "core/Solar.h"
 #include "map/GeoMap.h"
 
@@ -40,6 +41,7 @@ public:
     void setTarget(std::optional<double> azimuth);
     void setLink(Link state, const QString &detail);
     void setStatusLine(const QString &text);
+    void setStatusLine(const QString &text, StatusTone tone);
     void setHeadingStale(bool stale);
     void setShowSun(bool show);
     void setSolarPreview(const QDateTime &utc);
@@ -118,6 +120,7 @@ private:
     bool headingStale = false;
     bool sunDirty = true;
     QString statusLine;
+    StatusTone statusToneNow = StatusTone::Neutral;
     QDateTime solarPreview;
     QImage sunOverlay;
     QSize sunSize;

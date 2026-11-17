@@ -214,7 +214,8 @@ void SetupPanel::buildNetwork()
     gatewayNote->setObjectName(QStringLiteral("gatewayNote"));
     gatewayNote->setWordWrap(true);
     form->addRow(QString(), gatewayNote);
-    auto *noReset = new QLabel(QStringLiteral("Reset to defaults is not offered. Nothing on this page is written."));
+    auto *noReset = new QLabel(QStringLiteral(
+        "Reset to defaults is not offered. Write stays off until a network read succeeds on this connection."));
     noReset->setWordWrap(true);
     form->addRow(QString(), noReset);
 
@@ -278,6 +279,10 @@ void SetupPanel::buildNetwork()
             setStatus(QStringLiteral("Connect to a rotor before reading the network module."));
             return;
         }
+        if (readNetwork->text() == QStringLiteral("Cancel")) {
+            driver->cancelNetwork();
+            return;
+        }
         if (ipOnlyLink()) {
             setStatus(QStringLiteral("Needs a USB or serial connection; reading over IP drops the link."));
             return;
@@ -313,15 +318,31 @@ void SetupPanel::setDriver(Rt21Driver *next)
     connect(driver, &Rt21Driver::networkField, this, [this](const QString &key, const QString &value) {
         remember(key, value);
     });
+    connect(driver, &Rt21Driver::networkStatus, this, [this](const QString &text) {
+        setStatus(text);
+        if (readNetwork && !ipOnlyLink()) {
+            readNetwork->setText(QStringLiteral("Cancel"));
+            readNetwork->setEnabled(true);
+        }
+        refreshNetworkRead();
+    });
     connect(driver, &Rt21Driver::networkFinished, this, [this](bool ok, const QString &message) {
+        if (readNetwork)
+            readNetwork->setText(QStringLiteral("Read network"));
+        refreshNetworkRead();
         if (!message.isEmpty())
             setStatus(message);
         else if (!ok)
-            setStatus(QStringLiteral("The network module didn't answer."));
+            setStatus(QStringLiteral("Network module didn't answer after 8 tries"));
         else if (rawNetwork.value(QStringLiteral("id")).isEmpty())
             setStatus(QStringLiteral("The module didn't return a name. USB is the reliable way to read it."));
         else
             setStatus(QStringLiteral("Network module answered. Nothing was written."));
+    });
+    connect(driver, &Rt21Driver::writeFinished, this, [this](bool, const QString &) {
+        if (readNetwork && readNetwork->text() == QStringLiteral("Cancel"))
+            readNetwork->setText(QStringLiteral("Read network"));
+        refreshNetworkRead();
     });
 }
 
@@ -363,12 +384,18 @@ bool SetupPanel::ipOnlyLink() const
 void SetupPanel::refreshNetworkRead()
 {
     const bool ip = ipOnlyLink();
-    if (readNetwork)
+    const bool readOk = driver && driver->networkReadOk();
+    const bool reading = readNetwork && readNetwork->text() == QStringLiteral("Cancel");
+    if (readNetwork && !reading)
         readNetwork->setEnabled(!ip);
     for (QLineEdit *edit : values)
         edit->setEnabled(!ip);
-    for (QWidget *widget : networkWrites)
-        widget->setEnabled(!ip);
+    for (QWidget *widget : networkWrites) {
+        if (qobject_cast<QPushButton *>(widget))
+            widget->setEnabled(!ip && readOk && !reading);
+        else
+            widget->setEnabled(!ip);
+    }
     if (!networkLinkNote)
         return;
     networkLinkNote->setVisible(true);

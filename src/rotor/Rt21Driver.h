@@ -41,6 +41,7 @@ public:
 
     void readConfiguration();
     void readNetwork();
+    void cancelNetwork();
     void writeConfiguration(const QList<QPair<QChar, int>> &changes);
     void writeBrightness(int value);
     void writeRegister(QChar letter, int value, const QString &settingName);
@@ -51,6 +52,7 @@ public:
     void postNote(const QString &note);
 
     Link link() const { return link_; }
+    bool networkReadOk() const { return networkReadOkThisSession; }
     RotorEndpoint linkEndpoint() const { return endpoint; }
     std::optional<double> heading() const { return heading_; }
     std::optional<double> target() const { return target_; }
@@ -83,6 +85,7 @@ signals:
     void configFinished(bool ok, const QString &message);
     void networkField(const QString &key, const QString &value);
     void networkFinished(bool ok, const QString &message);
+    void networkStatus(const QString &text);
     void writeFinished(bool ok, const QString &message);
     void statusNote(const QString &text);
 
@@ -131,6 +134,9 @@ private:
     void beginGuardedRead(bool network);
     void enqueueConfiguration();
     void enqueueNetworkQueries();
+    void beginNetworkCycle();
+    void dropNetworkQueries();
+    QString networkTryText() const;
     void sendNetworkExit();
     void beginBrightnessWatch(bool sawRead, bool matched, const QString &readText);
     void finishBrightnessWatch(bool portClosed);
@@ -138,6 +144,7 @@ private:
     void sendBrightnessRead();
     void holdPollsForNetworkExit();
     void resumePollsAfterNetwork();
+    void afterNetworkHeading(bool headingSeen);
     QString noReplyMessage() const;
     bool moduleLineMatches(const QByteArray &frame) const;
     void startFastPoll();
@@ -198,11 +205,23 @@ private:
     QByteArray writeAck;
     bool networkWritePending = false;
     bool networkWriteOk = false;
+    bool networkWriting = false;
+    bool networkCancel = false;
+    bool networkGotField = false;
+    bool networkAnotherCycle = false;
+    bool networkReadOkThisSession = false;
+    bool networkEntered = false;
+    int networkCycle = 0;
     QString networkWriteCommand;
     QString networkWriteName;
+    QString networkWriteKey;
+    QString networkWriteExpect;
+    QByteArray networkReadBackCommand;
+    QString networkReadBackToken;
     qint64 lastModuleTxMs = -1;
     bool awaitHeadingAfterNetwork = false;
     bool networkHeadingRetried = false;
+    bool pendingConfigAfterNetwork = false;
     QString firmwareReport;
     bool brightnessSawRead = false;
     bool brightnessMatched = false;

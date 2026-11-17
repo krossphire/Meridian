@@ -476,9 +476,15 @@ void GlobeWidget::setTarget(std::optional<double> azimuth)
 
 void GlobeWidget::setStatusLine(const QString &text)
 {
-    if (statusLine == text)
+    setStatusLine(text, statusTone(text));
+}
+
+void GlobeWidget::setStatusLine(const QString &text, StatusTone tone)
+{
+    if (statusLine == text && statusToneNow == tone)
         return;
     statusLine = text;
+    statusToneNow = tone;
     update();
 }
 
@@ -859,8 +865,12 @@ void GlobeWidget::paintScene(QPainter &painter)
         const QFontMetrics metrics(font);
         const QString line = metrics.elidedText(lineText, Qt::ElideRight, int(globe.width() * 0.72));
         const QRectF box(globe.left() + 18, globe.bottom() - 22, globe.width() * 0.72, 16);
-        painter.setPen(QColor(210, 196, 184, 210));
-        painter.drawText(box, Qt::AlignLeft | Qt::AlignVCenter, line);
+        const QColor toneColor = statusToneColor(statusToneNow);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(toneColor);
+        painter.drawEllipse(QPointF(box.left() + 3, box.center().y()), 2.5, 2.5);
+        painter.setPen(toneColor);
+        painter.drawText(box.adjusted(12, 0, 0, 0), Qt::AlignLeft | Qt::AlignVCenter, line);
     }
 }
 

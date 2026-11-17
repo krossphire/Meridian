@@ -6,6 +6,8 @@
 
 #include "MainWindow.h"
 
+#include "StatusTone.h"
+
 #include "GlobeWidget.h"
 #include "SettingsDialog.h"
 #include "core/Coordinates.h"
@@ -134,13 +136,15 @@ void MainWindow::refreshStatus()
         return;
     const RotorEndpoint *active = config.activeRotor();
     if (!active || !active->configured()) {
-        globe->setStatusLine(QStringLiteral("Set up your RT-21 in settings"));
+        globe->setStatusLine(QStringLiteral("Set up your RT-21 in settings"), StatusTone::Neutral);
         globe->setHeadingStale(false);
         return;
     }
     QString line;
+    StatusTone tone = StatusTone::Neutral;
     if (link && !link->transientNote().isEmpty()) {
         line = link->transientNote();
+        tone = statusTone(line);
     } else if (link) {
         const auto state = link->link();
         if (state == Rt21Driver::Link::Failed || state == Rt21Driver::Link::Off
@@ -155,9 +159,10 @@ void MainWindow::refreshStatus()
             } else {
                 line = QStringLiteral("RT-21 not connected");
             }
+            tone = state == Rt21Driver::Link::Connecting ? StatusTone::Busy : StatusTone::Failure;
         }
     }
-    globe->setStatusLine(line);
+    globe->setStatusLine(line, tone);
     bool stale = false;
     if (link && link->lastSeenMs() >= 0
         && (link->link() == Rt21Driver::Link::On || link->link() == Rt21Driver::Link::Moving)) {
