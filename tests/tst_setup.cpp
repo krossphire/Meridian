@@ -6,8 +6,10 @@
 
 #include "StatusTone.h"
 #include "rotor/TrafficLog.h"
+#include "rotor/UserFiles.h"
 
 #include <QFile>
+#include <QSettings>
 #include "mock/Rt21Simulator.h"
 #include "rotor/AppConfig.h"
 #include "rotor/Rt21Driver.h"
@@ -151,6 +153,8 @@ void TestSetup::mockNetworkRead()
     connect(&driver, &Rt21Driver::networkField, &driver, [&](const QString &key, const QString &value) { got.insert(key, value); });
     QSignalSpy done(&driver, &Rt21Driver::networkFinished);
     QSignalSpy status(&driver, &Rt21Driver::networkStatus);
+    QSettings cycleSettings(UserFiles::settingsPath(), QSettings::IniFormat);
+    cycleSettings.remove(QStringLiteral("net_cycle_mode"));
     driver.readNetwork();
     QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 20000);
     QCOMPARE(status.at(0).at(0).toString(), QStringLiteral("Reading network (try 1 of 12)…"));
@@ -211,14 +215,12 @@ void TestSetup::mockNetworkRead()
     const int dtrLow = phaseMs(QStringLiteral("DTR-low"), &timingOk);
     const int dtrToEcho = phaseMs(QStringLiteral("DTR high->ECHO"), &timingOk);
     const int uartToEcho = phaseMs(QStringLiteral("uart2->ECHO"), &timingOk);
-    const int closeOpen = phaseMs(QStringLiteral("close+open"), &timingOk);
     QVERIFY(timingOk);
     QVERIFY(uartToDtr >= 490 && uartToDtr <= 560);
     QVERIFY(dtrLow >= 175 && dtrLow <= 230);
     QVERIFY(dtrToEcho >= 0 && dtrToEcho <= 15);
     QVERIFY(uartToEcho >= 700 && uartToEcho <= 760);
-    QVERIFY(closeOpen >= 0 && closeOpen <= 80);
-    QVERIFY(log.contains(QStringLiteral("mode reopen")));
+    QVERIFY(log.contains(QStringLiteral("variant A")));
 }
 
 void TestSetup::networkWriteNeedsAReadThenReadsBack()

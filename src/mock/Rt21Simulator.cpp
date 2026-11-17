@@ -290,6 +290,7 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
         if (cmd == "AT") {
             atMode = true;
             uart2AtMs = QDateTime::currentMSecsSinceEpoch();
+            echoSends = 0;
             reply(QByteArray("<uart2>"), false);
             return;
         }
@@ -312,7 +313,13 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
                 const qint64 sinceUart = now - uart2AtMs;
                 const qint64 rose = networkDtrRoseProbeMs().load();
                 const qint64 sinceRise = rose > 0 ? now - rose : 9999;
-                if (uart2AtMs > 0 && rose > 0 && sinceRise <= 30 && sinceUart >= 700 && sinceUart <= 760)
+                ++echoSends;
+                const bool firstWindow = uart2AtMs > 0 && rose > 0 && sinceRise <= 30 && sinceUart >= 700 && sinceUart <= 760;
+                if (echoSends == 1 && firstWindow)
+                    replyLine(QByteArray("ERROR 1"));
+                else if (echoSends >= 2 && echoSends <= 3 && firstWindow)
+                    replyLine(QByteArray("OK"));
+                else if (echoSends >= 2 && uart2AtMs > 0 && sinceUart >= 700 && sinceUart <= 900)
                     replyLine(QByteArray("OK"));
                 return;
             }

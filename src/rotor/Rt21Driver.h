@@ -155,6 +155,7 @@ private:
     bool handleNetworkFrame(const QByteArray &frame);
     void sendNetworkBytes(const QByteArray &bytes);
     void sendEcho();
+    void resendEcho();
     void sendNextQuery();
     void sendNetworkWrite();
     void beginNetworkExit();
@@ -162,6 +163,12 @@ private:
     void networkReopenFailed();
     void cycleSerialPort(const std::function<void(bool)> &done);
     void raiseLinesAndFinish(const std::function<void(bool)> &done);
+    void loadCycleOrigin();
+    char variantForThisTry() const;
+    void rememberCycleVariant();
+    void ingestReceived(const QByteArray &received, bool fromSerial);
+    void pollRawSerial();
+    void restoreQtSerial();
     void beginGuardedRead(bool network);
     void enqueueConfiguration();
     void enqueueNetworkQueries();
@@ -254,6 +261,12 @@ private:
     bool networkWarmupSawR01 = false;
     bool networkWarmupSawR21 = false;
     bool networkCycleReopen = false;
+    char networkVariant = 'A';
+    int networkEchoSends = 0;
+    qint64 networkEchoTxMs = 0;
+    int networkVariantOrigin = 0;
+    void *networkRawHandle = nullptr;
+    QTimer *networkRawTimer = nullptr;
     qint64 networkUart2Ms = 0;
     qint64 networkDtrLowMs = 0;
     qint64 networkReopenedMs = 0;
