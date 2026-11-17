@@ -333,7 +333,7 @@ void SetupPanel::setDriver(Rt21Driver *next)
         if (!message.isEmpty())
             setStatus(message);
         else if (!ok)
-            setStatus(QStringLiteral("Network module didn't answer after 8 tries"));
+            setStatus(QStringLiteral("Network module didn't answer after 12 tries"));
         else if (rawNetwork.value(QStringLiteral("id")).isEmpty())
             setStatus(QStringLiteral("The module didn't return a name. USB is the reliable way to read it."));
         else

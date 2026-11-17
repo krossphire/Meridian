@@ -8,6 +8,7 @@
 
 #include "StatusTone.h"
 
+#include "NetCycleProbe.h"
 #include "Reconnect.h"
 #include "SerialLines.h"
 #include "TrafficLog.h"
@@ -31,6 +32,7 @@
 #  endif
 #  include <winsock2.h>
 #  include <mstcpip.h>
+#  include <windows.h>
 #else
 #  include <netinet/in.h>
 #  include <netinet/tcp.h>
@@ -41,14 +43,14 @@ namespace {
 
 int g_alive = 0;
 
-// Captured AT; -> ECHO is 777-792 ms, and <uart2>; returns about 50 ms after AT;,
-// so ECHO is about 730 ms after uart2. DTR stays low for 200 ms and ECHO follows
-// DTR-high by 150 ms, which puts the drop at 380 ms after uart2. 520 + 200 + 150
-// is 870, and a Windows close adds still more; that was the 1120 ms miss.
-constexpr int kUartToEchoMs = 730;
-constexpr int kDtrLowMs = 200;
-constexpr int kEchoAfterReopenMs = 150;
-constexpr int kCloseAfterUartMs = kUartToEchoMs - kDtrLowMs - kEchoAfterReopenMs;
+// Captured IOCTL times, both successes: CLR_DTR is 519-527 ms after <uart2>;,
+// close follows about 9 ms later, open about 40 ms after close, and DTR stays
+// low for 190-197 ms. ECHO is 3-14 ms after the final SET_DTR. uart2->ECHO is
+// 730 ms. A 150 ms wait after DTR rose was the miss.
+constexpr int kUartToDtrLowMs = 520;
+constexpr int kDtrLowMs = 195;
+constexpr int kOpenAfterCloseMs = 40;
+constexpr int kNetworkTries = 12;
 constexpr int kWarmupFirstMs = 3000;
 constexpr int kWarmupRetryMs = 5000;
 constexpr int kWarmupGapMs = 400;
@@ -56,9 +58,37 @@ constexpr int kWarmupGapMs = 400;
 bool networkCycleUsesReopen()
 {
     QSettings settings(UserFiles::settingsPath(), QSettings::IniFormat);
-    return settings.value(QStringLiteral("net_cycle_mode"), QStringLiteral("dtr")).toString().trimmed().toLower()
-           == QLatin1String("reopen");
+    const QString mode = settings.value(QStringLiteral("net_cycle_mode"), QStringLiteral("reopen"))
+                             .toString()
+                             .trimmed()
+                             .toLower();
+    return mode != QLatin1String("dtr");
 }
+
+#if defined(Q_OS_WIN)
+// QSerialPort::close waits out a pending WaitCommEvent. CancelIo from this
+// thread does not always wake that wait, which is what stretched close to
+// hundreds of milliseconds on the Edgeport. Arm short timeouts, drop the
+// comm mask, and cancel the overlapped I/O before close.
+void wakeSerialForClose(QSerialPort *port)
+{
+    if (!port || !port->isOpen())
+        return;
+    const HANDLE handle = reinterpret_cast<HANDLE>(port->handle());
+    if (!handle || handle == INVALID_HANDLE_VALUE)
+        return;
+    COMMTIMEOUTS timeouts{};
+    timeouts.ReadIntervalTimeout = MAXDWORD;
+    timeouts.ReadTotalTimeoutMultiplier = 0;
+    timeouts.ReadTotalTimeoutConstant = 1;
+    timeouts.WriteTotalTimeoutMultiplier = 0;
+    timeouts.WriteTotalTimeoutConstant = 10;
+    ::SetCommTimeouts(handle, &timeouts);
+    ::SetCommMask(handle, 0);
+    ::CancelIoEx(handle, nullptr);
+    ::PurgeComm(handle, PURGE_RXABORT | PURGE_RXCLEAR | PURGE_TXABORT | PURGE_TXCLEAR);
+}
+#endif
 int g_transports = 0;
 int g_transportHighWater = 0;
 
@@ -1400,7 +1430,7 @@ void Rt21Driver::finishNetwork(bool ok, const QString &message)
     if (networkTimer)
         networkTimer->stop();
     const bool good = networkWriting ? networkWriteOk : networkGotField;
-    const bool stop = networkCancel || good || networkCycle >= 8;
+    const bool stop = networkCancel || good || networkCycle >= kNetworkTries;
     const QString name = networkWriteName.isEmpty() ? QStringLiteral("network") : networkWriteName;
     networkMode = false;
     configMode = false;
@@ -1427,7 +1457,7 @@ void Rt21Driver::finishNetwork(bool ok, const QString &message)
         networkReadOkThisSession = true;
         finalText = QStringLiteral("Network module answered. Nothing was written.");
     } else {
-        finalText = QStringLiteral("Network module didn't answer after 8 tries");
+        finalText = QStringLiteral("Network module didn't answer after 12 tries");
     }
     TrafficLog::instance().recordSession("NOTE", finalText.toLatin1());
     const bool writing = networkWriting;
@@ -1460,8 +1490,8 @@ void Rt21Driver::dropNetworkQueries()
 QString Rt21Driver::networkTryText() const
 {
     if (networkWriting)
-        return QStringLiteral("Writing %1 (try %2 of 8)…").arg(networkWriteName).arg(networkCycle);
-    return QStringLiteral("Reading network (try %1 of 8)…").arg(networkCycle);
+        return QStringLiteral("Writing %1 (try %2 of %3)…").arg(networkWriteName).arg(networkCycle).arg(kNetworkTries);
+    return QStringLiteral("Reading network (try %1 of %2)…").arg(networkCycle).arg(kNetworkTries);
 }
 
 void Rt21Driver::beginNetworkCycle()
@@ -1470,7 +1500,7 @@ void Rt21Driver::beginNetworkCycle()
     networkWriteOk = false;
     networkEntered = false;
     TrafficLog::instance().recordSession(
-        "NOTE", QByteArray("network cycle ") + QByteArray::number(networkCycle) + " of 8");
+        "NOTE", QByteArray("network cycle ") + QByteArray::number(networkCycle) + " of " + QByteArray::number(kNetworkTries));
     emit networkStatus(networkTryText());
     if (pollTimer)
         pollTimer->stop();
@@ -1584,6 +1614,24 @@ void Rt21Driver::sendNetworkBytes(const QByteArray &bytes)
         serial->flush();
 }
 
+void Rt21Driver::raiseLinesAndFinish(const std::function<void(bool)> &done)
+{
+    framer.clear();
+    bool dtr = false;
+    bool rts = false;
+    raiseDtrAndRts(serial, &dtr, &rts);
+    networkReopenedMs = QDateTime::currentMSecsSinceEpoch();
+    networkDtrRoseProbeMs().store(networkReopenedMs);
+    const int lowMs = int(networkReopenedMs - networkDtrLowMs);
+    TrafficLog::instance().recordSession(
+        "NOTE", QByteArray("network DTR-low ") + QByteArray::number(lowMs) + " ms mode "
+                    + (networkCycleReopen ? "reopen" : "dtr") + " DTR " + (dtr ? "on" : "off")
+                    + " RTS " + (rts ? "on" : "off"));
+    portCycling = false;
+    ignoreSerialErrorUntil = QDateTime::currentMSecsSinceEpoch() + 1500;
+    done(true);
+}
+
 void Rt21Driver::cycleSerialPort(const std::function<void(bool)> &done)
 {
     if (!serial || !serial->isOpen()) {
@@ -1595,54 +1643,71 @@ void Rt21Driver::cycleSerialPort(const std::function<void(bool)> &done)
     networkDtrLowMs = QDateTime::currentMSecsSinceEpoch();
     if (networkPhase == NetworkPhase::AfterUart && networkUart2Ms > 0) {
         TrafficLog::instance().recordSession(
-            "NOTE", QByteArray("network uart2->close ")
+            "NOTE", QByteArray("network uart2->DTR low ")
                         + QByteArray::number(int(networkDtrLowMs - networkUart2Ms)) + " ms");
     }
     dropDtr(serial);
+    networkDtrRoseProbeMs().store(0);
     serial->clear(QSerialPort::AllDirections);
     const bool reopen = networkCycleReopen;
     TrafficLog::instance().recordSession(
         "NOTE", reopen ? QByteArray("network port cycle: DTR low, purge, close")
                        : QByteArray("network port cycle: DTR low, purge, same handle"));
-    if (reopen)
-        serial->close();
-    const int spent = int(QDateTime::currentMSecsSinceEpoch() - networkDtrLowMs);
-    const int remain = std::max(0, kDtrLowMs - spent);
-    if (reopen && spent > kDtrLowMs + 10) {
-        TrafficLog::instance().recordSession(
-            "NOTE", QByteArray("network close already ") + QByteArray::number(spent)
-                        + " ms, past the 200 ms DTR-low target");
+    if (!reopen) {
+        QTimer::singleShot(kDtrLowMs, this, [this, done]() {
+            if (retired || !serial || !serial->isOpen() || !wantLink) {
+                portCycling = false;
+                return;
+            }
+            raiseLinesAndFinish(done);
+        });
+        return;
     }
-    QTimer::singleShot(remain, this, [this, done, reopen]() {
+    const qint64 closeStarted = QDateTime::currentMSecsSinceEpoch();
+#if defined(Q_OS_WIN)
+    wakeSerialForClose(serial);
+#endif
+    serial->close();
+    const int closeMs = int(QDateTime::currentMSecsSinceEpoch() - closeStarted);
+    TrafficLog::instance().recordSession("NOTE", QByteArray("network close ") + QByteArray::number(closeMs) + " ms");
+    const int openDelay = std::max(0, kOpenAfterCloseMs - closeMs);
+    QTimer::singleShot(openDelay, this, [this, done, closeStarted]() {
         if (retired || !serial || !wantLink) {
             portCycling = false;
             return;
         }
-        bool opened = serial->isOpen();
-        if (reopen) {
-            serial->setBaudRate(endpoint.baud > 0 ? endpoint.baud : 4800);
-            serial->setDataBits(QSerialPort::Data8);
-            serial->setParity(QSerialPort::NoParity);
-            serial->setStopBits(QSerialPort::OneStop);
-            serial->setFlowControl(QSerialPort::NoFlowControl);
-            opened = serial->open(QIODevice::ReadWrite);
-        }
-        bool dtr = false;
-        bool rts = false;
-        if (opened) {
-            raiseDtrAndRts(serial, &dtr, &rts);
-            serial->clear(QSerialPort::AllDirections);
-        }
-        framer.clear();
-        portCycling = false;
-        ignoreSerialErrorUntil = QDateTime::currentMSecsSinceEpoch() + 1500;
-        networkReopenedMs = QDateTime::currentMSecsSinceEpoch();
-        const int lowMs = int(networkReopenedMs - networkDtrLowMs);
+        serial->setBaudRate(endpoint.baud > 0 ? endpoint.baud : 4800);
+        serial->setDataBits(QSerialPort::Data8);
+        serial->setParity(QSerialPort::NoParity);
+        serial->setStopBits(QSerialPort::OneStop);
+        serial->setFlowControl(QSerialPort::NoFlowControl);
+        const qint64 openStarted = QDateTime::currentMSecsSinceEpoch();
+        const bool opened = serial->open(QIODevice::ReadWrite);
+        const int openMs = int(QDateTime::currentMSecsSinceEpoch() - openStarted);
+        const int closeOpenMs = int(QDateTime::currentMSecsSinceEpoch() - closeStarted);
         TrafficLog::instance().recordSession(
-            "NOTE", QByteArray("network DTR-low ") + QByteArray::number(lowMs) + " ms mode "
-                        + (reopen ? "reopen" : "dtr") + (opened ? "" : " reopen failed")
-                        + " DTR " + (dtr ? "on" : "off") + " RTS " + (rts ? "on" : "off"));
-        done(opened);
+            "NOTE", QByteArray("network open ") + QByteArray::number(openMs) + " ms");
+        TrafficLog::instance().recordSession(
+            "NOTE", QByteArray("network close+open ") + QByteArray::number(closeOpenMs) + " ms");
+        if (!opened) {
+            portCycling = false;
+            done(false);
+            return;
+        }
+        // .NET opens, sets the line state, then clears DTR. The driver often
+        // raises DTR inside open, so clear it again and only set it at the
+        // end of the 195 ms low window.
+        dropDtr(serial);
+        serial->clear(QSerialPort::AllDirections);
+        const int spent = int(QDateTime::currentMSecsSinceEpoch() - networkDtrLowMs);
+        const int remain = std::max(0, kDtrLowMs - spent);
+        QTimer::singleShot(remain, this, [this, done]() {
+            if (retired || !serial || !serial->isOpen() || !wantLink) {
+                portCycling = false;
+                return;
+            }
+            raiseLinesAndFinish(done);
+        });
     });
 }
 
@@ -1728,7 +1793,7 @@ void Rt21Driver::sendEcho()
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
     if (networkReopenedMs > 0) {
         TrafficLog::instance().recordSession(
-            "NOTE", QByteArray("network reopen->ECHO ") + QByteArray::number(int(now - networkReopenedMs)) + " ms");
+            "NOTE", QByteArray("network DTR high->ECHO ") + QByteArray::number(int(now - networkReopenedMs)) + " ms");
     }
     if (networkUart2Ms > 0) {
         TrafficLog::instance().recordSession(
@@ -1828,7 +1893,7 @@ bool Rt21Driver::handleNetworkFrame(const QByteArray &frame)
         networkPhase = NetworkPhase::AfterUart;
         networkUart2Ms = QDateTime::currentMSecsSinceEpoch();
         TrafficLog::instance().recordSession("NOTE", QByteArray("network uart2"));
-        QTimer::singleShot(kCloseAfterUartMs, this, [this]() {
+        QTimer::singleShot(kUartToDtrLowMs, this, [this]() {
             if (retired || networkPhase != NetworkPhase::AfterUart)
                 return;
             cycleSerialPort([this](bool ok) {
@@ -1842,11 +1907,7 @@ bool Rt21Driver::handleNetworkFrame(const QByteArray &frame)
                     beginNetworkExit();
                     return;
                 }
-                QTimer::singleShot(kEchoAfterReopenMs, this, [this]() {
-                    if (retired || networkPhase != NetworkPhase::AfterUart)
-                        return;
-                    sendEcho();
-                });
+                sendEcho();
             });
         });
         return true;
@@ -2278,7 +2339,7 @@ void Rt21Driver::afterNetworkHeading(bool headingSeen)
     TrafficLog::instance().recordSession(
         "NOTE", headingSeen ? QByteArray("heading resumed after network")
                             : QByteArray("no heading after network exit"));
-    if (networkAnotherCycle && !networkCancel && io && networkCycle < 8) {
+    if (networkAnotherCycle && !networkCancel && io && networkCycle < kNetworkTries) {
         if (!headingSeen) {
             TrafficLog::instance().recordSession(
                 "NOTE", QByteArray("starting the next network cycle without a heading"));

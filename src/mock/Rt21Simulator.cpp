@@ -7,6 +7,7 @@
 #include "Rt21Simulator.h"
 
 #include "core/Bearing.h"
+#include "rotor/NetCycleProbe.h"
 
 #include <QDateTime>
 #include <QTcpServer>
@@ -307,8 +308,11 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
         if (eq >= 0 && !cmd.endsWith('?')) {
             module.insert(key, cmd.mid(eq + 1));
             if (key == "SERIAL_ECHO") {
-                const qint64 dt = QDateTime::currentMSecsSinceEpoch() - uart2AtMs;
-                if (uart2AtMs > 0 && dt >= 680 && dt <= 780)
+                const qint64 now = QDateTime::currentMSecsSinceEpoch();
+                const qint64 sinceUart = now - uart2AtMs;
+                const qint64 rose = networkDtrRoseProbeMs().load();
+                const qint64 sinceRise = rose > 0 ? now - rose : 9999;
+                if (uart2AtMs > 0 && rose > 0 && sinceRise <= 30 && sinceUart >= 700 && sinceUart <= 760)
                     replyLine(QByteArray("OK"));
                 return;
             }

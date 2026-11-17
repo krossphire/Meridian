@@ -23,8 +23,13 @@ inline bool raiseDtrAndRts(QSerialPort *port, bool *dtrOn = nullptr, bool *rtsOn
 #if defined(Q_OS_UNIX)
         const int fd = static_cast<int>(port->handle());
         int bits = TIOCM_DTR | TIOCM_RTS;
-        if (fd >= 0 && ::ioctl(fd, TIOCMBIS, &bits) == 0)
+        if (fd >= 0 && ::ioctl(fd, TIOCMBIS, &bits) == 0) {
             dtr = rts = true;
+        } else if (fd >= 0 && ::ioctl(fd, TIOCMGET, &bits) == 0) {
+            bits |= TIOCM_DTR | TIOCM_RTS;
+            if (::ioctl(fd, TIOCMSET, &bits) == 0)
+                dtr = rts = true;
+        }
 #else
         dtr = port->setDataTerminalReady(true);
         rts = port->setRequestToSend(true);
@@ -46,8 +51,10 @@ inline void dropDtr(QSerialPort *port)
 #if defined(Q_OS_UNIX)
     const int fd = static_cast<int>(port->handle());
     int bits = TIOCM_DTR;
-    if (fd >= 0)
-        ::ioctl(fd, TIOCMBIC, &bits);
+    if (fd >= 0 && ::ioctl(fd, TIOCMBIC, &bits) != 0 && ::ioctl(fd, TIOCMGET, &bits) == 0) {
+        bits &= ~TIOCM_DTR;
+        ::ioctl(fd, TIOCMSET, &bits);
+    }
 #else
     port->setDataTerminalReady(false);
 #endif

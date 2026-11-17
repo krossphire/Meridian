@@ -153,7 +153,7 @@ void TestSetup::mockNetworkRead()
     QSignalSpy status(&driver, &Rt21Driver::networkStatus);
     driver.readNetwork();
     QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 20000);
-    QCOMPARE(status.at(0).at(0).toString(), QStringLiteral("Reading network (try 1 of 8)…"));
+    QCOMPARE(status.at(0).at(0).toString(), QStringLiteral("Reading network (try 1 of 12)…"));
     QCOMPARE(got.value(QStringLiteral("id")), QStringLiteral("RT-21"));
     QCOMPARE(got.value(QStringLiteral("dhcp")), QStringLiteral("0"));
     QCOMPARE(got.value(QStringLiteral("ip")), QStringLiteral("192.168.1.106"));
@@ -207,16 +207,18 @@ void TestSetup::mockNetworkRead()
         return log.mid(at + key.size()).section(QLatin1Char(' '), 0, 0).toInt(ok);
     };
     bool timingOk = true;
-    const int uartToClose = phaseMs(QStringLiteral("uart2->close"), &timingOk);
+    const int uartToDtr = phaseMs(QStringLiteral("uart2->DTR low"), &timingOk);
     const int dtrLow = phaseMs(QStringLiteral("DTR-low"), &timingOk);
-    const int reopenToEcho = phaseMs(QStringLiteral("reopen->ECHO"), &timingOk);
+    const int dtrToEcho = phaseMs(QStringLiteral("DTR high->ECHO"), &timingOk);
     const int uartToEcho = phaseMs(QStringLiteral("uart2->ECHO"), &timingOk);
+    const int closeOpen = phaseMs(QStringLiteral("close+open"), &timingOk);
     QVERIFY(timingOk);
-    QVERIFY(uartToClose >= 330 && uartToClose <= 460);
-    QVERIFY(dtrLow >= 180 && dtrLow <= 260);
-    QVERIFY(reopenToEcho >= 120 && reopenToEcho <= 220);
-    QVERIFY(uartToEcho >= 680 && uartToEcho <= 780);
-    QVERIFY(log.contains(QStringLiteral("mode dtr")));
+    QVERIFY(uartToDtr >= 490 && uartToDtr <= 560);
+    QVERIFY(dtrLow >= 175 && dtrLow <= 230);
+    QVERIFY(dtrToEcho >= 0 && dtrToEcho <= 15);
+    QVERIFY(uartToEcho >= 700 && uartToEcho <= 760);
+    QVERIFY(closeOpen >= 0 && closeOpen <= 80);
+    QVERIFY(log.contains(QStringLiteral("mode reopen")));
 }
 
 void TestSetup::networkWriteNeedsAReadThenReadsBack()
@@ -250,7 +252,7 @@ void TestSetup::networkWriteNeedsAReadThenReadsBack()
     QTRY_COMPARE_WITH_TIMEOUT(wrote.count(), 2, 40000);
     QVERIFY(wrote.at(1).at(0).toBool());
     QCOMPARE(wrote.at(1).at(1).toString(), QStringLiteral("Saved DHCP"));
-    QCOMPARE(status.at(0).at(0).toString(), QStringLiteral("Writing DHCP (try 1 of 8)…"));
+    QCOMPARE(status.at(0).at(0).toString(), QStringLiteral("Writing DHCP (try 1 of 12)…"));
     bool sawSet = false;
     bool sawQuery = false;
     for (const QByteArray &cmd : server.sim()->trace()) {
@@ -410,9 +412,9 @@ void TestSetup::silentModuleSkipsQueries()
     QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::On, 3000);
     QSignalSpy done(&driver, &Rt21Driver::networkFinished);
     driver.readNetwork();
-    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 90000);
+    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 120000);
     QVERIFY(!done.at(0).at(0).toBool());
-    QCOMPARE(done.at(0).at(1).toString(), QStringLiteral("Network module didn't answer after 8 tries"));
+    QCOMPARE(done.at(0).at(1).toString(), QStringLiteral("Network module didn't answer after 12 tries"));
     QCOMPARE(driver.link(), Rt21Driver::Link::On);
     int queries = 0;
     int exits = 0;
@@ -428,8 +430,8 @@ void TestSetup::silentModuleSkipsQueries()
         QVERIFY(cmd != "T11");
     }
     QCOMPARE(queries, 0);
-    QCOMPARE(exits, 8);
-    QCOMPARE(enters, 8);
+    QCOMPARE(exits, 12);
+    QCOMPARE(enters, 12);
 }
 
 void TestSetup::brightnessWriteReadsBack()
@@ -487,10 +489,10 @@ void TestSetup::statusToneStaysOffThePrimaryInk()
     QCOMPARE(statusTone(QStringLiteral("Controller settings read. Nothing was written.")), StatusTone::Success);
     QCOMPARE(statusTone(QStringLiteral("RT-21 not connected")), StatusTone::Failure);
     QCOMPARE(statusTone(QStringLiteral("Set up your RT-21 in settings")), StatusTone::Neutral);
-    QCOMPARE(statusTone(QStringLiteral("Reading network (try 3 of 8)…")), StatusTone::Busy);
-    QCOMPARE(statusTone(QStringLiteral("Writing DHCP (try 1 of 8)…")), StatusTone::Busy);
+    QCOMPARE(statusTone(QStringLiteral("Reading network (try 3 of 12)…")), StatusTone::Busy);
+    QCOMPARE(statusTone(QStringLiteral("Writing DHCP (try 1 of 12)…")), StatusTone::Busy);
     QCOMPARE(statusTone(QStringLiteral("Network module answered. Nothing was written.")), StatusTone::Success);
-    QCOMPARE(statusTone(QStringLiteral("Network module didn't answer after 8 tries")), StatusTone::Failure);
+    QCOMPARE(statusTone(QStringLiteral("Network module didn't answer after 12 tries")), StatusTone::Failure);
     QCOMPARE(statusTone(QStringLiteral("Read the network module before writing it.")), StatusTone::Failure);
     QCOMPARE(statusTone(QStringLiteral("The link dropped while talking to the network module.")), StatusTone::Failure);
     apart(StatusTone::Neutral);

@@ -161,6 +161,7 @@ private:
     void finishNetworkExit();
     void networkReopenFailed();
     void cycleSerialPort(const std::function<void(bool)> &done);
+    void raiseLinesAndFinish(const std::function<void(bool)> &done);
     void beginGuardedRead(bool network);
     void enqueueConfiguration();
     void enqueueNetworkQueries();
