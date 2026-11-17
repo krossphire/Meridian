@@ -11,12 +11,14 @@
 #include "Reconnect.h"
 #include "SerialLines.h"
 #include "TrafficLog.h"
+#include "UserFiles.h"
 #include "core/Bearing.h"
 
 #include <QDateTime>
 #include <QFileInfo>
 #include <QHostAddress>
 #include <QSerialPort>
+#include <QSettings>
 #include <QTcpSocket>
 #include <QTimer>
 
@@ -38,6 +40,25 @@
 namespace {
 
 int g_alive = 0;
+
+// Captured AT; -> ECHO is 777-792 ms, and <uart2>; returns about 50 ms after AT;,
+// so ECHO is about 730 ms after uart2. DTR stays low for 200 ms and ECHO follows
+// DTR-high by 150 ms, which puts the drop at 380 ms after uart2. 520 + 200 + 150
+// is 870, and a Windows close adds still more; that was the 1120 ms miss.
+constexpr int kUartToEchoMs = 730;
+constexpr int kDtrLowMs = 200;
+constexpr int kEchoAfterReopenMs = 150;
+constexpr int kCloseAfterUartMs = kUartToEchoMs - kDtrLowMs - kEchoAfterReopenMs;
+constexpr int kWarmupFirstMs = 3000;
+constexpr int kWarmupRetryMs = 5000;
+constexpr int kWarmupGapMs = 400;
+
+bool networkCycleUsesReopen()
+{
+    QSettings settings(UserFiles::settingsPath(), QSettings::IniFormat);
+    return settings.value(QStringLiteral("net_cycle_mode"), QStringLiteral("dtr")).toString().trimmed().toLower()
+           == QLatin1String("reopen");
+}
 int g_transports = 0;
 int g_transportHighWater = 0;
 
@@ -114,6 +135,10 @@ Rt21Driver::Rt21Driver(QObject *parent)
         const QString note = inflight->note;
         const bool brightnessJob = inflight->brightness;
         inflight.reset();
+        if (note == QLatin1String("warmup")) {
+            onWarmupMiss();
+            return;
+        }
         if (kind == Kind::Probe) {
             queue.clear();
             const QString message = noReplyMessage();
@@ -875,6 +900,8 @@ void Rt21Driver::onReadyRead()
     const QByteArray received = io->readAll();
     if (countingHandshakeBytes && !received.isEmpty())
         handshakeSawBytes = true;
+    if ((networkPhase == NetworkPhase::WaitEcho || networkPhase == NetworkPhase::WaitEchoLate) && !received.isEmpty())
+        networkLateBytes.append(received);
     if (brightnessCapture && !received.isEmpty())
         TrafficLog::instance().recordSession("WRITE-RX", received);
     if (serial)
@@ -894,6 +921,15 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
     const QByteArray upper = frame.toUpper();
     if (upper == "BI1" || upper == "AI1" || upper == "R21" || upper == "R11" || upper == "R01" || upper == "R41")
         return;
+
+    if (inflight && inflight->note == QLatin1String("warmup")) {
+        failures = 0;
+        const QByteArray command = inflight->bytes;
+        replyTimer->stop();
+        inflight.reset();
+        onWarmupAnswer(command);
+        return;
+    }
 
     if (handleNetworkFrame(frame))
         return;
@@ -1436,11 +1472,9 @@ void Rt21Driver::beginNetworkCycle()
     TrafficLog::instance().recordSession(
         "NOTE", QByteArray("network cycle ") + QByteArray::number(networkCycle) + " of 8");
     emit networkStatus(networkTryText());
-    networkMode = true;
-    configMode = true;
     if (pollTimer)
         pollTimer->stop();
-    startNetworkPass();
+    beginNetworkWarmup(networkCycle <= 1 ? kWarmupFirstMs : kWarmupRetryMs);
 }
 
 void Rt21Driver::cancelNetwork()
@@ -1552,27 +1586,47 @@ void Rt21Driver::sendNetworkBytes(const QByteArray &bytes)
 
 void Rt21Driver::cycleSerialPort(const std::function<void(bool)> &done)
 {
-    if (!serial) {
+    if (!serial || !serial->isOpen()) {
         done(false);
         return;
     }
     portCycling = true;
     ignoreSerialErrorUntil = QDateTime::currentMSecsSinceEpoch() + 1500;
+    networkDtrLowMs = QDateTime::currentMSecsSinceEpoch();
+    if (networkPhase == NetworkPhase::AfterUart && networkUart2Ms > 0) {
+        TrafficLog::instance().recordSession(
+            "NOTE", QByteArray("network uart2->close ")
+                        + QByteArray::number(int(networkDtrLowMs - networkUart2Ms)) + " ms");
+    }
     dropDtr(serial);
     serial->clear(QSerialPort::AllDirections);
-    TrafficLog::instance().recordSession("NOTE", QByteArray("network port cycle: DTR low, purge, close"));
-    serial->close();
-    QTimer::singleShot(200, this, [this, done]() {
+    const bool reopen = networkCycleReopen;
+    TrafficLog::instance().recordSession(
+        "NOTE", reopen ? QByteArray("network port cycle: DTR low, purge, close")
+                       : QByteArray("network port cycle: DTR low, purge, same handle"));
+    if (reopen)
+        serial->close();
+    const int spent = int(QDateTime::currentMSecsSinceEpoch() - networkDtrLowMs);
+    const int remain = std::max(0, kDtrLowMs - spent);
+    if (reopen && spent > kDtrLowMs + 10) {
+        TrafficLog::instance().recordSession(
+            "NOTE", QByteArray("network close already ") + QByteArray::number(spent)
+                        + " ms, past the 200 ms DTR-low target");
+    }
+    QTimer::singleShot(remain, this, [this, done, reopen]() {
         if (retired || !serial || !wantLink) {
             portCycling = false;
             return;
         }
-        serial->setBaudRate(endpoint.baud > 0 ? endpoint.baud : 4800);
-        serial->setDataBits(QSerialPort::Data8);
-        serial->setParity(QSerialPort::NoParity);
-        serial->setStopBits(QSerialPort::OneStop);
-        serial->setFlowControl(QSerialPort::NoFlowControl);
-        const bool opened = serial->open(QIODevice::ReadWrite);
+        bool opened = serial->isOpen();
+        if (reopen) {
+            serial->setBaudRate(endpoint.baud > 0 ? endpoint.baud : 4800);
+            serial->setDataBits(QSerialPort::Data8);
+            serial->setParity(QSerialPort::NoParity);
+            serial->setStopBits(QSerialPort::OneStop);
+            serial->setFlowControl(QSerialPort::NoFlowControl);
+            opened = serial->open(QIODevice::ReadWrite);
+        }
         bool dtr = false;
         bool rts = false;
         if (opened) {
@@ -1582,9 +1636,12 @@ void Rt21Driver::cycleSerialPort(const std::function<void(bool)> &done)
         framer.clear();
         portCycling = false;
         ignoreSerialErrorUntil = QDateTime::currentMSecsSinceEpoch() + 1500;
+        networkReopenedMs = QDateTime::currentMSecsSinceEpoch();
+        const int lowMs = int(networkReopenedMs - networkDtrLowMs);
         TrafficLog::instance().recordSession(
-            "NOTE", opened ? QByteArray("network port reopened DTR ") + (dtr ? "on" : "off") + " RTS " + (rts ? "on" : "off")
-                           : QByteArray("network port reopen failed"));
+            "NOTE", QByteArray("network DTR-low ") + QByteArray::number(lowMs) + " ms mode "
+                        + (reopen ? "reopen" : "dtr") + (opened ? "" : " reopen failed")
+                        + " DTR " + (dtr ? "on" : "off") + " RTS " + (rts ? "on" : "off"));
         done(opened);
     });
 }
@@ -1612,6 +1669,17 @@ void Rt21Driver::networkReopenFailed()
 
 void Rt21Driver::beginNetworkExit()
 {
+    if (networkPhase == NetworkPhase::Warmup) {
+        if (networkTimer)
+            networkTimer->stop();
+        replyTimer->stop();
+        inflight.reset();
+        queue.clear();
+        networkPhase = NetworkPhase::Exiting;
+        networkEntered = false;
+        finishNetworkExit();
+        return;
+    }
     if (networkPhase == NetworkPhase::Exiting && !portCycling)
         return;
     if (networkTimer)
@@ -1656,6 +1724,16 @@ void Rt21Driver::sendEcho()
         return;
     networkPhase = NetworkPhase::WaitEcho;
     framer.setLineMode(true);
+    networkLateBytes.clear();
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (networkReopenedMs > 0) {
+        TrafficLog::instance().recordSession(
+            "NOTE", QByteArray("network reopen->ECHO ") + QByteArray::number(int(now - networkReopenedMs)) + " ms");
+    }
+    if (networkUart2Ms > 0) {
+        TrafficLog::instance().recordSession(
+            "NOTE", QByteArray("network uart2->ECHO ") + QByteArray::number(int(now - networkUart2Ms)) + " ms");
+    }
     sendNetworkBytes(QByteArray("AT*SERIAL_ECHO=0\n"));
     armNetworkTimer(700);
 }
@@ -1691,10 +1769,22 @@ void Rt21Driver::sendNetworkWrite()
 
 void Rt21Driver::onNetworkTimeout()
 {
-    if (networkPhase == NetworkPhase::WaitUart || networkPhase == NetworkPhase::WaitEcho) {
+    if (networkPhase == NetworkPhase::WaitUart) {
+        TrafficLog::instance().recordSession("NOTE", QByteArray("network uart2 timeout"));
+        beginNetworkExit();
+        return;
+    }
+    if (networkPhase == NetworkPhase::WaitEcho) {
+        TrafficLog::instance().recordSession("NOTE", QByteArray("network echo timeout, listening 1000 ms for late bytes"));
+        networkPhase = NetworkPhase::WaitEchoLate;
+        armNetworkTimer(1000);
+        return;
+    }
+    if (networkPhase == NetworkPhase::WaitEchoLate) {
         TrafficLog::instance().recordSession(
-            "NOTE", networkPhase == NetworkPhase::WaitUart ? QByteArray("network uart2 timeout")
-                                                          : QByteArray("network echo timeout"));
+            "NOTE", networkLateBytes.isEmpty()
+                        ? QByteArray("network echo late bytes none")
+                        : QByteArray("network echo late bytes ") + networkLateBytes.toHex(' '));
         beginNetworkExit();
         return;
     }
@@ -1714,7 +1804,7 @@ void Rt21Driver::onNetworkTimeout()
 
 bool Rt21Driver::handleNetworkFrame(const QByteArray &frame)
 {
-    if (networkPhase == NetworkPhase::Idle)
+    if (networkPhase == NetworkPhase::Idle || networkPhase == NetworkPhase::Warmup)
         return false;
     if (networkPhase == NetworkPhase::Exiting || networkPhase == NetworkPhase::AfterUart)
         return true;
@@ -1736,8 +1826,9 @@ bool Rt21Driver::handleNetworkFrame(const QByteArray &frame)
         if (networkTimer)
             networkTimer->stop();
         networkPhase = NetworkPhase::AfterUart;
+        networkUart2Ms = QDateTime::currentMSecsSinceEpoch();
         TrafficLog::instance().recordSession("NOTE", QByteArray("network uart2"));
-        QTimer::singleShot(520, this, [this]() {
+        QTimer::singleShot(kCloseAfterUartMs, this, [this]() {
             if (retired || networkPhase != NetworkPhase::AfterUart)
                 return;
             cycleSerialPort([this](bool ok) {
@@ -1751,7 +1842,7 @@ bool Rt21Driver::handleNetworkFrame(const QByteArray &frame)
                     beginNetworkExit();
                     return;
                 }
-                QTimer::singleShot(150, this, [this]() {
+                QTimer::singleShot(kEchoAfterReopenMs, this, [this]() {
                     if (retired || networkPhase != NetworkPhase::AfterUart)
                         return;
                     sendEcho();
@@ -1762,12 +1853,14 @@ bool Rt21Driver::handleNetworkFrame(const QByteArray &frame)
     }
 
     const bool okLine = line.contains(QStringLiteral("OK"), Qt::CaseInsensitive);
-    if (networkPhase == NetworkPhase::WaitEcho) {
+    if (networkPhase == NetworkPhase::WaitEcho || networkPhase == NetworkPhase::WaitEchoLate) {
         if (!okLine)
             return true;
         if (networkTimer)
             networkTimer->stop();
-        TrafficLog::instance().recordSession("NOTE", QByteArray("network echo ok"));
+        TrafficLog::instance().recordSession(
+            "NOTE", networkPhase == NetworkPhase::WaitEchoLate ? QByteArray("network echo arrived late")
+                                                              : QByteArray("network echo ok"));
         if (!networkWriting)
             networkGotField = true;
         if (networkWriting)
@@ -1832,6 +1925,80 @@ bool Rt21Driver::handleNetworkFrame(const QByteArray &frame)
     return true;
 }
 
+void Rt21Driver::beginNetworkWarmup(int ms)
+{
+    networkPhase = NetworkPhase::Warmup;
+    networkMode = true;
+    configMode = true;
+    networkWarmupMs = ms;
+    networkWarmupStartMs = QDateTime::currentMSecsSinceEpoch();
+    networkWarmupStep = 0;
+    networkWarmupSawHeading = false;
+    networkWarmupSawR01 = false;
+    networkWarmupSawR21 = false;
+    if (pollTimer)
+        pollTimer->stop();
+    replyTimer->stop();
+    inflight.reset();
+    queue.clear();
+    TrafficLog::instance().recordSession(
+        "NOTE", QByteArray("network warmup ") + QByteArray::number(ms) + " ms of answered polls before AT;");
+    sendWarmupPoll();
+}
+
+void Rt21Driver::sendWarmupPoll()
+{
+    if (networkPhase != NetworkPhase::Warmup || !io || retired)
+        return;
+    const QByteArray commands[] = {Rt21::queryTenths(), Rt21::queryPot(), Rt21::queryStatus()};
+    Job job;
+    job.kind = Kind::Heading;
+    job.bytes = commands[networkWarmupStep % 3];
+    job.note = QStringLiteral("warmup");
+    ++networkWarmupStep;
+    queue.enqueue(job);
+    pump();
+}
+
+void Rt21Driver::onWarmupAnswer(const QByteArray &command)
+{
+    if (networkPhase != NetworkPhase::Warmup || networkCancel || retired)
+        return;
+    const QByteArray upper = command.toUpper();
+    if (upper.contains("R01"))
+        networkWarmupSawR01 = true;
+    else if (upper.contains("R21"))
+        networkWarmupSawR21 = true;
+    else
+        networkWarmupSawHeading = true;
+    const qint64 elapsed = QDateTime::currentMSecsSinceEpoch() - networkWarmupStartMs;
+    if (elapsed >= networkWarmupMs && networkWarmupSawHeading && networkWarmupSawR01 && networkWarmupSawR21) {
+        TrafficLog::instance().recordSession(
+            "NOTE", QByteArray("network warmup done ") + QByteArray::number(int(elapsed)) + " ms");
+        startNetworkPass();
+        return;
+    }
+    QTimer::singleShot(kWarmupGapMs, this, [this]() {
+        if (networkPhase == NetworkPhase::Warmup && !networkCancel)
+            sendWarmupPoll();
+    });
+}
+
+void Rt21Driver::onWarmupMiss()
+{
+    if (networkPhase != NetworkPhase::Warmup || retired)
+        return;
+    networkWarmupStartMs = QDateTime::currentMSecsSinceEpoch();
+    networkWarmupSawHeading = false;
+    networkWarmupSawR01 = false;
+    networkWarmupSawR21 = false;
+    TrafficLog::instance().recordSession("NOTE", QByteArray("network warmup poll missed, window restarted"));
+    QTimer::singleShot(kWarmupGapMs, this, [this]() {
+        if (networkPhase == NetworkPhase::Warmup && !networkCancel)
+            sendWarmupPoll();
+    });
+}
+
 void Rt21Driver::startNetworkPass()
 {
     queue.clear();
@@ -1843,10 +2010,16 @@ void Rt21Driver::startNetworkPass()
     networkQueryIndex = 0;
     networkGotField = false;
     networkWriteOk = false;
+    networkUart2Ms = 0;
+    networkReopenedMs = 0;
+    networkCycleReopen = networkCycleUsesReopen();
     networkPhase = NetworkPhase::WaitUart;
+    networkMode = true;
+    configMode = true;
     const QByteArray enter("AT;");
     networkEntered = true;
-    TrafficLog::instance().recordSession("NOTE", QByteArray("network enter AT; expecting <uart2>;"));
+    TrafficLog::instance().recordSession(
+        "NOTE", QByteArray("network enter AT; expecting <uart2>; mode ") + (networkCycleReopen ? "reopen" : "dtr"));
     sendNetworkBytes(enter);
     armNetworkTimer(500);
 }
@@ -1873,9 +2046,7 @@ void Rt21Driver::readNetwork()
     networkGotField = false;
     networkEntered = false;
     networkReadOkThisSession = false;
-    emit networkStatus(networkTryText());
-    TrafficLog::instance().recordSession("NOTE", QByteArray("network cycle 1 of 8"));
-    beginGuardedRead(true);
+    beginNetworkCycle();
 }
 
 void Rt21Driver::writeBrightness(int value)
@@ -1962,9 +2133,7 @@ void Rt21Driver::scheduleBrightnessWrite()
         networkGotField = false;
         networkWriteOk = false;
         networkEntered = false;
-        emit networkStatus(networkTryText());
-        TrafficLog::instance().recordSession("NOTE", QByteArray("network cycle 1 of 8"));
-        beginGuardedRead(true);
+        beginNetworkCycle();
         return;
     }
     const int value = brightnessQueued;

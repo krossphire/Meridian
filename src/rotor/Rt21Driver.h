@@ -137,6 +137,8 @@ private:
         WaitUart,
         AfterUart,
         WaitEcho,
+        WaitEchoLate,
+        Warmup,
         Query,
         WriteAck,
         WriteRead,
@@ -144,6 +146,10 @@ private:
     };
 
     void startNetworkPass();
+    void beginNetworkWarmup(int ms);
+    void sendWarmupPoll();
+    void onWarmupAnswer(const QByteArray &command);
+    void onWarmupMiss();
     void armNetworkTimer(int ms);
     void onNetworkTimeout();
     bool handleNetworkFrame(const QByteArray &frame);
@@ -240,6 +246,17 @@ private:
     qint64 ignoreSerialErrorUntil = 0;
     int networkCycle = 0;
     int networkQueryIndex = 0;
+    int networkWarmupMs = 0;
+    int networkWarmupStep = 0;
+    qint64 networkWarmupStartMs = 0;
+    bool networkWarmupSawHeading = false;
+    bool networkWarmupSawR01 = false;
+    bool networkWarmupSawR21 = false;
+    bool networkCycleReopen = false;
+    qint64 networkUart2Ms = 0;
+    qint64 networkDtrLowMs = 0;
+    qint64 networkReopenedMs = 0;
+    QByteArray networkLateBytes;
     NetworkPhase networkPhase = NetworkPhase::Idle;
     QTimer *networkTimer = nullptr;
     QString networkWriteCommand;

@@ -8,6 +8,7 @@
 
 #include "core/Bearing.h"
 
+#include <QDateTime>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTimer>
@@ -287,6 +288,7 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
     if (cmd == "T11" || cmd == "T01" || cmd == "AT") {
         if (cmd == "AT") {
             atMode = true;
+            uart2AtMs = QDateTime::currentMSecsSinceEpoch();
             reply(QByteArray("<uart2>"), false);
             return;
         }
@@ -304,6 +306,12 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
         auto stored = [&](const char *id) { return module.value(QByteArray(id)); };
         if (eq >= 0 && !cmd.endsWith('?')) {
             module.insert(key, cmd.mid(eq + 1));
+            if (key == "SERIAL_ECHO") {
+                const qint64 dt = QDateTime::currentMSecsSinceEpoch() - uart2AtMs;
+                if (uart2AtMs > 0 && dt >= 680 && dt <= 780)
+                    replyLine(QByteArray("OK"));
+                return;
+            }
             replyLine(QByteArray("OK"));
             return;
         }

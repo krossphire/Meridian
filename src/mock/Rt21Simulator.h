@@ -60,6 +60,7 @@ private:
     QHash<QChar, int> ee;
     QHash<QByteArray, QByteArray> module;
     bool atMode = false;
+    qint64 uart2AtMs = 0;
     int pot = 512;
     int biReplies = 0;
     bool ignoreQueries = false;

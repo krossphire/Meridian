@@ -192,16 +192,18 @@ The 4.B12 release note says that build fixes a bug that always cleared the scree
 
 Ground truth from Setup Utility 4.B12 on COM6 at 4800 8N1, no flow control, DTR and RTS on, firmware 4.13.2. Reads return on the first byte or at 2 seconds. The utility's close is drop DTR, purge RX and TX, then close, which leaves DTR low for about 190–210 ms.
 
-Both successes followed a register read and polls the controller actually answered. One failure used the same bytes after an unanswered `R11;`. Meridian therefore requires a fresh heading reply immediately before `AT;`.
+Both successes followed a register read and many answered `R21;`, `R01;`, and `BI1;` polls. One failure used the same bytes after an unanswered `R11;`. Meridian therefore polls for at least 3 seconds before the first `AT;`, and for at least 5 seconds between failed tries. Every poll in that window has to be answered, and the window includes a heading, `R01;`, and `R21;`. A missed poll restarts the window.
+
+The captured successes send `AT*SERIAL_ECHO=0` about 777–792 ms after `AT;`. `<uart2>;` comes back about 50 ms after `AT;`, so the echo is about 730 ms after the uart2 reply. DTR is low for 190–210 ms, and the echo goes out about 150 ms after DTR is high again. Those three intervals sum to 730 only when the drop starts about 380 ms after uart2, not 520. A 520 ms wait plus a 200 ms sleep plus the time Windows spends in close was the 1120 ms miss on COM6 (the close-to-reopen note spanned about 430 ms).
 
 1. TX `AT;` (`41 54 3b`). Expect `<uart2>;` (`3c 75 61 72 74 32 3e 3b`) in about 50 ms. No leading `;`, no `T11;`, no second `AT;`.
-2. About 520 ms after that reply, close and reopen the port (DTR low about 200 ms, both directions purged).
-3. About 150 ms after reopen, TX `AT*SERIAL_ECHO=0` plus LF only. Expect `OK` CR LF within about 700 ms.
+2. About 380 ms after that reply, drop DTR and purge. The default (`net_cycle_mode=dtr` in meridian.ini) keeps the handle open and raises DTR again so the low time is 200 ms. `net_cycle_mode=reopen` closes and reopens, and sleeps only the remainder of that 200 ms after measuring close, purge, and open. Each NOTE line records uart2→close, the DTR-low duration, reopen→ECHO, and uart2→ECHO.
+3. About 150 ms after DTR is high, TX `AT*SERIAL_ECHO=0` plus LF only. Expect `OK` CR LF within about 700 ms. If nothing arrives, Meridian keeps listening for another second and logs any late bytes before ESC.
 4. Queries are `AT*KEY?` plus LF, one at a time, read to CR LF before the next. Observed replies are 25–45 ms; Meridian allows 300 ms. Order: HWTYPE, DHCP, IP, AIP, NMASK, GW, ID, HTTP, UDP, TFTP, HTTP_USER, HTTP_PASS, NVREG16_0, LINK. On this station: HWTYPE=2, DHCP=0, IP=AIP=192.168.1.106, NMASK=255.255.255.0, GW=192.168.2.1, ID=RT-21, HTTP=801, UDP=23073, TFTP=69, HTTP_USER empty, HTTP_PASS empty, NVREG16_0=6555, LINK=1.
 5. A write is `AT*KEY=value` plus LF, then `OK` CR LF, then `AT*KEY?` plus LF. The utility did this with `AT*ID=RT-21`. Meridian writes only after a read succeeded on this connection, and only over USB or serial.
 6. Exit is a single ESC (`0x1b`), then close within about 10 ms, reopen, and a normal poll (answered about 440 ms after ESC). No `T01;`.
 
-If `AT*SERIAL_ECHO=0` gets no OK within about 700 ms, Meridian sends ESC, closes and reopens, waits for a heading, and starts again. The cap is 8 tries. Cancel stops the same way. The status line is `Reading network (try n of 8)…`, then `Network module answered. Nothing was written.` or `Network module didn't answer after 8 tries`. The intentional close is not a disconnect and does not turn the status red. An IP-only link still cannot read or write network settings.
+If `AT*SERIAL_ECHO=0` gets no OK within about 700 ms, and none in the extra second, Meridian sends ESC, cycles the port, waits for a heading, polls for at least 5 seconds, and starts again. The cap is 8 tries. Cancel stops the same way. The status line is `Reading network (try n of 8)…`, then `Network module answered. Nothing was written.` or `Network module didn't answer after 8 tries`. The intentional close is not a disconnect and does not turn the status red. An IP-only link still cannot read or write network settings.
 
 ## Network module TCP port
 

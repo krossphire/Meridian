@@ -5,6 +5,9 @@
  */
 
 #include "StatusTone.h"
+#include "rotor/TrafficLog.h"
+
+#include <QFile>
 #include "mock/Rt21Simulator.h"
 #include "rotor/AppConfig.h"
 #include "rotor/Rt21Driver.h"
@@ -149,7 +152,7 @@ void TestSetup::mockNetworkRead()
     QSignalSpy done(&driver, &Rt21Driver::networkFinished);
     QSignalSpy status(&driver, &Rt21Driver::networkStatus);
     driver.readNetwork();
-    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 12000);
+    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 20000);
     QCOMPARE(status.at(0).at(0).toString(), QStringLiteral("Reading network (try 1 of 8)…"));
     QCOMPARE(got.value(QStringLiteral("id")), QStringLiteral("RT-21"));
     QCOMPARE(got.value(QStringLiteral("dhcp")), QStringLiteral("0"));
@@ -191,6 +194,29 @@ void TestSetup::mockNetworkRead()
     QVERIFY(sawEcho);
     QVERIFY(sawEsc);
     QVERIFY(sawQuery);
+    QFile logFile(TrafficLog::instance().filePath());
+    QVERIFY(logFile.open(QIODevice::ReadOnly));
+    const QString log = QString::fromUtf8(logFile.readAll());
+    const auto phaseMs = [&](const QString &label, bool *ok) {
+        const QString key = QStringLiteral("network ") + label + QStringLiteral(" ");
+        const int at = log.lastIndexOf(key);
+        if (at < 0) {
+            *ok = false;
+            return -1;
+        }
+        return log.mid(at + key.size()).section(QLatin1Char(' '), 0, 0).toInt(ok);
+    };
+    bool timingOk = true;
+    const int uartToClose = phaseMs(QStringLiteral("uart2->close"), &timingOk);
+    const int dtrLow = phaseMs(QStringLiteral("DTR-low"), &timingOk);
+    const int reopenToEcho = phaseMs(QStringLiteral("reopen->ECHO"), &timingOk);
+    const int uartToEcho = phaseMs(QStringLiteral("uart2->ECHO"), &timingOk);
+    QVERIFY(timingOk);
+    QVERIFY(uartToClose >= 330 && uartToClose <= 460);
+    QVERIFY(dtrLow >= 180 && dtrLow <= 260);
+    QVERIFY(reopenToEcho >= 120 && reopenToEcho <= 220);
+    QVERIFY(uartToEcho >= 680 && uartToEcho <= 780);
+    QVERIFY(log.contains(QStringLiteral("mode dtr")));
 }
 
 void TestSetup::networkWriteNeedsAReadThenReadsBack()
@@ -221,7 +247,7 @@ void TestSetup::networkWriteNeedsAReadThenReadsBack()
 
     QSignalSpy status(&driver, &Rt21Driver::networkStatus);
     driver.writeNetworkSetting(QStringLiteral("dhcp"), QStringLiteral("Static"), QStringLiteral("DHCP"));
-    QTRY_COMPARE_WITH_TIMEOUT(wrote.count(), 2, 20000);
+    QTRY_COMPARE_WITH_TIMEOUT(wrote.count(), 2, 40000);
     QVERIFY(wrote.at(1).at(0).toBool());
     QCOMPARE(wrote.at(1).at(1).toString(), QStringLiteral("Saved DHCP"));
     QCOMPARE(status.at(0).at(0).toString(), QStringLiteral("Writing DHCP (try 1 of 8)…"));
@@ -384,7 +410,7 @@ void TestSetup::silentModuleSkipsQueries()
     QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::On, 3000);
     QSignalSpy done(&driver, &Rt21Driver::networkFinished);
     driver.readNetwork();
-    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 45000);
+    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 90000);
     QVERIFY(!done.at(0).at(0).toBool());
     QCOMPARE(done.at(0).at(1).toString(), QStringLiteral("Network module didn't answer after 8 tries"));
     QCOMPARE(driver.link(), Rt21Driver::Link::On);
