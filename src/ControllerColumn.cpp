@@ -12,6 +12,7 @@
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QFontMetrics>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -32,7 +33,7 @@ public:
     explicit TravelBar(QWidget *parent = nullptr)
         : QWidget(parent)
     {
-        setMinimumHeight(36);
+        setMinimumHeight(58);
     }
     void setArc(int ccw, int cw, int center)
     {
@@ -47,7 +48,12 @@ protected:
     {
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing, true);
-        const QRectF bar(8, 14, width() - 16, 8);
+        const QFontMetrics metrics(painter.font());
+        const int textH = metrics.height();
+        const QString ccwText = QStringLiteral("CCW %1").arg(ccwLimit);
+        const QString cwText = QStringLiteral("CW %1").arg(cwLimit);
+        const QString offsetText = QStringLiteral("offset %1").arg(offset);
+        const QRectF bar(8, textH + 6, std::max(8, width() - 16), 8);
         painter.setPen(Qt::NoPen);
         painter.setBrush(QColor(36, 48, 58));
         painter.drawRoundedRect(bar, 4, 4);
@@ -59,10 +65,19 @@ protected:
         const int end = std::clamp(offset + cwLimit, 0, 360);
         painter.setBrush(QColor(61, 90, 76));
         painter.drawRoundedRect(QRectF(xOf(start), bar.top(), std::max(4.0, xOf(end) - xOf(start)), bar.height()), 4, 4);
+        const double mark = xOf(std::clamp(offset, 0, 360));
+        painter.setPen(QPen(QColor(224, 177, 92), 2));
+        painter.drawLine(QPointF(mark, bar.top() - 3), QPointF(mark, bar.bottom() + 3));
         painter.setPen(QColor(142, 160, 153));
-        painter.drawText(QRectF(0, 0, width(), 12), Qt::AlignLeft, QStringLiteral("CCW %1").arg(ccwLimit));
-        painter.drawText(QRectF(0, 0, width(), 12), Qt::AlignHCenter, QStringLiteral("offset %1").arg(offset));
-        painter.drawText(QRectF(0, 0, width(), 12), Qt::AlignRight, QStringLiteral("CW %1").arg(cwLimit));
+        const int half = std::max(1, width() / 2);
+        painter.drawText(QRect(0, 0, half, textH), Qt::AlignLeft | Qt::AlignVCenter,
+                         metrics.elidedText(ccwText, Qt::ElideRight, half - 4));
+        painter.drawText(QRect(half, 0, width() - half, textH), Qt::AlignRight | Qt::AlignVCenter,
+                         metrics.elidedText(cwText, Qt::ElideRight, width() - half - 4));
+        const int offsetW = metrics.horizontalAdvance(offsetText);
+        const int offsetX = int(std::clamp(mark - offsetW / 2.0, 0.0, std::max(0.0, double(width() - offsetW))));
+        painter.drawText(QRect(offsetX, int(bar.bottom()) + 6, offsetW, textH), Qt::AlignLeft | Qt::AlignVCenter,
+                         offsetText);
     }
 
 private:
@@ -149,8 +164,9 @@ ControllerColumn::ControllerColumn(QWidget *parent)
     auto *limitBox = makeGroup(QStringLiteral("Limits and offset"), column);
     auto *limitLay = new QVBoxLayout(limitBox);
     limits = new TravelBar;
-    auto *limitText = new QLabel(QStringLiteral("CCW —    CW —    offset —"));
+    auto *limitText = new QLabel(QStringLiteral("CCW limit (H) —\nCW limit (I) —\noffset (D) —"));
     limitText->setObjectName(QStringLiteral("limitText"));
+    limitText->setWordWrap(true);
     values['H' - 'A'] = limitText;
     limitLay->addWidget(limits);
     limitLay->addWidget(limitText);
@@ -159,6 +175,7 @@ ControllerColumn::ControllerColumn(QWidget *parent)
         auto *lay = new QHBoxLayout(row);
         lay->setContentsMargins(0, 0, 0, 0);
         auto *spin = new QSpinBox;
+        spin->setObjectName(QStringLiteral("limit") + id);
         spin->setRange(0, maxValue);
         editors.insert(id, spin);
         auto *write = new QPushButton(QStringLiteral("Write"));
@@ -451,8 +468,6 @@ void ControllerColumn::applyField(QChar id, const QString &raw, bool numeric, in
         shown = QString::number(value);
         if (brightnessSpin)
             brightnessSpin->setValue(std::clamp(value, brightnessSpin->minimum(), brightnessSpin->maximum()));
-    if (QSpinBox *spin = editors.value(id, nullptr))
-        spin->setValue(std::clamp(value, spin->minimum(), spin->maximum()));
     } else if (numeric && id == QLatin1Char('X'))
         shown = QStringLiteral("%1 (raw %2)").arg(value / 10.0, 0, 'f', 1).arg(value);
     else if (numeric && (id == QLatin1Char('P') || id == QLatin1Char('E') || id == QLatin1Char('V')))
@@ -465,9 +480,16 @@ void ControllerColumn::applyField(QChar id, const QString &raw, bool numeric, in
     else if (id == QLatin1Char('['))
         shown = raw;
 
+    if (numeric) {
+        if (QSpinBox *spin = editors.value(id, nullptr))
+            spin->setValue(std::clamp(value, spin->minimum(), spin->maximum()));
+    }
     if (id == QLatin1Char('H') || id == QLatin1Char('I') || id == QLatin1Char('D')) {
         if (QLabel *label = values['H' - 'A'])
-            label->setText(QStringLiteral("CCW %1°    CW %2°    offset %3°").arg(ccwLimit).arg(cwLimit).arg(offset));
+            label->setText(QStringLiteral("CCW limit (H) %1°\nCW limit (I) %2°\noffset (D) %3°")
+                               .arg(ccwLimit)
+                               .arg(cwLimit)
+                               .arg(offset));
     }
     if (id == QLatin1Char('A') && ccwCal)
         ccwCal->setText(QStringLiteral("CCW %1").arg(shown));
