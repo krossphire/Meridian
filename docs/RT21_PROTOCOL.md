@@ -80,7 +80,7 @@ Appendix F writes `WXn(value)` and describes `n = 0` as a reboot. That descripti
 
 ### Brightness, the one unlocked write
 
-Register O, default 8. The Write button sends `WO0` plus the decimal plus `;`. Brightness 10 is `WO010;` (`57 4F 30 31 30 3B`). The controller answers `06 4F 3B` before it stores. Meridian waits for that ack, pauses 150 ms, sends `RO;`, then watches heading polls for 10 seconds. No line feed is sent. Has no visible effect on OLED RT-21 units (LCD units only, unverified).
+Register O, default 8. The Write button sends `WO0` plus the decimal plus `;`. Brightness 10 is `WO010;` (`57 4F 30 31 30 3B`). On 16 November, over IP to 192.168.1.106:6555 with firmware 4.13.2, `WO08;` was acked `06 4F 3B` in 161 ms, `RO;` read back 8, and the following 10 seconds of heading polls returned 5 replies and no timeouts. The value is the one that was written. The controller answers `06 4F 3B` before it stores. Meridian waits for that ack, pauses 150 ms, sends `RO;`, then watches heading polls for 10 seconds. No line feed is sent. Has no visible effect on OLED RT-21 units (LCD units only, unverified).
 
 The button never writes by itself. A read must already have reported 4.13.2, the poll in flight has to finish, and no `AT` byte may have gone out in the previous 5 seconds. The traffic log records the set and the read-back as `WRITE-TX` and `WRITE-RX` with timestamps, then a note of how many heading replies arrived in the next ten seconds. The status line is one of: `Brightness written and verified`, `Brightness read-back mismatch: wrote X, read Y`, or `RT-21 stopped answering after write. Power-cycle it.`
 

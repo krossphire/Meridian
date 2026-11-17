@@ -225,7 +225,8 @@ int runScreenshots(const QString &directory, qreal dpr)
         scroll->ensureWidgetVisible(readNetwork);
     QApplication::processEvents();
     if (!readNetwork || readNetwork->isEnabled() || !ipNote
-        || !ipNote->text().contains(QStringLiteral("Needs a USB or serial connection"))
+        || !ipNote->isVisible()
+        || !ipNote->text().contains(QStringLiteral("while connected by USB or serial"))
         || !dialog->grab().save(directory + QStringLiteral("/setup-network.png")))
         return 21;
     auto *guide = dialog->findChild<QPushButton *>(QStringLiteral("openWizard"));

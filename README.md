@@ -14,7 +14,9 @@ Network settings (DHCP, static IP, mask, gateway, HTTP port, UDP port, and the s
 
 Tested with RT-21 firmware 4.13.2 and display firmware 3.1. On 4.13.2 the screen saver is safe over serial and over IP: it blanks the panel and replies keep coming. On 4.14.g1 the saver and register writes hang serial until a power cycle. Users report 4.13.2 feels snappier. That has not been measured.
 
-The 0.1.0-alpha17 build records raw rotor traffic in `%APPDATA%\Meridian\logs` by default (a `Record rotor traffic` checkbox turns that off). Each log line is flushed immediately. Min speed, rotor type, mode, security, the advanced bitfield, the limit switch, magnetic variation, and the multiplier stay locked because their encodings are not confirmed.
+The Network page keeps this line visible: "Network settings can only be read or changed while connected by USB or serial." On an IP-only link it is normal text and the network fields and buttons are grey. On USB or serial the same line stays, in a quieter color.
+
+The 0.1.0-alpha18 build records raw rotor traffic in `%APPDATA%\Meridian\logs` by default (a `Record rotor traffic` checkbox turns that off). Each log line is flushed immediately. Min speed, rotor type, mode, security, the advanced bitfield, the limit switch, magnetic variation, and the multiplier stay locked because their encodings are not confirmed.
 
 Every TCP connect is limited to 3 seconds. If the rotor closed the session or stopped answering, the next background try waits 20 seconds, then backs off up to 5 minutes. If the host does not answer, tries are 15 seconds apart for the first 2 minutes, then use that same backoff. A click, a typed heading, opening the app, or leaving settings tries immediately. A goto is never resent on a later reconnect. Idle polls are every 30 seconds (30–60 in Settings). Settings has one map switch, **Show sun & day/night**, on by default. The sun and the day/night tint are not clickable. See [docs/ROADMAP.md](docs/ROADMAP.md) for what comes after this alpha.
 

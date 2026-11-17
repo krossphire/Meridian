@@ -224,10 +224,10 @@ void SetupPanel::buildNetwork()
 
     readNetwork = new QPushButton(QStringLiteral("Read network"));
     readNetwork->setObjectName(QStringLiteral("readNetwork"));
-    networkLinkNote = new QLabel;
+    networkLinkNote = new QLabel(QStringLiteral(
+        "Network settings can only be read or changed while connected by USB or serial."));
     networkLinkNote->setObjectName(QStringLiteral("networkLinkNote"));
     networkLinkNote->setWordWrap(true);
-    networkLinkNote->setVisible(false);
     auto *save = new QPushButton(QStringLiteral("Save a copy"));
     auto *guide = new QPushButton(QStringLiteral("Guide me"));
     guide->setObjectName(QStringLiteral("openWizard"));
@@ -262,7 +262,6 @@ void SetupPanel::buildNetwork()
     auto *formLayout = new QVBoxLayout(formPage);
     formLayout->setContentsMargins(0, 0, 0, 0);
     formLayout->addLayout(actions);
-    formLayout->addWidget(networkLinkNote);
     formLayout->addWidget(scroll, 1);
 
     stack = new QStackedWidget;
@@ -270,6 +269,7 @@ void SetupPanel::buildNetwork()
     stack->addWidget(formPage);
     stack->addWidget(wizard);
 
+    layout->addWidget(networkLinkNote);
     layout->addWidget(banner);
     layout->addWidget(stack, 1);
 
@@ -290,6 +290,7 @@ void SetupPanel::buildNetwork()
     connect(closeGuide, &QPushButton::clicked, this, [this]() { showNetwork(); });
     connect(back, &QPushButton::clicked, this, [this]() { showWizardStep(wizardStep - 1); });
     connect(next, &QPushButton::clicked, this, [this]() { showWizardStep(wizardStep + 1); });
+    refreshNetworkRead();
 }
 
 void SetupPanel::setDriver(Rt21Driver *next)
@@ -364,14 +365,14 @@ void SetupPanel::refreshNetworkRead()
     const bool ip = ipOnlyLink();
     if (readNetwork)
         readNetwork->setEnabled(!ip);
-    if (!networkLinkNote)
-        return;
-    networkLinkNote->setVisible(ip);
-    networkLinkNote->setText(ip ? QStringLiteral(
-                                    "Needs a USB or serial connection; changing network settings over IP can drop the link.")
-                                : QString());
+    for (QLineEdit *edit : values)
+        edit->setEnabled(!ip);
     for (QWidget *widget : networkWrites)
         widget->setEnabled(!ip);
+    if (!networkLinkNote)
+        return;
+    networkLinkNote->setVisible(true);
+    networkLinkNote->setStyleSheet(ip ? QString() : QStringLiteral("color: #8ea099;"));
 }
 
 QMap<QString, QString> SetupPanel::networkValues() const
