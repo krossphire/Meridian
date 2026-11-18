@@ -342,12 +342,12 @@ Rt21Driver::Rt21Driver(QObject *parent)
         if (kind == Kind::Motion || kind == Kind::Write) {
             if (kind == Kind::Write && brightnessJob) {
                 TrafficLog::instance().recordSession("NOTE", QByteArray("brightness ack missing"));
-                QTimer::singleShot(150, this, [this]() { sendBrightnessRead(); });
+                failRegisterWrite(QStringLiteral("Write not confirmed: %1").arg(writeSettingName));
                 return;
             }
             if (kind == Kind::Write && queue.isEmpty() && configMode) {
                 configMode = false;
-                emit writeFinished(true, QStringLiteral("Settings sent."));
+                emit writeFinished(false, QStringLiteral("Write not confirmed."));
                 startPoll();
             }
             pump();
@@ -506,11 +506,28 @@ void Rt21Driver::postNote(const QString &note)
     showNote(note);
 }
 
+void Rt21Driver::failRegisterWrite(const QString &message)
+{
+    brightnessCapture = false;
+    brightnessHold = false;
+    brightnessWatching = false;
+    if (brightnessWatchTimer)
+        brightnessWatchTimer->stop();
+    if (brightnessPollTimer)
+        brightnessPollTimer->stop();
+    if (!retired && io && !networkMode && !configMode)
+        startPoll();
+    emit writeFinished(false, message);
+}
+
 void Rt21Driver::showNote(const QString &note)
 {
     note_ = note;
     emit statusNote(note);
-    if (statusTone(note) == StatusTone::Failure)
+    const StatusTone tone = statusTone(note);
+    // Red stays until the next note. Amber stays while the work is still running.
+    // Green and neutral notes leave after a few seconds.
+    if (tone == StatusTone::Failure || tone == StatusTone::Busy)
         noteTimer->stop();
     else
         noteTimer->start(4000);
@@ -1146,15 +1163,7 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
         }
         if (Rt21::isCommandEcho(frame))
             return;
-        if (postNetwork || postQuiet) {
-            failures = 0;
-            finishInflight();
-            if (postNetwork)
-                resumePollsAfterNetwork();
-            else
-                afterNetworkHeading(true);
-            return;
-        }
+        // A leftover module line is not proof the controller is answering polls again.
         TrafficLog::instance().note(QStringLiteral("unparsed %1").arg(QString::fromLatin1(frame.toHex(' '))));
         return;
     }
@@ -1262,9 +1271,16 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
     }
 
     if (inflight && inflight->kind == Kind::Note) {
+        const QString payload = Rt21::payloadAfterSoh(frame);
+        // A late heading ("0.0") is not a version, pot, or reset reply. Taking it
+        // would store the heading as the firmware and unlock the wrong gate.
+        if (inflight->note == QLatin1String("Version ") && !payload.contains(QStringLiteral("RT-21")))
+            return;
+        if ((inflight->note == QLatin1String("Pot A/D ") || inflight->note == QLatin1String("Last reset "))
+            && !Rt21::parseIntegerPayload(frame))
+            return;
         failures = 0;
         configTimeouts = 0;
-        const QString payload = Rt21::payloadAfterSoh(frame);
         if (inflight->note == QLatin1String("Version "))
             firmwareReport = payload;
         emit configNote(inflight->note + payload);
@@ -2599,13 +2615,12 @@ void Rt21Driver::writeRegister(QChar letter, int value, const QString &settingNa
         emit writeFinished(false, QStringLiteral("Screen saver is Off or 1, 2, 5, 10, 20, 30, 40, 50, or 60 minutes."));
         return;
     }
-    if (firmwareReport.contains(QStringLiteral("4.14"))
-        || (!firmwareReport.isEmpty() && !firmwareReport.contains(QStringLiteral("4.13.2")))) {
-        emit writeFinished(false, Rt21::firmwareNotice(firmwareReport));
-        return;
-    }
     if (!transportOpen()) {
         emit writeFinished(false, QStringLiteral("Connect to a rotor before writing."));
+        return;
+    }
+    if (!Rt21::firmwareWritesAllowed(firmwareReport)) {
+        emit writeFinished(false, Rt21::firmwareNotice(firmwareReport));
         return;
     }
     if (brightnessWatching || brightnessCapture || brightnessHold || brightnessQueued >= 0 || networkWritePending) {
@@ -2698,11 +2713,6 @@ void Rt21Driver::writeNetworkSetting(const QString &key, const QString &value, c
         emit writeFinished(false, QStringLiteral("Read the network module before writing it."));
         return;
     }
-    if (firmwareReport.contains(QStringLiteral("4.14"))
-        || (!firmwareReport.isEmpty() && !firmwareReport.contains(QStringLiteral("4.13.2")))) {
-        emit writeFinished(false, Rt21::firmwareNotice(firmwareReport));
-        return;
-    }
     const QString trimmed = value.trimmed();
     const QStringList octets = trimmed.split(QLatin1Char('.'));
     QStringList normalized;
@@ -2741,6 +2751,10 @@ void Rt21Driver::writeNetworkSetting(const QString &key, const QString &value, c
     }
     if (!transportOpen()) {
         emit writeFinished(false, QStringLiteral("Connect to a rotor before writing."));
+        return;
+    }
+    if (!Rt21::firmwareWritesAllowed(firmwareReport)) {
+        emit writeFinished(false, Rt21::firmwareNotice(firmwareReport));
         return;
     }
     if (brightnessWatching || brightnessCapture || brightnessHold || brightnessQueued >= 0 || networkWritePending) {
@@ -2872,11 +2886,14 @@ void Rt21Driver::finishBrightnessWatch(bool portClosed)
         "NOTE", QByteArray("brightness watch heading replies ") + QByteArray::number(replies));
     QString message;
     bool ok = false;
-    Q_UNUSED(wrote);
-    Q_UNUSED(readText);
-    if (portClosed || replies <= 0 || !sawRead || !matched)
+    if (sawRead && !matched) {
+        message = QStringLiteral("Write not confirmed: %1. Read back %2, not %3.")
+                      .arg(writeSettingName, readText, QString::number(wrote));
+    } else if (sawRead && matched && (portClosed || replies <= 0)) {
+        message = QStringLiteral("RT-21 stopped answering after write. Power-cycle it.");
+    } else if (portClosed || replies <= 0 || !sawRead || !matched) {
         message = QStringLiteral("Write not confirmed: %1").arg(writeSettingName);
-    else {
+    } else {
         message = QStringLiteral("Saved %1").arg(writeSettingName);
         ok = true;
     }

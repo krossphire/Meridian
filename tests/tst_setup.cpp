@@ -37,6 +37,7 @@ private slots:
     void silentModuleSkipsQueries();
     void brightnessWriteReadsBack();
     void statusToneStaysOffThePrimaryInk();
+    void statusNotesKeepRedAndAmber();
 };
 
 void TestSetup::commandsMatchTheUtility()
@@ -66,7 +67,7 @@ void TestSetup::commandsMatchTheUtility()
     fields.insert(QStringLiteral("anmask"), QStringLiteral("255.255.255.0"));
     fields.insert(QStringLiteral("agw"), QStringLiteral("192.168.1.1"));
     QVERIFY(Rt21::planGroup(QStringLiteral("network-address"), fields, &plan).isEmpty());
-    QCOMPARE(plan.first().command, QByteArray("AT*DHCP=0\r"));
+    QCOMPARE(plan.first().command, QByteArray("AT*DHCP=0\n"));
     QVERIFY(!Rt21::planGroup(QStringLiteral("factory"), fields, &plan).isEmpty());
     QVERIFY(!Rt21::planGroup(QStringLiteral("tftp"), fields, &plan).isEmpty());
 
@@ -250,6 +251,10 @@ void TestSetup::networkWriteNeedsAReadThenReadsBack()
     endpoint.baud = 4800;
     driver.connectEndpoint(endpoint);
     QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::On, 3000);
+    QSignalSpy configured(&driver, &Rt21Driver::configFinished);
+    driver.readConfiguration();
+    QTRY_COMPARE_WITH_TIMEOUT(configured.count(), 1, 8000);
+    QVERIFY(configured.at(0).at(0).toBool());
 
     QSignalSpy wrote(&driver, &Rt21Driver::writeFinished);
     driver.writeNetworkSetting(QStringLiteral("dhcp"), QStringLiteral("1"), QStringLiteral("DHCP"));
@@ -276,7 +281,7 @@ void TestSetup::networkWriteNeedsAReadThenReadsBack()
     QSignalSpy status(&driver, &Rt21Driver::networkStatus);
     driver.writeNetworkSetting(QStringLiteral("agw"), QStringLiteral("192.168.1.1"), QStringLiteral("Gateway"));
     QTRY_COMPARE_WITH_TIMEOUT(wrote.count(), 4, 40000);
-    QVERIFY(wrote.at(3).at(0).toBool());
+    QVERIFY2(wrote.at(3).at(0).toBool(), qPrintable(wrote.at(3).at(1).toString()));
     QCOMPARE(wrote.at(3).at(1).toString(), QStringLiteral("Saved Gateway"));
     QCOMPARE(status.at(0).at(0).toString(), QStringLiteral("Writing Gateway (try 1 of 12)…"));
     const QList<QByteArray> trace = server.sim()->trace();
@@ -484,21 +489,42 @@ void TestSetup::brightnessWriteReadsBack()
 
     QSignalSpy done(&driver, &Rt21Driver::writeFinished);
     driver.writeBrightness(1);
-    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 15000);
-    QCOMPARE(done.at(0).at(0).toBool(), true);
-    QCOMPARE(done.at(0).at(1).toString(), QStringLiteral("Saved Brightness"));
+    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 3000);
+    QCOMPARE(done.at(0).at(0).toBool(), false);
+    QVERIFY(done.at(0).at(1).toString().contains(QStringLiteral("Writes stay off")));
+    QVERIFY(!server.sim()->trace().contains(QByteArray("WO01")));
+
+    QSignalSpy configured(&driver, &Rt21Driver::configFinished);
+    driver.readConfiguration();
+    QTRY_COMPARE_WITH_TIMEOUT(configured.count(), 1, 8000);
+    QVERIFY(configured.at(0).at(0).toBool());
+
+    driver.writeBrightness(1);
+    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 2, 15000);
+    QCOMPARE(done.at(1).at(0).toBool(), true);
+    QCOMPARE(done.at(1).at(1).toString(), QStringLiteral("Saved Brightness"));
     QVERIFY(server.sim()->trace().contains(QByteArray("WO01")));
     QVERIFY(server.sim()->trace().contains(QByteArray("RO")));
 
+    server.sim()->clearTrace();
+    server.sim()->setDropWriteAcks(true);
+    driver.writeBrightness(3);
+    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 3, 5000);
+    QCOMPARE(done.at(2).at(0).toBool(), false);
+    QCOMPARE(done.at(2).at(1).toString(), QStringLiteral("Write not confirmed: Brightness"));
+    QVERIFY(server.sim()->trace().contains(QByteArray("WO03")));
+    QVERIFY(!server.sim()->trace().contains(QByteArray("RO")));
+    server.sim()->setDropWriteAcks(false);
+
     server.sim()->setIgnoreQueries(true);
     driver.writeBrightness(2);
-    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 2, 15000);
-    QCOMPARE(done.at(1).at(0).toBool(), false);
-    QCOMPARE(done.at(1).at(1).toString(), QStringLiteral("Write not confirmed: Brightness"));
+    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 4, 15000);
+    QCOMPARE(done.at(3).at(0).toBool(), false);
+    QCOMPARE(done.at(3).at(1).toString(), QStringLiteral("RT-21 stopped answering after write. Power-cycle it."));
 
     driver.applySetupGroup(QStringLiteral("motion"), {}, QString());
-    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 3, 1000);
-    QVERIFY(done.at(2).at(1).toString().contains(QStringLiteral("off in this alpha")));
+    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 5, 1000);
+    QVERIFY(done.at(4).at(1).toString().contains(QStringLiteral("off in this alpha")));
 }
 
 void TestSetup::statusToneStaysOffThePrimaryInk()
@@ -527,6 +553,24 @@ void TestSetup::statusToneStaysOffThePrimaryInk()
     apart(StatusTone::Success);
     apart(StatusTone::Failure);
     QCOMPARE(statusToneColor(StatusTone::Neutral), QColor(142, 160, 153));
+    QCOMPARE(statusTone(QStringLiteral("Writes stay off. 4.13.2 is the tested firmware. This unit reports nothing.")),
+             StatusTone::Failure);
+    QCOMPARE(statusTone(QStringLiteral("Couldn't use that location. That grid square isn't valid.")), StatusTone::Failure);
+    QCOMPARE(statusTone(QStringLiteral("RT-21 stopped answering after write. Power-cycle it.")), StatusTone::Failure);
+}
+
+void TestSetup::statusNotesKeepRedAndAmber()
+{
+    Rt21Driver driver;
+    driver.postNote(QStringLiteral("Reading network (try 1 of 12)…"));
+    QTest::qWait(4200);
+    QCOMPARE(driver.transientNote(), QStringLiteral("Reading network (try 1 of 12)…"));
+    driver.postNote(QStringLiteral("Write not confirmed: Brightness"));
+    QTest::qWait(4200);
+    QCOMPARE(driver.transientNote(), QStringLiteral("Write not confirmed: Brightness"));
+    driver.postNote(QStringLiteral("Saved Brightness"));
+    QTest::qWait(4200);
+    QVERIFY(driver.transientNote().isEmpty());
 }
 
 QTEST_MAIN(TestSetup)

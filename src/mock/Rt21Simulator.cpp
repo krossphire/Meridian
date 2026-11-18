@@ -100,6 +100,11 @@ void Rt21Simulator::setIgnoreModule(bool ignore)
     ignoreModule = ignore;
 }
 
+void Rt21Simulator::setDropWriteAcks(bool drop)
+{
+    dropWriteAcks = drop;
+}
+
 void Rt21Simulator::clearTrace()
 {
     trace_.clear();
@@ -262,6 +267,8 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
     }
     if (cmd.size() >= 3 && cmd.at(0) == 'W' && cmd.at(1) >= 'A' && cmd.at(1) <= 'Z'
         && cmd.at(2) >= '0' && cmd.at(2) <= '9') {
+        if (dropWriteAcks)
+            return;
         const QChar id(cmd.at(1));
         QByteArray ack;
         ack.append(char(0x06));

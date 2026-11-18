@@ -130,6 +130,7 @@ private:
     void sendArmedGoto();
     void dropCommand(const QString &note);
     void showNote(const QString &note);
+    void failRegisterWrite(const QString &message);
     void finishNetwork(bool ok, const QString &message);
     void enqueueModule(const Rt21::ModuleQuery &query);
     enum class NetworkPhase {

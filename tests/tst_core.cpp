@@ -221,6 +221,15 @@ void TestCore::framing()
     QCOMPARE(frames.size(), 2);
     QCOMPARE(frames.at(0), QByteArray(" 45.0"));
     QCOMPARE(frames.at(1), QByteArray("BI1"));
+
+    Rt21::Framer flood;
+    flood.append(QByteArray(2000, 'X'));
+    QVERIFY(flood.take().isEmpty());
+    flood.append(";");
+    frames = flood.take();
+    QCOMPARE(frames.size(), 1);
+    QVERIFY(frames.at(0).size() > 0);
+    QVERIFY(frames.at(0).size() <= 1024);
 }
 
 void TestCore::commands()

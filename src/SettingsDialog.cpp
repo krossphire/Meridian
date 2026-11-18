@@ -36,7 +36,6 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
-#include <QMessageBox>
 #include <QPointer>
 #include <QPushButton>
 #include <QThread>
@@ -438,8 +437,8 @@ bool SettingsDialog::commitDraft(bool interactive)
     QString error;
     if (!resolveLocation(homeEdit->text(), zips, &error)) {
         if (interactive) {
-            QMessageBox::warning(this, QStringLiteral("Location"), error);
             tabs->setCurrentIndex(0);
+            setStatus(QStringLiteral("Couldn't use that location. %1").arg(error));
             committing = false;
             return false;
         }

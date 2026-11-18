@@ -287,6 +287,9 @@ void Framer::append(const QByteArray &bytes)
             continue;
         }
         buffer.append(char(c));
+        // A reply with no ';' or line ending must not grow without a bound.
+        if (buffer.size() > 1024)
+            buffer.clear();
         if (buffer.size() == 4 && buffer.at(0) == ';'
             && std::isdigit(static_cast<unsigned char>(buffer.at(1)))
             && std::isdigit(static_cast<unsigned char>(buffer.at(2)))

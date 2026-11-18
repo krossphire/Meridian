@@ -12,6 +12,8 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
+#include <QMutex>
+#include <QRecursiveMutex>
 
 namespace {
 
@@ -56,6 +58,12 @@ QFile &logFile()
     return file;
 }
 
+QRecursiveMutex &logMutex()
+{
+    static QRecursiveMutex mutex;
+    return mutex;
+}
+
 } // namespace
 
 TrafficLog &TrafficLog::instance()
@@ -71,6 +79,7 @@ QString TrafficLog::directory() const
 
 void TrafficLog::setEnabled(bool on)
 {
+    const QMutexLocker locker(&logMutex());
     enabled = on;
     if (enabled)
         ensureOpen();
@@ -78,6 +87,7 @@ void TrafficLog::setEnabled(bool on)
 
 void TrafficLog::ensureOpen()
 {
+    const QMutexLocker locker(&logMutex());
     if (opened)
         return;
     const QString dir = UserFiles::logDirectory();
@@ -87,17 +97,19 @@ void TrafficLog::ensureOpen()
     logFile().setFileName(path);
     opened = logFile().open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Unbuffered);
     if (opened)
-        writeLine(QStringLiteral("NOTE Meridian 0.1.0-alpha24 traffic log ") + path);
+        writeLine(QStringLiteral("NOTE Meridian 0.1.0-alpha25c traffic log ") + path);
 }
 
 void TrafficLog::flush()
 {
+    const QMutexLocker locker(&logMutex());
     if (opened)
         logFile().flush();
 }
 
 void TrafficLog::writeLine(const QString &line)
 {
+    const QMutexLocker locker(&logMutex());
     if (!opened)
         return;
     const QByteArray bytes = (line + QLatin1Char('\n')).toUtf8();
@@ -107,6 +119,7 @@ void TrafficLog::writeLine(const QString &line)
 
 void TrafficLog::note(const QString &text)
 {
+    const QMutexLocker locker(&logMutex());
     if (!enabled)
         return;
     ensureOpen();
@@ -115,6 +128,7 @@ void TrafficLog::note(const QString &text)
 
 void TrafficLog::recordSession(const char *direction, const QByteArray &bytes)
 {
+    const QMutexLocker locker(&logMutex());
     const bool was = enabled;
     enabled = true;
     record(direction, bytes);
@@ -123,6 +137,7 @@ void TrafficLog::recordSession(const char *direction, const QByteArray &bytes)
 
 void TrafficLog::record(const char *direction, const QByteArray &bytes)
 {
+    const QMutexLocker locker(&logMutex());
     if (!enabled || bytes.isEmpty())
         return;
     ensureOpen();

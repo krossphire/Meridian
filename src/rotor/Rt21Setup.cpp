@@ -242,10 +242,10 @@ QString planGroup(const QString &group, const QMap<QString, QString> &fields, QL
             QHostAddress check;
             if (!check.setAddress(ip) || !check.setAddress(mask) || !check.setAddress(gateway))
                 return QStringLiteral("Static address, mask, and gateway each need an IPv4 address.");
-            addModule(out, QStringLiteral("AT*DHCP=%1\r").arg(dhcp), QStringLiteral("AT*DHCP?\r"), QStringLiteral("DHCP="), dhcp);
-            addModule(out, QStringLiteral("AT*AIP=%1\r").arg(ip), QStringLiteral("AT*AIP?\r"), QStringLiteral("AIP="), ip);
-            addModule(out, QStringLiteral("AT*ANMASK=%1\r").arg(mask), QStringLiteral("AT*ANMASK?\r"), QStringLiteral("ANMASK="), mask);
-            addModule(out, QStringLiteral("AT*AGW=%1\r").arg(gateway), QStringLiteral("AT*AGW?\r"), QStringLiteral("AGW="), gateway);
+            addModule(out, QStringLiteral("AT*DHCP=%1\n").arg(dhcp), QStringLiteral("AT*DHCP?\n"), QStringLiteral("DHCP="), dhcp);
+            addModule(out, QStringLiteral("AT*AIP=%1\n").arg(ip), QStringLiteral("AT*AIP?\n"), QStringLiteral("AIP="), ip);
+            addModule(out, QStringLiteral("AT*ANMASK=%1\n").arg(mask), QStringLiteral("AT*ANMASK?\n"), QStringLiteral("ANMASK="), mask);
+            addModule(out, QStringLiteral("AT*AGW=%1\n").arg(gateway), QStringLiteral("AT*AGW?\n"), QStringLiteral("AGW="), gateway);
             return {};
         }
         if (group == QLatin1String("network-ports")) {
@@ -258,11 +258,11 @@ QString planGroup(const QString &group, const QMap<QString, QString> &fields, QL
                 return error;
             if (http < 1 || http > 65535 || serial < 1 || serial > 65535 || udp < 0 || udp > 65535)
                 return QStringLiteral("Ports have to sit between 1 and 65535.");
-            addModule(out, QStringLiteral("AT*HTTP=%1\r").arg(http), QStringLiteral("AT*HTTP?\r"), QStringLiteral("HTTP="),
+            addModule(out, QStringLiteral("AT*HTTP=%1\n").arg(http), QStringLiteral("AT*HTTP?\n"), QStringLiteral("HTTP="),
                       QString::number(http));
-            addModule(out, QStringLiteral("AT*UDP=%1\r").arg(udp), QStringLiteral("AT*UDP?\r"), QStringLiteral("UDP="),
+            addModule(out, QStringLiteral("AT*UDP=%1\n").arg(udp), QStringLiteral("AT*UDP?\n"), QStringLiteral("UDP="),
                       QString::number(udp));
-            addModule(out, QStringLiteral("AT*NVREG16_0=%1\r").arg(serial), QStringLiteral("AT*NVREG16_0?\r"),
+            addModule(out, QStringLiteral("AT*NVREG16_0=%1\n").arg(serial), QStringLiteral("AT*NVREG16_0?\n"),
                       QStringLiteral("NVREG16_0="), QString::number(serial));
             return {};
         }
@@ -278,19 +278,19 @@ QString planGroup(const QString &group, const QMap<QString, QString> &fields, QL
                 return QStringLiteral("The network name is empty.");
             if (security != 0 && key.size() < 8)
                 return QStringLiteral("The setup utility refuses a passphrase shorter than 8 characters.");
-            addModule(out, QStringLiteral("AT*WIFI_SECURITY=%1\r").arg(security), QStringLiteral("AT*WIFI_SECURITY?\r"),
+            addModule(out, QStringLiteral("AT*WIFI_SECURITY=%1\n").arg(security), QStringLiteral("AT*WIFI_SECURITY?\n"),
                       QStringLiteral("SECURITY="), QString::number(security));
-            addModule(out, QStringLiteral("AT*WIFI_ASSID=%1\r").arg(ssid), QStringLiteral("AT*WIFI_ASSID?\r"),
+            addModule(out, QStringLiteral("AT*WIFI_ASSID=%1\n").arg(ssid), QStringLiteral("AT*WIFI_ASSID?\n"),
                       QStringLiteral("ASSID="), ssid);
             if (security != 0)
-                addModule(out, QStringLiteral("AT*WIFI_KEY=%1\r").arg(key), QStringLiteral("AT*WIFI_KEY?\r"),
+                addModule(out, QStringLiteral("AT*WIFI_KEY=%1\n").arg(key), QStringLiteral("AT*WIFI_KEY?\n"),
                           QStringLiteral("KEY="), key);
             return {};
         }
         const QString id = fields.value(QStringLiteral("id")).trimmed();
         if (id.isEmpty())
             return QStringLiteral("The rotator name is empty.");
-        addModule(out, QStringLiteral("AT*ID=%1\r").arg(id), QStringLiteral("AT*ID?\r"), QStringLiteral("ID="), id);
+        addModule(out, QStringLiteral("AT*ID=%1\n").arg(id), QStringLiteral("AT*ID?\n"), QStringLiteral("ID="), id);
         return {};
     }
     if (group == QLatin1String("factory") || group == QLatin1String("bootloader") || group == QLatin1String("module-reset")
@@ -579,7 +579,8 @@ QString screenSaverRecommendation()
 {
     return QStringLiteral(
         "On 4.13.2 the screen saver blanks the panel and serial keeps answering. Polls do not count as activity, and a turn command wakes the display. "
-        "On 4.14.g1 the same 1-minute saver stops serial until a power cycle. 4.13.2 is the firmware to run, especially on an OLED unit. Off leaves the heading on the display. Meridian does not write this register.");
+        "On 4.14.g1 the same 1-minute saver stops serial until a power cycle. 4.13.2 is the firmware to run, especially on an OLED unit. Off leaves the heading on the display. "
+        "The Display page writes this register as WW0 plus the minutes, and only after a read reports 4.13.2.");
 }
 
 QString advancedOptionsText(int value)

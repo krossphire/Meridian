@@ -444,7 +444,9 @@ QList<FoundRotor> Rt21Finder::scanHosts(const QStringList &hosts, const QList<in
                 if (!rx.isEmpty())
                     TrafficLog::instance().recordSession("FIND-NET", rx);
             };
-            auto settle = [&, socket](const QByteArray &result) {
+            // Copy `note` into settle. A reference would dangle: the slot runs
+            // from loop.exec() after this iteration's locals are gone.
+            auto settle = [&pending, &loop, socket, note](const QByteArray &result) {
                 if (socket->property("done").toBool())
                     return;
                 socket->setProperty("done", true);

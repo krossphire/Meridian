@@ -10,6 +10,7 @@
 
 #include "MainWindow.h"
 #include "SettingsDialog.h"
+#include "StatusTone.h"
 #include "mock/Rt21Simulator.h"
 #include "rotor/AppConfig.h"
 #include "rotor/Rt21Driver.h"
@@ -18,6 +19,8 @@
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDialogButtonBox>
+#include <QLabel>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QSerialPort>
 #include <QTcpSocket>
@@ -30,6 +33,7 @@ class TestSettings : public QObject
     Q_OBJECT
 private slots:
     void transportFlickKeepsOneConnection();
+    void badLocationStaysOnTheStatusLine();
 };
 
 void TestSettings::transportFlickKeepsOneConnection()
@@ -134,6 +138,24 @@ void TestSettings::transportFlickKeepsOneConnection()
     QCOMPARE(Rt21Driver::transportHighWater(), 1);
     QCOMPARE(window.driver()->findChildren<QTcpSocket *>().size(), 1);
     QCOMPARE(window.findChildren<QSerialPort *>().size(), 0);
+}
+
+void TestSettings::badLocationStaysOnTheStatusLine()
+{
+    SettingsDialog dialog(AppConfig::defaults(), nullptr, nullptr);
+    auto *home = dialog.findChild<QLineEdit *>(QStringLiteral("homeEdit"));
+    QVERIFY(home);
+    home->setText(QStringLiteral("not a place"));
+    auto *buttons = dialog.findChild<QDialogButtonBox *>();
+    QVERIFY(buttons);
+    QPushButton *save = buttons->button(QDialogButtonBox::Save);
+    QVERIFY(save);
+    save->click();
+    auto *status = dialog.findChild<QLabel *>(QStringLiteral("setupStatus"));
+    QVERIFY(status);
+    QVERIFY(status->text().contains(QStringLiteral("Couldn't use that location")));
+    QCOMPARE(statusTone(status->text()), StatusTone::Failure);
+    QCOMPARE(dialog.result(), int(QDialog::Rejected));
 }
 
 QTEST_MAIN(TestSettings)
