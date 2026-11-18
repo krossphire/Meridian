@@ -157,6 +157,8 @@ private:
     void onNetworkTimeout();
     bool handleNetworkFrame(const QByteArray &frame);
     void sendNetworkBytes(const QByteArray &bytes);
+    bool loggingNetworkWire() const;
+    void logNetworkWire(const char *dir, const QByteArray &bytes) const;
     void sendEcho();
     void resendEcho();
     void sendNextQuery();
@@ -173,7 +175,6 @@ private:
     char variantForThisTry() const;
     void rememberCycleVariant();
     void ingestReceived(const QByteArray &received, bool fromSerial);
-    void pollRawSerial();
     void restoreQtSerial();
     void beginGuardedRead(bool network);
     void enqueueConfiguration();
@@ -275,8 +276,7 @@ private:
     int networkEchoSends = 0;
     qint64 networkEchoTxMs = 0;
     int networkVariantOrigin = 0;
-    void *networkRawHandle = nullptr;
-    QTimer *networkRawTimer = nullptr;
+    int networkRearmCount = 0;
     qint64 networkUart2Ms = 0;
     qint64 networkDtrLowMs = 0;
     qint64 networkReopenedMs = 0;

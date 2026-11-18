@@ -11,6 +11,7 @@
 
 #include <QByteArray>
 #include <QList>
+#include <QString>
 
 #include <optional>
 
@@ -53,6 +54,11 @@ bool isCommandEcho(const QByteArray &frame);
 std::optional<HeadingReading> parseStatusFrame(const QByteArray &frame);
 QString payloadAfterSoh(const QByteArray &frame);
 std::optional<int> parseIntegerPayload(const QByteArray &frame);
+
+// Drop embedded NUL bytes, then keep printable ASCII. A monitor can show
+// 3c 00 75 00 … for "<uart2>" and the module's "OK" the same way. Spaces are
+// only for other non-printable bytes, so a real gap still shows up.
+QString networkText(const QByteArray &frame);
 
 class Framer
 {

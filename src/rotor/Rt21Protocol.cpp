@@ -254,6 +254,20 @@ std::optional<int> parseIntegerPayload(const QByteArray &frame)
     return value;
 }
 
+QString networkText(const QByteArray &frame)
+{
+    QString line;
+    for (unsigned char c : frame) {
+        if (c == 0)
+            continue;
+        if (c >= 32 && c < 127)
+            line.append(QChar(c));
+        else if (!line.isEmpty() && !line.endsWith(QLatin1Char(' ')))
+            line.append(QLatin1Char(' '));
+    }
+    return line.trimmed();
+}
+
 void Framer::append(const QByteArray &bytes)
 {
     for (unsigned char c : bytes) {

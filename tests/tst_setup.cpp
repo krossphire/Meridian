@@ -25,6 +25,7 @@ class TestSetup : public QObject
     Q_OBJECT
 private slots:
     void commandsMatchTheUtility();
+    void networkTextIgnoresNulPadding();
     void adviceStaysOffTheConnectionFields();
     void secretsStayOutOfTheLog();
     void moduleLinesSplitOnCr();
@@ -38,6 +39,25 @@ private slots:
     void brightnessWriteReadsBack();
     void statusToneStaysOffThePrimaryInk();
 };
+
+void TestSetup::networkTextIgnoresNulPadding()
+{
+    const QByteArray uart2("\x3c\x00\x75\x00\x61\x00\x72\x00\x74\x00\x32\x00\x3e", 14);
+    QCOMPARE(Rt21::networkText(uart2), QStringLiteral("<uart2>"));
+    QCOMPARE(Rt21::networkText(QByteArray("O\0K", 3)), QStringLiteral("OK"));
+    QCOMPARE(Rt21::networkText(QByteArray("ERROR 1")), QStringLiteral("ERROR 1"));
+    QCOMPARE(Rt21::networkText(QByteArray("\0\0", 2)), QString());
+
+    Rt21::Framer framer;
+    framer.setLineMode(true);
+    const QByteArray echoed("O\0K\r\n", 5);
+    framer.append(echoed);
+    const QList<QByteArray> frames = framer.take();
+    QCOMPARE(frames.size(), 1);
+    QCOMPARE(Rt21::networkText(frames.at(0)), QStringLiteral("OK"));
+    QVERIFY(Rt21::networkText(frames.at(0)).contains(QStringLiteral("OK")));
+    QVERIFY(!Rt21::networkText(QByteArray("O K")).contains(QStringLiteral("OK")));
+}
 
 void TestSetup::commandsMatchTheUtility()
 {
@@ -231,6 +251,8 @@ void TestSetup::mockNetworkRead()
     QVERIFY(dtrToEcho >= 0 && dtrToEcho <= 15);
     QVERIFY(uartToEcho >= 500 && uartToEcho <= 720);
     QVERIFY(log.contains(QStringLiteral("variant D")));
+    QVERIFY(log.contains(QStringLiteral("network wire tx")));
+    QVERIFY(log.contains(QStringLiteral("41 54 2a 53 45 52 49 41 4c 5f 45 43 48 4f 3d 30 0a")));
     QVERIFY(log.contains(QStringLiteral("network echo rx ERROR 1")));
     QVERIFY(log.contains(QStringLiteral("network echo send 2")));
     QVERIFY(log.contains(QStringLiteral("network query rx AGW=")));
