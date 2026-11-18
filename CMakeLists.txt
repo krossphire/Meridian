@@ -106,7 +106,6 @@ meridian_test(tst_driver)
 meridian_test(tst_globe)
 target_sources(tst_globe PRIVATE src/GlobeWidget.cpp)
 target_link_libraries(tst_globe PRIVATE Qt6::Svg)
-set_tests_properties(tst_globe PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 meridian_test(tst_settings)
 target_sources(tst_settings PRIVATE
     src/MainWindow.cpp
@@ -117,7 +116,7 @@ target_sources(tst_settings PRIVATE
     src/GlobeWidget.cpp)
 meridian_test(tst_setup)
 target_link_libraries(tst_settings PRIVATE Qt6::Svg)
-set_tests_properties(tst_settings PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+set_tests_properties(tst_globe tst_settings tst_usb tst_setup PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
 
 install(TARGETS meridian meridian-mock
