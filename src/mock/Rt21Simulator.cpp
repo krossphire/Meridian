@@ -291,6 +291,7 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
             atMode = true;
             uart2AtMs = QDateTime::currentMSecsSinceEpoch();
             echoSends = 0;
+            echoErrorAtMs = 0;
             reply(QByteArray("<uart2>"), false);
             return;
         }
@@ -314,10 +315,16 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
                 const qint64 rose = networkDtrRoseProbeMs().load();
                 const qint64 sinceRise = rose > 0 ? now - rose : 9999;
                 ++echoSends;
-                const bool firstWindow = uart2AtMs > 0 && rose > 0 && sinceRise <= 30 && sinceUart >= 700 && sinceUart <= 760;
-                if (echoSends == 1 && firstWindow)
+                // Variant D echoes as soon as the port is open, about 520 ms plus
+                // the close/open, so the first byte can land well before 700 ms.
+                // A and B still land in the 700–760 ms window. Either way the
+                // first echo is within a few milliseconds of DTR rising.
+                const bool prompt = uart2AtMs > 0 && rose > 0 && sinceRise <= 40 && sinceUart >= 480
+                                    && sinceUart <= 800;
+                if (echoSends == 1 && prompt) {
+                    echoErrorAtMs = now;
                     replyLine(QByteArray("ERROR 1"));
-                else if (echoSends >= 2 && echoSends <= 3 && firstWindow)
+                } else if (echoSends >= 2 && echoSends <= 3 && echoErrorAtMs > 0 && now - echoErrorAtMs <= 250)
                     replyLine(QByteArray("OK"));
                 else if (echoSends >= 2 && uart2AtMs > 0 && sinceUart >= 700 && sinceUart <= 900)
                     replyLine(QByteArray("OK"));

@@ -35,6 +35,14 @@ target_include_directories(meridian-core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(meridian-core PUBLIC Qt6::Widgets Qt6::Network Qt6::SerialPort)
 if(WIN32)
     target_link_libraries(meridian-core PUBLIC setupapi cfgmgr32 winmm)
+    # Private header so a close does not SetCommState the saved DCB back
+    # (that re-raises DTR/RTS). Qt6_DIR is .../lib/cmake/Qt6.
+    target_include_directories(meridian-core PRIVATE
+        "${Qt6_DIR}/../../../include"
+        "${Qt6_DIR}/../../../include/QtCore/${Qt6_VERSION}"
+        "${Qt6_DIR}/../../../include/QtCore/${Qt6_VERSION}/QtCore"
+        "${Qt6_DIR}/../../../include/QtSerialPort/${Qt6_VERSION}"
+        "${Qt6_DIR}/../../../include/QtSerialPort/${Qt6_VERSION}/QtSerialPort")
 endif()
 if(APPLE)
     target_link_libraries(meridian-core PUBLIC "-framework IOKit" "-framework CoreFoundation")

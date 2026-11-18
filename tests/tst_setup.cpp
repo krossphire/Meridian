@@ -217,10 +217,12 @@ void TestSetup::mockNetworkRead()
     const int uartToEcho = phaseMs(QStringLiteral("uart2->ECHO"), &timingOk);
     QVERIFY(timingOk);
     QVERIFY(uartToDtr >= 490 && uartToDtr <= 560);
-    QVERIFY(dtrLow >= 175 && dtrLow <= 230);
+    QVERIFY(dtrLow >= 0 && dtrLow <= 150);
     QVERIFY(dtrToEcho >= 0 && dtrToEcho <= 15);
-    QVERIFY(uartToEcho >= 700 && uartToEcho <= 760);
-    QVERIFY(log.contains(QStringLiteral("variant A")));
+    QVERIFY(uartToEcho >= 500 && uartToEcho <= 720);
+    QVERIFY(log.contains(QStringLiteral("variant D")));
+    QVERIFY(log.contains(QStringLiteral("network echo rx ERROR 1")));
+    QVERIFY(log.contains(QStringLiteral("network echo send 2")));
 }
 
 void TestSetup::networkWriteNeedsAReadThenReadsBack()

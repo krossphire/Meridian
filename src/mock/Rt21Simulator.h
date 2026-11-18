@@ -62,6 +62,7 @@ private:
     bool atMode = false;
     qint64 uart2AtMs = 0;
     int echoSends = 0;
+    qint64 echoErrorAtMs = 0;
     int pot = 512;
     int biReplies = 0;
     bool ignoreQueries = false;

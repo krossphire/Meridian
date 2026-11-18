@@ -142,7 +142,8 @@ private:
         Query,
         WriteAck,
         WriteRead,
-        Exiting
+        Exiting,
+        Quiet
     };
 
     void startNetworkPass();
@@ -160,6 +161,9 @@ private:
     void sendNetworkWrite();
     void beginNetworkExit();
     void finishNetworkExit();
+    void writeEsc();
+    void beginPassThroughQuiet();
+    void abortNetworkRead(const QString &text);
     void networkReopenFailed();
     void cycleSerialPort(const std::function<void(bool)> &done);
     void raiseLinesAndFinish(const std::function<void(bool)> &done);
@@ -260,6 +264,10 @@ private:
     bool networkWarmupSawHeading = false;
     bool networkWarmupSawR01 = false;
     bool networkWarmupSawR21 = false;
+    qint64 networkWarmupHardStartMs = 0;
+    bool networkTxQuiet = false;
+    bool networkQuietFromWarmup = false;
+    int networkQuiets = 0;
     bool networkCycleReopen = false;
     char networkVariant = 'A';
     int networkEchoSends = 0;
