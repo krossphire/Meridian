@@ -34,6 +34,7 @@ class TestSettings : public QObject
 private slots:
     void transportFlickKeepsOneConnection();
     void badLocationStaysOnTheStatusLine();
+    void stopWithNoRotorDoesNotCrash();
 };
 
 void TestSettings::transportFlickKeepsOneConnection()
@@ -156,6 +157,17 @@ void TestSettings::badLocationStaysOnTheStatusLine()
     QVERIFY(status->text().contains(QStringLiteral("Couldn't use that location")));
     QCOMPARE(statusTone(status->text()), StatusTone::Failure);
     QCOMPARE(dialog.result(), int(QDialog::Rejected));
+}
+
+void TestSettings::stopWithNoRotorDoesNotCrash()
+{
+    AppConfig config = AppConfig::defaults();
+    config.rotors.clear();
+    MainWindow window(config, nullptr);
+    QCOMPARE(window.driver(), nullptr);
+    QTest::keyClick(&window, Qt::Key_Space);
+    QTest::keyClick(&window, Qt::Key_Escape);
+    QCOMPARE(window.driver(), nullptr);
 }
 
 QTEST_MAIN(TestSettings)

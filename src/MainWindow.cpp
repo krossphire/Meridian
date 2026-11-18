@@ -29,7 +29,7 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
     , config(std::move(initial))
     , settings(store)
 {
-    setWindowTitle(QStringLiteral("Meridian 0.1.0-alpha24"));
+    setWindowTitle(QStringLiteral("Meridian 0.1.0-alpha25c"));
     TrafficLog::instance().setEnabled(config.trafficLog);
     globe = new GlobeWidget;
     setCentralWidget(globe);
@@ -303,7 +303,8 @@ SettingsDialog *MainWindow::settingsDialog()
 void MainWindow::keyPressEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Escape || event->key() == Qt::Key_Space) {
-        link->stopMotion();
+        if (link)
+            link->stopMotion();
         return;
     }
     QMainWindow::keyPressEvent(event);

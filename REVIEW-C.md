@@ -8,7 +8,11 @@ The program is a real rotor UI, not a sketch. Heading, goto, stop, reconnect bac
 
 No confirmed path sends `W0…;` or starts a network-module read on a TCP link. `registerWriteCommand` refuses a letter outside `A`–`Z` (`src/rotor/Rt21Protocol.cpp:112`), and an IP link is turned away before `AT;` (`src/rotor/Rt21Driver.cpp:2573`).
 
-One crash was critical and is fixed on this branch. `Rt21Finder::scanHosts` copied a lambda that still referred to another lambda on the for-loop stack. The slot runs later, from `loop.exec()`, after that stack frame is gone. A host that answered `BI1;` segfaulted in `QObject::property` (`src/rotor/Rt21Finder.cpp:437` is the log helper; the dangling capture was the `settle` lambda now at `src/rotor/Rt21Finder.cpp:449`). `tst_finder` hit this on the first Linux run. The lambda now copies the pieces it needs. Unverified on Windows and Mac.
+Two crashes were critical and are fixed on this branch.
+
+`MainWindow::keyPressEvent` called `link->stopMotion()` for Escape and Space with no null check (`src/MainWindow.cpp:303`). The map’s own key handler already checks. The window handler did not. With no rotor in the list, `link` is null and the key crashes. The globe click and heading paths were already guarded. Escape and Space now are too.
+
+`Rt21Finder::scanHosts` copied a lambda that still referred to another lambda on the for-loop stack. The slot runs later, from `loop.exec()`, after that stack frame is gone. A host that answered `BI1;` segfaulted in `QObject::property` (`src/rotor/Rt21Finder.cpp:437` is the log helper; the dangling capture was the `settle` lambda now at `src/rotor/Rt21Finder.cpp:449`). `tst_finder` hit this on the first Linux run. The lambda now copies the pieces it needs. Unverified on Windows and Mac.
 
 ## High
 
@@ -102,6 +106,7 @@ All of these keep alpha24’s features. Linux `ctest` (Qt 6.4.2): 7/7 passed aft
 - `writeRegister` and `writeNetworkSetting` call `firmwareWritesAllowed`. An empty or non-4.13.2 report does not go on the wire. The settings page already refused; the driver did not, and a late heading of `0.0` could be stored as the firmware (`src/rotor/Rt21Driver.cpp:1273`). Version, pot, and reset notes now ignore a frame that is not their reply.
 - Amber and red notes stay until the next note. Green still clears after 4 seconds. “Writes stay off” is red.
 - A bad home location is a status line, not a message box.
+- Escape and Space no longer call through a null rotor pointer when the rotor list is empty. The map path already checked; the window key handler did not.
 - Find’s network scan no longer crashes when a host answers.
 - The traffic log is mutexed so Find and the driver can write it together.
 - The framer drops a gathered buffer once it passes 1024 bytes without a terminator (`src/rotor/Rt21Protocol.cpp`, `Framer::append`).
@@ -113,7 +118,7 @@ All of these keep alpha24’s features. Linux `ctest` (Qt 6.4.2): 7/7 passed aft
 
 `Meridian-0.1.0-alpha25c-win64.zip` sits at the repo root (gitignored, same as the other zips). SHA-256:
 
-`9523ab4e4ee88197b1f01ab1b98c7cedccb3f37d58257e0f0641aea20fe81b03`
+`98c284d27d467de60e61486434aa7faa0168ac10291764e2da07aa6c21bab66a`
 
 It is a MinGW cross-build of this branch against Qt 6.8.3, plus `meridian-mock.exe`, the Qt DLLs, `platforms/qwindows.dll`, the MinGW runtime, `LICENSE.txt`, and the Inter OFL. `file` reports a PE32+ GUI executable. It was not launched. There is no Windows machine in this review, so startup, the serial port, and the map are unverified for this zip.
 
