@@ -74,6 +74,14 @@ void TestSetup::commandsMatchTheUtility()
     QCOMPARE(sequence.first().command, QByteArray("AT*HWTYPE?\n"));
     QCOMPARE(sequence.last().command, QByteArray("AT*LINK?\n"));
     bool sawUser = false;
+    int gwAt = -1;
+    for (int i = 0; i < sequence.size(); ++i) {
+        if (sequence.at(i).key == QLatin1String("gw"))
+            gwAt = i;
+    }
+    QVERIFY(gwAt >= 0 && gwAt + 1 < sequence.size());
+    QCOMPARE(sequence.at(gwAt + 1).command, QByteArray("AT*AGW?\n"));
+    QCOMPARE(sequence.at(gwAt + 1).key, QStringLiteral("agw"));
     for (const auto &query : sequence) {
         QVERIFY(!query.command.contains(';'));
         QVERIFY(!query.command.contains("T11"));
@@ -164,6 +172,7 @@ void TestSetup::mockNetworkRead()
     QCOMPARE(got.value(QStringLiteral("aip")), QStringLiteral("192.168.1.106"));
     QCOMPARE(got.value(QStringLiteral("nmask")), QStringLiteral("255.255.255.0"));
     QCOMPARE(got.value(QStringLiteral("gw")), QStringLiteral("192.168.2.1"));
+    QCOMPARE(got.value(QStringLiteral("agw")), QStringLiteral("192.168.2.1"));
     QCOMPARE(got.value(QStringLiteral("http")), QStringLiteral("801"));
     QCOMPARE(got.value(QStringLiteral("udp")), QStringLiteral("23073"));
     QCOMPARE(got.value(QStringLiteral("tftp")), QStringLiteral("69"));
@@ -215,6 +224,7 @@ void TestSetup::mockNetworkRead()
     const int dtrLow = phaseMs(QStringLiteral("DTR-low"), &timingOk);
     const int dtrToEcho = phaseMs(QStringLiteral("DTR high->ECHO"), &timingOk);
     const int uartToEcho = phaseMs(QStringLiteral("uart2->ECHO"), &timingOk);
+    const int preAtQuiet = phaseMs(QStringLiteral("pre-AT quiet"), &timingOk);
     QVERIFY(timingOk);
     QVERIFY(uartToDtr >= 490 && uartToDtr <= 560);
     QVERIFY(dtrLow >= 0 && dtrLow <= 150);
@@ -223,6 +233,8 @@ void TestSetup::mockNetworkRead()
     QVERIFY(log.contains(QStringLiteral("variant D")));
     QVERIFY(log.contains(QStringLiteral("network echo rx ERROR 1")));
     QVERIFY(log.contains(QStringLiteral("network echo send 2")));
+    QVERIFY(log.contains(QStringLiteral("network query rx AGW=")));
+    QVERIFY(preAtQuiet >= 650 && preAtQuiet <= 900);
 }
 
 void TestSetup::networkWriteNeedsAReadThenReadsBack()
@@ -243,30 +255,41 @@ void TestSetup::networkWriteNeedsAReadThenReadsBack()
     driver.writeNetworkSetting(QStringLiteral("dhcp"), QStringLiteral("1"), QStringLiteral("DHCP"));
     QTRY_COMPARE_WITH_TIMEOUT(wrote.count(), 1, 1000);
     QVERIFY(!wrote.at(0).at(0).toBool());
-    QVERIFY(wrote.at(0).at(1).toString().contains(QStringLiteral("Read the network module")));
+    QVERIFY(wrote.at(0).at(1).toString().contains(QStringLiteral("Only the gateway")));
+
+    driver.writeNetworkSetting(QStringLiteral("agw"), QStringLiteral("192.168.1.1"), QStringLiteral("Gateway"));
+    QTRY_COMPARE_WITH_TIMEOUT(wrote.count(), 2, 1000);
+    QVERIFY(!wrote.at(1).at(0).toBool());
+    QVERIFY(wrote.at(1).at(1).toString().contains(QStringLiteral("Read the network module")));
 
     QSignalSpy read(&driver, &Rt21Driver::networkFinished);
     driver.readNetwork();
-    QTRY_COMPARE_WITH_TIMEOUT(read.count(), 1, 12000);
+    QTRY_COMPARE_WITH_TIMEOUT(read.count(), 1, 15000);
     QVERIFY(read.at(0).at(0).toBool());
     QVERIFY(driver.networkReadOk());
 
+    driver.writeNetworkSetting(QStringLiteral("agw"), QStringLiteral("192.168.1"), QStringLiteral("Gateway"));
+    QTRY_COMPARE_WITH_TIMEOUT(wrote.count(), 3, 1000);
+    QVERIFY(!wrote.at(2).at(0).toBool());
+    QVERIFY(wrote.at(2).at(1).toString().contains(QStringLiteral("IPv4")));
+
     QSignalSpy status(&driver, &Rt21Driver::networkStatus);
-    driver.writeNetworkSetting(QStringLiteral("dhcp"), QStringLiteral("Static"), QStringLiteral("DHCP"));
-    QTRY_COMPARE_WITH_TIMEOUT(wrote.count(), 2, 40000);
-    QVERIFY(wrote.at(1).at(0).toBool());
-    QCOMPARE(wrote.at(1).at(1).toString(), QStringLiteral("Saved DHCP"));
-    QCOMPARE(status.at(0).at(0).toString(), QStringLiteral("Writing DHCP (try 1 of 12)…"));
-    bool sawSet = false;
-    bool sawQuery = false;
-    for (const QByteArray &cmd : server.sim()->trace()) {
-        if (cmd.contains("AT*DHCP=1"))
-            sawSet = true;
-        if (cmd.contains("AT*DHCP?"))
-            sawQuery = true;
+    driver.writeNetworkSetting(QStringLiteral("agw"), QStringLiteral("192.168.1.1"), QStringLiteral("Gateway"));
+    QTRY_COMPARE_WITH_TIMEOUT(wrote.count(), 4, 40000);
+    QVERIFY(wrote.at(3).at(0).toBool());
+    QCOMPARE(wrote.at(3).at(1).toString(), QStringLiteral("Saved Gateway"));
+    QCOMPARE(status.at(0).at(0).toString(), QStringLiteral("Writing Gateway (try 1 of 12)…"));
+    const QList<QByteArray> trace = server.sim()->trace();
+    int setAt = -1;
+    for (int i = 0; i < trace.size(); ++i) {
+        QVERIFY(!trace.at(i).contains("AT*RESET"));
+        QVERIFY(!trace.at(i).contains(';') || trace.at(i) == QByteArray("ESC") || !trace.at(i).startsWith("AT"));
+        if (trace.at(i) == QByteArray("AT*AGW=192.168.1.1"))
+            setAt = i;
     }
-    QVERIFY(sawSet);
-    QVERIFY(sawQuery);
+    QVERIFY(setAt >= 0);
+    QCOMPARE(trace.at(setAt + 1), QByteArray("AT*AGW?"));
+    QCOMPARE(trace.at(setAt + 2), QByteArray("AT*GW?"));
 }
 
 void TestSetup::screenSaverIsOnlyInTheDisplayGroup()

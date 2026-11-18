@@ -23,6 +23,8 @@ inline StatusTone statusTone(const QString &text)
         || t.contains(QStringLiteral("link dropped")) || t.contains(QStringLiteral("link closed"))
         || t.contains(QStringLiteral("didn't reopen"))
         || t.contains(QStringLiteral("read the network module"))
+        || t.contains(QStringLiteral("only the gateway"))
+        || t.contains(QStringLiteral("ipv4"))
         || t.contains(QStringLiteral("connect to a rotor")) || t.contains(QStringLiteral("drops the link"))
         || t.contains(QStringLiteral("pre-release")) || t.contains(QStringLiteral("hang serial")))
         return StatusTone::Failure;

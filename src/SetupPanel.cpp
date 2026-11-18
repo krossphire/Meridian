@@ -158,7 +158,7 @@ void SetupPanel::buildNetwork()
         {QStringLiteral("nmask"), QStringLiteral("Current mask")},
         {QStringLiteral("anmask"), QStringLiteral("Static mask")},
         {QStringLiteral("gw"), QStringLiteral("Current gateway")},
-        {QStringLiteral("agw"), QStringLiteral("Static gateway")},
+        {QStringLiteral("agw"), QStringLiteral("Gateway")},
         {QStringLiteral("dns"), QStringLiteral("DNS")},
         {QStringLiteral("http"), QStringLiteral("HTTP port")},
         {QStringLiteral("serialPort"), QStringLiteral("Serial TCP port")},
@@ -184,10 +184,7 @@ void SetupPanel::buildNetwork()
         if (row.first == QLatin1String("mode"))
             edit->setPlaceholderText(QStringLiteral("Not in the setup utility"));
         values.insert(row.first, edit);
-        const bool canWrite = row.first == QLatin1String("dhcp") || row.first == QLatin1String("aip")
-                              || row.first == QLatin1String("anmask") || row.first == QLatin1String("agw")
-                              || row.first == QLatin1String("http") || row.first == QLatin1String("udp")
-                              || row.first == QLatin1String("serialPort");
+        const bool canWrite = row.first == QLatin1String("agw");
         if (canWrite) {
             edit->setReadOnly(false);
             edit->setPlaceholderText(QStringLiteral("Not read"));
@@ -215,7 +212,7 @@ void SetupPanel::buildNetwork()
     gatewayNote->setWordWrap(true);
     form->addRow(QString(), gatewayNote);
     auto *noReset = new QLabel(QStringLiteral(
-        "Reset to defaults is not offered. Write stays off until a network read succeeds on this connection."));
+        "Reset to defaults is not offered. The gateway can be written after a network read on this serial connection. Other network settings stay read-only."));
     noReset->setWordWrap(true);
     form->addRow(QString(), noReset);
 

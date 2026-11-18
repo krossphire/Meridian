@@ -143,7 +143,8 @@ private:
         WriteAck,
         WriteRead,
         Exiting,
-        Quiet
+        Quiet,
+        PreAt
     };
 
     void startNetworkPass();
@@ -151,6 +152,7 @@ private:
     void sendWarmupPoll();
     void onWarmupAnswer(const QByteArray &command);
     void onWarmupMiss();
+    void holdQuietThenEnter();
     void armNetworkTimer(int ms);
     void onNetworkTimeout();
     bool handleNetworkFrame(const QByteArray &frame);
@@ -287,6 +289,7 @@ private:
     QString networkWriteExpect;
     QByteArray networkReadBackCommand;
     QString networkReadBackToken;
+    int networkWriteReadStep = 0;
     qint64 lastModuleTxMs = -1;
     bool awaitHeadingAfterNetwork = false;
     bool networkHeadingRetried = false;

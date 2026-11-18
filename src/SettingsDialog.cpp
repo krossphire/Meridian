@@ -347,7 +347,8 @@ void SettingsDialog::setDriver(Rt21Driver *next)
             setStatus(message.isEmpty() ? fallback : message);
             const bool brightnessNote = message.startsWith(QStringLiteral("Brightness"))
                                         || message.startsWith(QStringLiteral("RT-21 stopped answering after write"));
-            if (ok && driver && !brightnessNote)
+            const bool networkWrite = message.contains(QStringLiteral("Gateway"));
+            if (ok && driver && !brightnessNote && !networkWrite)
                 driver->readConfiguration();
         });
 }

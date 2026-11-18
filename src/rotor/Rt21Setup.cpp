@@ -86,6 +86,7 @@ QList<ModuleQuery> networkReadSequence()
     rows.append(query("AT*AIP?\n", "AIP=", "aip"));
     rows.append(query("AT*NMASK?\n", "NMASK=", "nmask"));
     rows.append(query("AT*GW?\n", "GW=", "gw"));
+    rows.append(query("AT*AGW?\n", "AGW=", "agw"));
     rows.append(query("AT*ID?\n", "ID=", "id"));
     rows.append(query("AT*HTTP?\n", "HTTP=", "http"));
     rows.append(query("AT*UDP?\n", "UDP=", "udp"));

@@ -61,6 +61,7 @@ constexpr int kWarmupRetryMs = 5000;
 constexpr int kWarmupGapMs = 400;
 constexpr int kWarmupCapMs = 15000;
 constexpr int kPassThroughQuietMs = 35000;
+constexpr int kPreAtQuietMs = 650;
 
 void preciseSleepMs(int ms)
 {
@@ -1702,12 +1703,18 @@ void Rt21Driver::enqueueNetworkQueries()
         write.expectToken = QStringLiteral("OK");
         write.note = QStringLiteral("netwrite");
         queue.enqueue(write);
-        Job read;
-        read.kind = Kind::Module;
-        read.bytes = networkReadBackCommand;
-        read.moduleKey = networkWriteKey;
-        read.expectToken = networkReadBackToken;
-        queue.enqueue(read);
+        Job agw;
+        agw.kind = Kind::Module;
+        agw.bytes = QByteArray("AT*AGW?\n");
+        agw.moduleKey = QStringLiteral("agw");
+        agw.expectToken = QStringLiteral("AGW=");
+        queue.enqueue(agw);
+        Job gw;
+        gw.kind = Kind::Module;
+        gw.bytes = QByteArray("AT*GW?\n");
+        gw.moduleKey = QStringLiteral("gw");
+        gw.expectToken = QStringLiteral("GW=");
+        queue.enqueue(gw);
         sendNetworkExit();
         return;
     }
@@ -2214,6 +2221,7 @@ void Rt21Driver::sendNetworkWrite()
         beginNetworkExit();
         return;
     }
+    networkWriteReadStep = 0;
     networkPhase = NetworkPhase::WriteAck;
     framer.setLineMode(true);
     sendNetworkBytes(networkWriteCommand.toLatin1());
@@ -2257,7 +2265,7 @@ void Rt21Driver::onNetworkTimeout()
 bool Rt21Driver::handleNetworkFrame(const QByteArray &frame)
 {
     if (networkPhase == NetworkPhase::Idle || networkPhase == NetworkPhase::Warmup
-        || networkPhase == NetworkPhase::Quiet)
+        || networkPhase == NetworkPhase::Quiet || networkPhase == NetworkPhase::PreAt)
         return false;
     if (networkPhase == NetworkPhase::Exiting || networkPhase == NetworkPhase::AfterUart)
         return true;
@@ -2342,8 +2350,10 @@ bool Rt21Driver::handleNetworkFrame(const QByteArray &frame)
         if (networkQueryIndex >= rows.size())
             return true;
         const Rt21::ModuleQuery query = rows.at(networkQueryIndex);
-        if (!line.contains(query.token, Qt::CaseInsensitive))
+        if (!line.startsWith(query.token, Qt::CaseInsensitive))
             return true;
+        TrafficLog::instance().recordSession(
+            "NOTE", QByteArray("network query rx ") + line.toLatin1() + " " + frame.toHex(' '));
         if (networkTimer)
             networkTimer->stop();
         const QString value = takeValue(query.token);
@@ -2358,25 +2368,45 @@ bool Rt21Driver::handleNetworkFrame(const QByteArray &frame)
     if (networkPhase == NetworkPhase::WriteAck) {
         if (!okLine)
             return true;
+        TrafficLog::instance().recordSession(
+            "NOTE", QByteArray("network write rx ") + line.toLatin1() + " " + frame.toHex(' '));
         if (networkTimer)
             networkTimer->stop();
         networkPhase = NetworkPhase::WriteRead;
-        sendNetworkBytes(networkReadBackCommand);
+        networkWriteReadStep = 0;
+        sendNetworkBytes(QByteArray("AT*AGW?\n"));
         armNetworkTimer(300);
         return true;
     }
 
     if (networkPhase == NetworkPhase::WriteRead) {
-        if (!line.contains(networkReadBackToken, Qt::CaseInsensitive))
+        const bool agwLine = line.startsWith(QStringLiteral("AGW="), Qt::CaseInsensitive);
+        const bool gwLine = line.startsWith(QStringLiteral("GW="), Qt::CaseInsensitive);
+        if (networkWriteReadStep == 0) {
+            if (!agwLine)
+                return true;
+            TrafficLog::instance().recordSession(
+                "NOTE", QByteArray("network query rx ") + line.toLatin1() + " " + frame.toHex(' '));
+            if (networkTimer)
+                networkTimer->stop();
+            const QString value = takeValue(QStringLiteral("AGW="));
+            networkWriteOk = value == networkWriteExpect;
+            TrafficLog::instance().recordSession(
+                "NOTE", QByteArray("network read-back ") + value.toLatin1()
+                            + (networkWriteOk ? " match" : " mismatch"));
+            emit networkField(QStringLiteral("agw"), value);
+            networkWriteReadStep = 1;
+            sendNetworkBytes(QByteArray("AT*GW?\n"));
+            armNetworkTimer(300);
             return true;
+        }
+        if (!gwLine)
+            return true;
+        TrafficLog::instance().recordSession(
+            "NOTE", QByteArray("network query rx ") + line.toLatin1() + " " + frame.toHex(' '));
         if (networkTimer)
             networkTimer->stop();
-        const QString value = takeValue(networkReadBackToken);
-        networkWriteOk = value == networkWriteExpect;
-        TrafficLog::instance().recordSession(
-            "NOTE", QByteArray("network read-back ") + value.toLatin1()
-                        + (networkWriteOk ? " match" : " mismatch"));
-        emit networkField(networkWriteKey, value);
+        emit networkField(QStringLiteral("gw"), takeValue(QStringLiteral("GW=")));
         beginNetworkExit();
         return true;
     }
@@ -2439,7 +2469,7 @@ void Rt21Driver::onWarmupAnswer(const QByteArray &command)
     if (elapsed >= networkWarmupMs && networkWarmupSawR01 && networkWarmupSawR21) {
         TrafficLog::instance().recordSession(
             "NOTE", QByteArray("network warmup done ") + QByteArray::number(int(elapsed)) + " ms");
-        startNetworkPass();
+        holdQuietThenEnter();
         return;
     }
     QTimer::singleShot(kWarmupGapMs, this, [this]() {
@@ -2466,6 +2496,30 @@ void Rt21Driver::onWarmupMiss()
         if (networkPhase == NetworkPhase::Warmup && !networkCancel)
             sendWarmupPoll();
     });
+}
+
+void Rt21Driver::holdQuietThenEnter()
+{
+    if (networkPhase != NetworkPhase::Warmup || retired)
+        return;
+    const qint64 replyMs = QDateTime::currentMSecsSinceEpoch();
+    networkPhase = NetworkPhase::PreAt;
+    networkTxQuiet = true;
+    if (pollTimer)
+        pollTimer->stop();
+    replyTimer->stop();
+    inflight.reset();
+    queue.clear();
+    preciseSleepMs(kPreAtQuietMs);
+    networkTxQuiet = false;
+    const int quiet = int(QDateTime::currentMSecsSinceEpoch() - replyMs);
+    TrafficLog::instance().recordSession(
+        "NOTE", QByteArray("network pre-AT quiet ") + QByteArray::number(quiet) + " ms");
+    if (retired || networkCancel || !wantLink) {
+        beginNetworkExit();
+        return;
+    }
+    startNetworkPass();
 }
 
 void Rt21Driver::startNetworkPass()
@@ -2636,6 +2690,10 @@ void Rt21Driver::writeNetworkSetting(const QString &key, const QString &value, c
             "Needs a USB or serial connection; changing network settings over IP can drop the link."));
         return;
     }
+    if (key != QLatin1String("agw")) {
+        emit writeFinished(false, QStringLiteral("Only the gateway can be written right now."));
+        return;
+    }
     if (!networkReadOkThisSession) {
         emit writeFinished(false, QStringLiteral("Read the network module before writing it."));
         return;
@@ -2645,49 +2703,38 @@ void Rt21Driver::writeNetworkSetting(const QString &key, const QString &value, c
         emit writeFinished(false, Rt21::firmwareNotice(firmwareReport));
         return;
     }
-    QString command;
     const QString trimmed = value.trimmed();
-    if (key == QLatin1String("dhcp")) {
-        QString code;
-        if (trimmed == QLatin1String("0") || trimmed.startsWith(QStringLiteral("DHCP"), Qt::CaseInsensitive))
-            code = QStringLiteral("0");
-        else if (trimmed == QLatin1String("1") || trimmed.startsWith(QStringLiteral("Static"), Qt::CaseInsensitive))
-            code = QStringLiteral("1");
-        else {
-            emit writeFinished(false, QStringLiteral("DHCP is 0 or 1."));
-            return;
+    const QStringList octets = trimmed.split(QLatin1Char('.'));
+    QStringList normalized;
+    bool dotted = octets.size() == 4;
+    for (const QString &octet : octets) {
+        if (!dotted)
+            break;
+        if (octet.isEmpty() || octet.size() > 3) {
+            dotted = false;
+            break;
         }
-        command = QStringLiteral("AT*DHCP=%1\n").arg(code);
-        networkWriteExpect = code;
-        networkReadBackCommand = QByteArray("AT*DHCP?\n");
-        networkReadBackToken = QStringLiteral("DHCP=");
-    } else if (key == QLatin1String("aip") || key == QLatin1String("anmask") || key == QLatin1String("agw")) {
-        QHostAddress address;
-        if (!address.setAddress(trimmed) || address.protocol() != QAbstractSocket::IPv4Protocol) {
-            emit writeFinished(false, QStringLiteral("%1 needs an IPv4 address.").arg(settingName));
-            return;
+        for (const QChar c : octet) {
+            if (!c.isDigit())
+                dotted = false;
         }
-        const char *id = key == QLatin1String("aip") ? "AIP" : key == QLatin1String("anmask") ? "ANMASK" : "AGW";
-        command = QStringLiteral("AT*%1=%2\n").arg(QLatin1String(id), address.toString());
-        networkWriteExpect = address.toString();
-        networkReadBackCommand = QByteArray("AT*") + id + "?\n";
-        networkReadBackToken = QString::fromLatin1(id) + QStringLiteral("=");
-    } else if (key == QLatin1String("http") || key == QLatin1String("udp") || key == QLatin1String("serialPort")) {
         bool ok = false;
-        const int port = trimmed.toInt(&ok);
-        if (!ok || port < 1 || port > 65535) {
-            emit writeFinished(false, QStringLiteral("%1 needs a port from 1 to 65535.").arg(settingName));
-            return;
-        }
-        const char *id = key == QLatin1String("http") ? "HTTP" : key == QLatin1String("udp") ? "UDP" : "NVREG16_0";
-        command = QStringLiteral("AT*%1=%2\n").arg(QLatin1String(id)).arg(port);
-        networkWriteExpect = QString::number(port);
-        networkReadBackCommand = QByteArray("AT*") + id + "?\n";
-        networkReadBackToken = QString::fromLatin1(id) + QStringLiteral("=");
-    } else {
-        emit writeFinished(false, QStringLiteral("Write not confirmed: %1").arg(settingName));
+        const int n = octet.toInt(&ok);
+        if (!ok || n < 0 || n > 255)
+            dotted = false;
+        if (dotted)
+            normalized.append(QString::number(n));
+    }
+    if (!dotted) {
+        emit writeFinished(false, QStringLiteral("Gateway needs an IPv4 address."));
         return;
     }
+    const QString address = normalized.join(QLatin1Char('.'));
+    const QString command = QStringLiteral("AT*AGW=%1\n").arg(address);
+    networkWriteExpect = address;
+    networkReadBackCommand = QByteArray("AT*AGW?\n");
+    networkReadBackToken = QStringLiteral("AGW=");
+    networkWriteReadStep = 0;
     if (command.contains(QLatin1Char(';')) || command.startsWith(QStringLiteral("W0"))) {
         emit writeFinished(false, QStringLiteral("Write not confirmed: %1").arg(settingName));
         return;
