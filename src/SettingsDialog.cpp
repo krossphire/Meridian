@@ -448,6 +448,8 @@ bool SettingsDialog::commitDraft(bool interactive)
     }
     if (trafficBox)
         draft.trafficLog = trafficBox->isChecked();
+    if (serialBytesBox)
+        draft.serialBytes = serialBytesBox->isChecked();
     if (sunBox)
         draft.showSun = sunBox->isChecked();
     if (idleSpin)
@@ -463,6 +465,8 @@ void SettingsDialog::setConfig(const AppConfig &config)
     homeEdit->setText(draft.homeText);
     if (trafficBox)
         trafficBox->setChecked(draft.trafficLog);
+    if (serialBytesBox)
+        serialBytesBox->setChecked(draft.serialBytes);
     if (sunBox)
         sunBox->setChecked(draft.showSun);
     if (idleSpin)
@@ -504,6 +508,14 @@ void SettingsDialog::buildStation()
     layout->addWidget(detail);
     trafficBox = new QCheckBox(QStringLiteral("Record rotor traffic"));
     trafficBox->setChecked(draft.trafficLog);
+    serialBytesBox = new QCheckBox(QStringLiteral("Log exact serial bytes"));
+    serialBytesBox->setObjectName(QStringLiteral("serialBytes"));
+    serialBytesBox->setChecked(draft.serialBytes);
+    auto *byteHint = new QLabel(QStringLiteral(
+        "Writes each byte on the serial port, with the time, into the traffic log. "
+        "Leave this on when a network read fails."));
+    byteHint->setWordWrap(true);
+    byteHint->setObjectName(QStringLiteral("hint"));
     auto *filePath = new QLabel(UserFiles::settingsPath());
     filePath->setObjectName(QStringLiteral("settingsPath"));
     filePath->setWordWrap(true);
@@ -521,6 +533,8 @@ void SettingsDialog::buildStation()
     where->setObjectName(QStringLiteral("hint"));
     layout->addSpacing(16);
     layout->addWidget(trafficBox);
+    layout->addWidget(serialBytesBox);
+    layout->addWidget(byteHint);
     layout->addWidget(where);
     layout->addWidget(filePath);
     layout->addWidget(openFolder, 0, Qt::AlignLeft);

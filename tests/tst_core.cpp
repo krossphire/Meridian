@@ -11,14 +11,21 @@
 #include "core/ZipCodes.h"
 #include "map/GeoMap.h"
 #include "core/Solar.h"
+#include "rotor/AppConfig.h"
 #include "rotor/Reconnect.h"
 #include "rotor/Rt21Protocol.h"
+#include "rotor/SerialLines.h"
+#include "rotor/TrafficLog.h"
+#include "rotor/UserFiles.h"
 
 #include <QDateTime>
 #include <QFile>
+#include <QSettings>
+#include <QTemporaryDir>
 #include <QTest>
 
 #include <cmath>
+#include <cstring>
 
 class TestCore : public QObject
 {
@@ -38,6 +45,7 @@ private slots:
     void commands();
     void headingParse();
     void hardwareRx();
+    void serialWireBytes();
     void solarPosition();
     void reconnectTiming();
 };
@@ -328,6 +336,98 @@ void TestCore::hardwareRx()
     QVERIFY(moving->haveStatus);
     QCOMPARE(moving->status, 1);
     QVERIFY(std::abs(moving->azimuth - 122.6) < 1e-9);
+}
+
+void TestCore::serialWireBytes()
+{
+    const QByteArray echo = Rt21::networkEchoCommand();
+    QCOMPARE(echo, QByteArray::fromHex("41542a53455249414c5f4543484f3d300a"));
+    QCOMPARE(echo.size(), 17);
+    QVERIFY(!echo.contains('\0'));
+    QCOMPARE(Rt21::networkEnterCommand(), QByteArray("AT;"));
+    QCOMPARE(Rt21::networkEscCommand(), QByteArray(1, '\x1b'));
+    QCOMPARE(Rt21::queryPot(), QByteArray("R01;"));
+    QCOMPARE(Rt21::queryStatus(), QByteArray("R21;"));
+    QByteArray utf16;
+    for (unsigned char c : echo) {
+        utf16.append(char(c));
+        utf16.append('\0');
+    }
+    QCOMPARE(utf16.size(), echo.size() * 2);
+    QVERIFY(utf16 != echo);
+
+    char padded[16] = {};
+    const QByteArray ok("OK\r\n");
+    memcpy(padded, ok.constData(), size_t(ok.size()));
+    QCOMPARE(serialBytesTaken(padded, int(sizeof padded), ok.size()), ok);
+    QVERIFY(serialBytesTaken(padded, int(sizeof padded), 0).isEmpty());
+    padded[0] = 0;
+    QVERIFY(serialBytesTaken(padded, int(sizeof padded), 0).isEmpty());
+
+    // 01 30 00 3E 42.9; is a real stopped-status frame. The 00 before '>' is
+    // the flag. Two more 00s are only the unused tail of a larger read.
+    const QByteArray idle = QByteArray::fromHex("0130003e34322e393b");
+    QCOMPARE(idle.size(), 9);
+    QCOMPARE(idle.at(2), '\0');
+    char idleBuf[12] = {};
+    memcpy(idleBuf, idle.constData(), size_t(idle.size()));
+    const QByteArray taken = serialBytesTaken(idleBuf, int(sizeof idleBuf), idle.size());
+    QCOMPARE(taken, idle);
+    Rt21::Framer idleFramer;
+    idleFramer.append(taken);
+    const QList<QByteArray> idleFrames = idleFramer.take();
+    QCOMPARE(idleFrames.size(), 1);
+    const auto stopped = Rt21::parseStatusFrame(idleFrames.at(0));
+    QVERIFY(stopped);
+    QCOMPARE(stopped->status, 0);
+    QVERIFY(std::abs(stopped->azimuth - 42.9) < 1e-9);
+
+    Rt21::Framer lines;
+    lines.setLineMode(true);
+    lines.append("ERROR 1\r\nOK\r\n");
+    const QList<QByteArray> replies = lines.take();
+    QCOMPARE(replies.size(), 2);
+    QCOMPARE(Rt21::moduleReplyText(replies.at(0)), QStringLiteral("ERROR 1"));
+    QCOMPARE(Rt21::moduleReplyText(replies.at(1)), QStringLiteral("OK"));
+
+    Rt21::Framer semi;
+    semi.append("<uart2>;");
+    QCOMPARE(Rt21::moduleReplyText(semi.take().at(0)), QStringLiteral("<uart2>"));
+
+    QByteArray wideUart;
+    for (unsigned char c : QByteArray("<uart2>;")) {
+        wideUart.append(char(c));
+        wideUart.append('\0');
+    }
+    Rt21::Framer wide;
+    wide.append(wideUart);
+    const QList<QByteArray> wideFrames = wide.take();
+    QCOMPARE(wideFrames.size(), 1);
+    QVERIFY(Rt21::moduleReplyText(wideFrames.at(0)) != QStringLiteral("<uart2>"));
+    QVERIFY(!Rt21::moduleReplyText(QByteArray("O\0K", 3)).contains(QStringLiteral("OK")));
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    UserFiles::setRoot(dir.path());
+    AppConfig config = AppConfig::defaults();
+    QCOMPARE(config.serialBytes, true);
+    config.serialBytes = false;
+    QSettings settings(dir.filePath(QStringLiteral("meridian.ini")), QSettings::IniFormat);
+    config.save(settings);
+    settings.sync();
+    QSettings again(dir.filePath(QStringLiteral("meridian.ini")), QSettings::IniFormat);
+    QCOMPARE(AppConfig::load(again).serialBytes, false);
+
+    TrafficLog::instance().setByteLog(true);
+    TrafficLog::instance().recordPort("PORT-TX", echo);
+    TrafficLog::instance().flush();
+    QFile logFile(TrafficLog::instance().filePath());
+    QVERIFY(logFile.open(QIODevice::ReadOnly));
+    const QString log = QString::fromUtf8(logFile.readAll());
+    QVERIFY(log.contains(QStringLiteral("PORT-TX")));
+    QVERIFY(log.contains(QStringLiteral("41 54 2A 53 45 52 49 41 4C 5F 45 43 48 4F 3D 30 0A")));
+    QVERIFY(!log.contains(QStringLiteral("41 00 54 00")));
+    QVERIFY(log.contains(QStringLiteral("0.1.0-alpha25b")));
 }
 
 void TestCore::solarPosition()

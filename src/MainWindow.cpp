@@ -29,8 +29,9 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
     , config(std::move(initial))
     , settings(store)
 {
-    setWindowTitle(QStringLiteral("Meridian 0.1.0-alpha24"));
+    setWindowTitle(QStringLiteral("Meridian 0.1.0-alpha25b"));
     TrafficLog::instance().setEnabled(config.trafficLog);
+    TrafficLog::instance().setByteLog(config.serialBytes);
     globe = new GlobeWidget;
     setCentralWidget(globe);
     resize(880, 920);
@@ -120,6 +121,7 @@ void MainWindow::applyConfig(const AppConfig &saved)
 {
     config = saved;
     TrafficLog::instance().setEnabled(config.trafficLog);
+    TrafficLog::instance().setByteLog(config.serialBytes);
     UserFiles::save(config);
     applyHome();
     QStringList names;

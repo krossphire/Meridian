@@ -147,6 +147,33 @@ QByteArray setPulseHeading(double azimuth)
     return QByteArray("AW1") + azField(azimuth) + QByteArray(";");
 }
 
+QByteArray networkEnterCommand()
+{
+    return QByteArray("AT;");
+}
+
+QByteArray networkEchoCommand()
+{
+    return QByteArray("AT*SERIAL_ECHO=0\n");
+}
+
+QByteArray networkEscCommand()
+{
+    return QByteArray(1, '\x1b');
+}
+
+QString moduleReplyText(const QByteArray &frame)
+{
+    QString line;
+    for (unsigned char c : frame) {
+        if (c >= 32 && c < 127)
+            line.append(QChar(c));
+        else if (!line.isEmpty() && !line.endsWith(QLatin1Char(' ')))
+            line.append(QLatin1Char(' '));
+    }
+    return line.trimmed();
+}
+
 std::optional<double> parseHeading(const QByteArray &frame)
 {
     const QByteArray body = stripNoise(frame);

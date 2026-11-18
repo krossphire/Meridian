@@ -20,6 +20,10 @@ public:
 
     void setEnabled(bool on);
     bool isEnabled() const { return enabled; }
+    void setByteLog(bool on);
+    bool byteLogOn() const { return byteLog; }
+    // Exact bytes that crossed QSerialPort or the raw overlapped handle.
+    void recordPort(const char *direction, const QByteArray &bytes);
     QString directory() const;
     QString filePath() const { return path; }
 
@@ -35,6 +39,7 @@ private:
     void writeLine(const QString &line);
 
     bool enabled = false;
+    bool byteLog = false;
     QString path;
     bool opened = false;
 };

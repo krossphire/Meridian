@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
     QApplication::setOrganizationName(QStringLiteral("K5PO"));
     QApplication::setOrganizationDomain(QStringLiteral("k5po.example"));
     QApplication::setApplicationName(QStringLiteral("Meridian"));
-    QApplication::setApplicationVersion(QStringLiteral("0.1.0-alpha24"));
+    QApplication::setApplicationVersion(QStringLiteral("0.1.0-alpha25b"));
     QApplication::setWindowIcon(appIcon());
     installFonts();
     installPalette(app);
@@ -118,12 +118,15 @@ int main(int argc, char *argv[])
     QCommandLineOption dprOpt(QStringLiteral("dpr"), QStringLiteral("Device pixel ratio for the sharp screenshot."),
                               QStringLiteral("scale"), QStringLiteral("2"));
     QCommandLineOption logOpt(QStringLiteral("log"), QStringLiteral("Record raw rotor TX/RX for this session."));
+    QCommandLineOption bytesOpt(QStringLiteral("serial-bytes"),
+                                QStringLiteral("Log every serial byte with its time."));
     parser.addOption(configOpt);
     parser.addOption(connectOpt);
     parser.addOption(mockOpt);
     parser.addOption(shotsOpt);
     parser.addOption(dprOpt);
     parser.addOption(logOpt);
+    parser.addOption(bytesOpt);
     parser.process(app);
 
     if (parser.isSet(shotsOpt))
@@ -134,7 +137,10 @@ int main(int argc, char *argv[])
     AppConfig config = UserFiles::load();
     if (parser.isSet(logOpt))
         config.trafficLog = true;
+    if (parser.isSet(bytesOpt))
+        config.serialBytes = true;
     TrafficLog::instance().setEnabled(config.trafficLog);
+    TrafficLog::instance().setByteLog(config.serialBytes);
     MockRt21Server mock;
     if (parser.isSet(mockOpt)) {
         mock.sim()->setHeading(52);

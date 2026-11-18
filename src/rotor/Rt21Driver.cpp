@@ -8,6 +8,7 @@
 
 #include "StatusTone.h"
 
+#include "LoggedSerialPort.h"
 #include "NetCycleProbe.h"
 #include "Reconnect.h"
 #include "SerialLines.h"
@@ -42,6 +43,20 @@
 #  include <netinet/tcp.h>
 #  include <sys/socket.h>
 #  include <termios.h>
+#endif
+
+#if defined(Q_OS_WIN)
+struct WinRawSerial
+{
+    HANDLE handle = INVALID_HANDLE_VALUE;
+    HANDLE readEvent = nullptr;
+    HANDLE writeEvent = nullptr;
+    OVERLAPPED readOv{};
+    OVERLAPPED writeOv{};
+    bool readPending = false;
+    qint64 timeoutLogMs = 0;
+    char buf[512]{};
+};
 #endif
 
 namespace {
@@ -159,6 +174,64 @@ void wakeSerialForClose(QSerialPort *port)
     ::SetCommMask(handle, 0);
     ::CancelIoEx(handle, nullptr);
     ::PurgeComm(handle, PURGE_RXABORT | PURGE_RXCLEAR | PURGE_TXABORT | PURGE_TXCLEAR);
+}
+
+void closeWinRaw(WinRawSerial *&raw)
+{
+    if (!raw)
+        return;
+    if (raw->handle != INVALID_HANDLE_VALUE) {
+        ::CancelIoEx(raw->handle, nullptr);
+        if (raw->readPending && raw->readEvent)
+            ::WaitForSingleObject(raw->readEvent, 50);
+        ::CloseHandle(raw->handle);
+        raw->handle = INVALID_HANDLE_VALUE;
+    }
+    if (raw->readEvent)
+        ::CloseHandle(raw->readEvent);
+    if (raw->writeEvent)
+        ::CloseHandle(raw->writeEvent);
+    delete raw;
+    raw = nullptr;
+}
+
+// Overlapped, like .NET SerialPort. A synchronous ReadFile on this thread
+// blocks inside the Edgeport driver for the 2000 ms timeout, and a write
+// that has only been queued never reaches the module.
+bool writeWinRaw(WinRawSerial *raw, const QByteArray &bytes)
+{
+    if (!raw || raw->handle == INVALID_HANDLE_VALUE || bytes.isEmpty() || !raw->writeEvent)
+        return false;
+    TrafficLog::instance().recordPort("PORT-TX", bytes);
+    ::ResetEvent(raw->writeEvent);
+    ::ZeroMemory(&raw->writeOv, sizeof raw->writeOv);
+    raw->writeOv.hEvent = raw->writeEvent;
+    DWORD wrote = 0;
+    const BOOL started = ::WriteFile(raw->handle, bytes.constData(), DWORD(bytes.size()), &wrote, &raw->writeOv);
+    if (!started && ::GetLastError() != ERROR_IO_PENDING) {
+        TrafficLog::instance().recordSession(
+            "NOTE", QByteArray("raw write failed err ") + QByteArray::number(int(::GetLastError())) + " of "
+                        + QByteArray::number(bytes.size()));
+        return false;
+    }
+    if (!started || int(wrote) != bytes.size()) {
+        if (::WaitForSingleObject(raw->writeEvent, 300) != WAIT_OBJECT_0) {
+            TrafficLog::instance().recordSession("NOTE", QByteArray("raw write still pending after 300 ms"));
+            return false;
+        }
+        if (!::GetOverlappedResult(raw->handle, &raw->writeOv, &wrote, FALSE)) {
+            TrafficLog::instance().recordSession(
+                "NOTE", QByteArray("raw write failed err ") + QByteArray::number(int(::GetLastError())));
+            return false;
+        }
+    }
+    if (int(wrote) != bytes.size()) {
+        TrafficLog::instance().recordSession(
+            "NOTE", QByteArray("raw write short ") + QByteArray::number(int(wrote)) + "/"
+                        + QByteArray::number(bytes.size()));
+        return false;
+    }
+    return true;
 }
 #endif
 int g_transports = 0;
@@ -726,8 +799,13 @@ void Rt21Driver::closeIo(const QString &reason)
             io = nullptr;
         port->disconnect(this);
         TrafficLog::instance().note(QStringLiteral("close %1 serial error=%2").arg(reason, port->errorString()));
-        if (port->isOpen())
+        if (port->isOpen()) {
+#if defined(Q_OS_WIN)
+            PortLeaveLines::apply(port);
+            wakeSerialForClose(port);
+#endif
             port->close();
+        }
         port->setParent(nullptr);
         port->deleteLater();
         trackTransport(-1);
@@ -794,7 +872,7 @@ void Rt21Driver::connectEndpoint(const RotorEndpoint &next)
         return;
     }
 
-    serial = new QSerialPort(this);
+    serial = new LoggedSerialPort(this);
     trackTransport(1);
     io = serial;
     serial->setPortName(endpoint.serialPort);
@@ -1024,7 +1102,7 @@ void Rt21Driver::ingestReceived(const QByteArray &received, bool fromSerial)
 
 void Rt21Driver::onReadyRead()
 {
-    if (networkRawHandle)
+    if (winRaw)
         return;
     if (!io || (serial && !serial->isOpen()))
         return;
@@ -1034,13 +1112,65 @@ void Rt21Driver::onReadyRead()
 void Rt21Driver::pollRawSerial()
 {
 #if defined(Q_OS_WIN)
-    if (!networkRawHandle)
+    if (!winRaw || winRaw->handle == INVALID_HANDLE_VALUE)
         return;
-    char buf[512];
-    DWORD got = 0;
-    if (!::ReadFile(reinterpret_cast<HANDLE>(networkRawHandle), buf, sizeof buf, &got, nullptr) || got == 0)
+    WinRawSerial *raw = winRaw;
+    auto deliver = [this, raw](DWORD got) {
+        const QByteArray bytes = serialBytesTaken(raw->buf, int(sizeof raw->buf), int(got));
+        if (bytes.isEmpty()) {
+            const qint64 now = QDateTime::currentMSecsSinceEpoch();
+            if (now - raw->timeoutLogMs >= 1000) {
+                raw->timeoutLogMs = now;
+                DWORD errors = 0;
+                COMSTAT stat{};
+                const BOOL cleared = ::ClearCommError(raw->handle, &errors, &stat);
+                TrafficLog::instance().recordSession(
+                    "NOTE", QByteArray("raw read complete 0 bytes (timeout, not a received 00) queued ")
+                                + QByteArray::number(cleared ? int(stat.cbInQue) : -1) + " err "
+                                + QByteArray::number(cleared ? int(errors) : -1));
+            }
+            return;
+        }
+        TrafficLog::instance().recordPort("PORT-RX", bytes);
+        ingestReceived(bytes, true);
+    };
+    if (raw->readPending) {
+        if (::WaitForSingleObject(raw->readEvent, 0) != WAIT_OBJECT_0)
+            return;
+        DWORD got = 0;
+        const BOOL ok = ::GetOverlappedResult(raw->handle, &raw->readOv, &got, FALSE);
+        raw->readPending = false;
+        if (!ok) {
+            TrafficLog::instance().recordSession(
+                "NOTE", QByteArray("raw read error ") + QByteArray::number(int(::GetLastError())));
+        } else {
+            deliver(got);
+        }
+    }
+    if (winRaw != raw)
         return;
-    ingestReceived(QByteArray(buf, int(got)), true);
+    for (int n = 0; n < 8 && winRaw == raw && !raw->readPending; ++n) {
+        ::ResetEvent(raw->readEvent);
+        ::ZeroMemory(&raw->readOv, sizeof raw->readOv);
+        raw->readOv.hEvent = raw->readEvent;
+        ::ZeroMemory(raw->buf, sizeof raw->buf);
+        DWORD got = 0;
+        const BOOL ok = ::ReadFile(raw->handle, raw->buf, sizeof raw->buf, &got, &raw->readOv);
+        if (ok) {
+            deliver(got);
+            if (got == 0 || winRaw != raw)
+                break;
+            continue;
+        }
+        const DWORD err = ::GetLastError();
+        if (err == ERROR_IO_PENDING) {
+            raw->readPending = true;
+            break;
+        }
+        TrafficLog::instance().recordSession(
+            "NOTE", QByteArray("raw read error ") + QByteArray::number(int(err)));
+        break;
+    }
 #else
     Q_UNUSED(this);
 #endif
@@ -1051,11 +1181,7 @@ void Rt21Driver::restoreQtSerial()
 #if defined(Q_OS_WIN)
     if (networkRawTimer)
         networkRawTimer->stop();
-    if (networkRawHandle) {
-        ::FlushFileBuffers(reinterpret_cast<HANDLE>(networkRawHandle));
-        ::CloseHandle(reinterpret_cast<HANDLE>(networkRawHandle));
-        networkRawHandle = nullptr;
-    }
+    closeWinRaw(winRaw);
 #endif
     if (serial && !serial->isOpen() && !endpoint.serialPort.isEmpty()) {
         serial->setBaudRate(endpoint.baud > 0 ? endpoint.baud : 4800);
@@ -1369,7 +1495,7 @@ void Rt21Driver::enqueue(Job job)
 
 void Rt21Driver::pump()
 {
-    if (networkTxQuiet || inflight || queue.isEmpty() || !io)
+    if (networkTxQuiet || winRaw || inflight || queue.isEmpty() || !io)
         return;
     inflight = queue.dequeue();
     if (inflight->brightness) {
@@ -1403,6 +1529,10 @@ void Rt21Driver::pump()
 
 void Rt21Driver::goTo(double azimuth)
 {
+    if (networkMode || portCycling || winRaw) {
+        showNote(QStringLiteral("Waiting for the network read to finish"));
+        return;
+    }
     const double clamped = clampRt21Azimuth(azimuth);
     pendingGoto = clamped;
     target_ = clamped;
@@ -1435,6 +1565,10 @@ void Rt21Driver::goTo(double azimuth)
 
 void Rt21Driver::stopMotion()
 {
+    if (networkMode || portCycling || winRaw) {
+        showNote(QStringLiteral("Waiting for the network read to finish"));
+        return;
+    }
     pendingGoto.reset();
     awaitPrePoll = false;
     commandArmed = false;
@@ -1748,14 +1882,12 @@ void Rt21Driver::armNetworkTimer(int ms)
 void Rt21Driver::sendNetworkBytes(const QByteArray &bytes)
 {
 #if defined(Q_OS_WIN)
-    if (networkRawHandle) {
+    if (winRaw) {
         if (bytes.contains("AT"))
             lastModuleTxMs = QDateTime::currentMSecsSinceEpoch();
         TrafficLog::instance().recordSession("NOTE", QByteArray("network tx ") + bytes.toHex(' '));
         TrafficLog::instance().recordSession("SER-TX", bytes);
-        DWORD wrote = 0;
-        ::WriteFile(reinterpret_cast<HANDLE>(networkRawHandle), bytes.constData(), DWORD(bytes.size()), &wrote,
-                    nullptr);
+        writeWinRaw(winRaw, bytes);
         return;
     }
 #endif
@@ -1838,8 +1970,8 @@ void Rt21Driver::cycleSerialPort(const std::function<void(bool)> &done)
     const int baud = endpoint.baud > 0 ? endpoint.baud : 4800;
     bool ok = true;
 #if defined(Q_OS_WIN)
-    HANDLE handle = networkRawHandle ? reinterpret_cast<HANDLE>(networkRawHandle) : portHandle(serial);
-    if (networkVariant == 'D' && !networkRawHandle) {
+    HANDLE handle = winRaw ? winRaw->handle : portHandle(serial);
+    if (networkVariant == 'D' && !winRaw) {
         HANDLE live = portHandle(serial);
         const qint64 closeStarted = QDateTime::currentMSecsSinceEpoch();
         PortLeaveLines::apply(serial);
@@ -1858,7 +1990,7 @@ void Rt21Driver::cycleSerialPort(const std::function<void(bool)> &done)
                                    : QStringLiteral("\\\\.\\") + endpoint.serialPort;
         const qint64 openStarted = QDateTime::currentMSecsSinceEpoch();
         handle = ::CreateFileW(reinterpret_cast<LPCWSTR>(device.utf16()), GENERIC_READ | GENERIC_WRITE, 0, nullptr,
-                               OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+                               OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr);
         bool opened = handle != INVALID_HANDLE_VALUE;
         if (opened) {
             COMMPROP properties{};
@@ -1912,13 +2044,28 @@ void Rt21Driver::cycleSerialPort(const std::function<void(bool)> &done)
             done(false);
             return;
         }
-        networkRawHandle = handle;
+        auto *raw = new WinRawSerial;
+        raw->handle = handle;
+        raw->readEvent = ::CreateEventW(nullptr, TRUE, FALSE, nullptr);
+        raw->writeEvent = ::CreateEventW(nullptr, TRUE, FALSE, nullptr);
+        if (!raw->readEvent || !raw->writeEvent) {
+            TrafficLog::instance().recordSession(
+                "NOTE", QByteArray("raw events failed err ") + QByteArray::number(int(::GetLastError())));
+            closeWinRaw(raw);
+            restoreQtSerial();
+            portCycling = false;
+            done(false);
+            return;
+        }
+        winRaw = raw;
+        TrafficLog::instance().recordSession("NOTE", QByteArray("network raw handle overlapped"));
         if (!networkRawTimer) {
             networkRawTimer = new QTimer(this);
             connect(networkRawTimer, &QTimer::timeout, this, [this]() { pollRawSerial(); });
         }
         networkRawTimer->start(5);
         framer.clear();
+        pollRawSerial();
         raiseLinesAndFinish(done);
         return;
     } else if (!handle || handle == INVALID_HANDLE_VALUE) {
@@ -2040,9 +2187,9 @@ void Rt21Driver::networkReopenFailed()
 
 void Rt21Driver::writeEsc()
 {
-    const QByteArray esc(1, '\x1b');
+    const QByteArray esc = Rt21::networkEscCommand();
 #if defined(Q_OS_WIN)
-    if (!networkRawHandle && !(serial && serial->isOpen()))
+    if (!winRaw && !(serial && serial->isOpen()))
         restoreQtSerial();
 #else
     if (!(serial && serial->isOpen()))
@@ -2194,7 +2341,7 @@ void Rt21Driver::resendEcho()
     networkPhase = NetworkPhase::WaitEcho;
     TrafficLog::instance().recordSession(
         "NOTE", QByteArray("network echo send ") + QByteArray::number(networkEchoSends));
-    sendNetworkBytes(QByteArray("AT*SERIAL_ECHO=0\n"));
+    sendNetworkBytes(Rt21::networkEchoCommand());
     armNetworkTimer(60);
 }
 
@@ -2270,14 +2417,7 @@ bool Rt21Driver::handleNetworkFrame(const QByteArray &frame)
     if (networkPhase == NetworkPhase::Exiting || networkPhase == NetworkPhase::AfterUart)
         return true;
 
-    QString line;
-    for (unsigned char c : frame) {
-        if (c >= 32 && c < 127)
-            line.append(QChar(c));
-        else if (!line.isEmpty() && !line.endsWith(QLatin1Char(' ')))
-            line.append(QLatin1Char(' '));
-    }
-    line = line.trimmed();
+    const QString line = Rt21::moduleReplyText(frame);
     if (line.isEmpty())
         return true;
 
@@ -2540,7 +2680,7 @@ void Rt21Driver::startNetworkPass()
     networkPhase = NetworkPhase::WaitUart;
     networkMode = true;
     configMode = true;
-    const QByteArray enter("AT;");
+    const QByteArray enter = Rt21::networkEnterCommand();
     networkEntered = true;
     TrafficLog::instance().recordSession(
         "NOTE", QByteArray("network enter AT; expecting <uart2>; variant ") + networkVariant);

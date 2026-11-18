@@ -28,6 +28,7 @@ struct AppConfig {
     QVector<RotorEndpoint> rotors;
     int active = 0;
     bool trafficLog = true;
+    bool serialBytes = true;
     bool showSun = true;
     int idlePollSeconds = 30;
 

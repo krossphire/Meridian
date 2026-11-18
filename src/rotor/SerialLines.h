@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <QByteArray>
 #include <QSerialPort>
 
 #if defined(Q_OS_UNIX)
@@ -58,4 +59,14 @@ inline void dropDtr(QSerialPort *port)
 #else
     port->setDataTerminalReady(false);
 #endif
+}
+
+// Bytes a ReadFile actually transferred. The rest of a zeroed request buffer
+// is not payload. A timeout (transferred == 0) is not a received 0x00.
+inline QByteArray serialBytesTaken(const char *data, int capacity, int transferred)
+{
+    if (!data || transferred <= 0 || capacity <= 0)
+        return {};
+    const int count = transferred < capacity ? transferred : capacity;
+    return QByteArray(data, count);
 }

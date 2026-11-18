@@ -25,6 +25,7 @@ AppConfig AppConfig::defaults()
     config.homeText = QStringLiteral("EM26");
     config.active = 0;
     config.trafficLog = true;
+    config.serialBytes = true;
     config.showSun = true;
     config.idlePollSeconds = 30;
     return config;
@@ -34,6 +35,7 @@ AppConfig AppConfig::load(QSettings &settings)
 {
     AppConfig config;
     const bool traffic = settings.value(QStringLiteral("log/traffic"), true).toBool();
+    const bool bytes = settings.value(QStringLiteral("log/serialBytes"), true).toBool();
     const bool sun = settings.value(QStringLiteral("view/sun"), true).toBool();
     const int idle = std::clamp(settings.value(QStringLiteral("link/idlePoll"), 30).toInt(), 30, 60);
     config.homeText = settings.value(QStringLiteral("home/text"), QStringLiteral("EM26")).toString();
@@ -62,11 +64,13 @@ AppConfig AppConfig::load(QSettings &settings)
     if (config.rotors.isEmpty()) {
         config = defaults();
         config.trafficLog = traffic;
+        config.serialBytes = bytes;
         config.showSun = sun;
         config.idlePollSeconds = idle;
         return config;
     }
     config.trafficLog = traffic;
+    config.serialBytes = bytes;
     config.showSun = sun;
     config.idlePollSeconds = idle;
     config.active = settings.value(QStringLiteral("rotors/active"), 0).toInt();
@@ -98,6 +102,7 @@ void AppConfig::save(QSettings &settings) const
     settings.endArray();
     settings.setValue(QStringLiteral("rotors/active"), active);
     settings.setValue(QStringLiteral("log/traffic"), trafficLog);
+    settings.setValue(QStringLiteral("log/serialBytes"), serialBytes);
     settings.setValue(QStringLiteral("view/sun"), showSun);
     settings.setValue(QStringLiteral("link/idlePoll"), idlePollSeconds);
 }

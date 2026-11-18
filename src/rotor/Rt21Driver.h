@@ -25,6 +25,7 @@ class QIODevice;
 class QTcpSocket;
 class QSerialPort;
 class QTimer;
+struct WinRawSerial;
 
 class Rt21Driver : public QObject
 {
@@ -275,7 +276,7 @@ private:
     int networkEchoSends = 0;
     qint64 networkEchoTxMs = 0;
     int networkVariantOrigin = 0;
-    void *networkRawHandle = nullptr;
+    WinRawSerial *winRaw = nullptr;
     QTimer *networkRawTimer = nullptr;
     qint64 networkUart2Ms = 0;
     qint64 networkDtrLowMs = 0;

@@ -11,6 +11,7 @@
 
 #include <QByteArray>
 #include <QList>
+#include <QString>
 
 #include <optional>
 
@@ -35,6 +36,13 @@ QByteArray brightnessWriteCommand(int value);
 QByteArray brightnessReadCommand();
 QByteArray calibrateEndpoint(bool clockwise);
 QByteArray setPulseHeading(double azimuth);
+// Network-module bytes. Echo is AT*SERIAL_ECHO=0 plus LF, never UTF-16.
+QByteArray networkEnterCommand();
+QByteArray networkEchoCommand();
+QByteArray networkEscCommand();
+// Printable text of one module reply. A 0x00 between letters becomes a space,
+// so a UTF-16 widening of "OK" does not match OK.
+QString moduleReplyText(const QByteArray &frame);
 
 struct HeadingReading {
     double azimuth = 0;

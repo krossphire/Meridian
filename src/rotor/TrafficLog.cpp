@@ -76,6 +76,23 @@ void TrafficLog::setEnabled(bool on)
         ensureOpen();
 }
 
+void TrafficLog::setByteLog(bool on)
+{
+    byteLog = on;
+    if (byteLog)
+        ensureOpen();
+}
+
+void TrafficLog::recordPort(const char *direction, const QByteArray &bytes)
+{
+    if (!byteLog || bytes.isEmpty())
+        return;
+    const bool was = enabled;
+    enabled = true;
+    record(direction, bytes);
+    enabled = was;
+}
+
 void TrafficLog::ensureOpen()
 {
     if (opened)
@@ -87,7 +104,7 @@ void TrafficLog::ensureOpen()
     logFile().setFileName(path);
     opened = logFile().open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Unbuffered);
     if (opened)
-        writeLine(QStringLiteral("NOTE Meridian 0.1.0-alpha24 traffic log ") + path);
+        writeLine(QStringLiteral("NOTE Meridian 0.1.0-alpha25b traffic log ") + path);
 }
 
 void TrafficLog::flush()
