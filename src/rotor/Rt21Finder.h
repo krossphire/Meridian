@@ -3,8 +3,10 @@
  * Copyright (C) 2026 Andrew, K5PO
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Find an RT-21. USB and COM ports are checked first. A TCP scan of the
- * local subnet runs only when those find nothing. Nothing is selected on its own.
+ * Find an RT-21. USB and COM ports are checked first, and the scan stops at
+ * the first port that answers. A TCP scan of the local subnet runs only when
+ * those find nothing. A saved IP connection that is not up is replaced by
+ * that hit. Any other hit stays a button until it is clicked.
  */
 
 #pragma once
@@ -40,6 +42,10 @@ QList<int> networkCandidatePorts(const QList<int> &extra = {});
 // 4800, then 9600, then 19200.
 QList<int> serialProbeBauds();
 
+// Saved TCP is down, and Find confirmed a different endpoint. The live TCP
+// session is left alone.
+bool findReplacesSavedEndpoint(const RotorEndpoint &saved, bool linkUp, const RotorEndpoint &found);
+
 struct SerialPortChoice {
     QString port;
     QString label;
@@ -56,18 +62,20 @@ public:
 
     static std::optional<FoundRotor> probeTcp(const QString &host, int port, int timeoutMs);
 
-    // Every present serial port, including Edgeport COM1–COM8. Ports that will not open are skipped.
-    // `onFound` is called as each rotor answers, including from a worker thread.
-    static QList<FoundRotor> scanSerialPorts(int timeoutMs = 650,
-                                             const std::function<void(const FoundRotor &)> &onFound = {},
-                                             const std::function<bool()> &cancelled = {});
+// Present serial ports, including Edgeport COM1–COM8. Ports that will not open are skipped.
+// Stops at the first port that answers. `onFound` may run on a worker thread.
+// `onlyPorts`, when set, is probed in that order instead of the system list.
+static QList<FoundRotor> scanSerialPorts(int timeoutMs = 650,
+                                         const std::function<void(const FoundRotor &)> &onFound = {},
+                                         const std::function<bool()> &cancelled = {},
+                                         const QStringList &onlyPorts = {});
 
     // IPv4 hosts on local /24s of physical adapters, excluding this machine.
     static QStringList localSubnetHosts();
 
     // Probes host × port with `connectMs` handshakes, 32 at a time, and stops
-    // launching new probes after about 14 s. A hit needs BI1; and an R11; version.
-    // No AT command is sent.
+    // at the first BI1; plus R11; version. Gives up launching new probes after
+    // about 14 s. No AT command is sent.
     static QList<FoundRotor> scanHosts(const QStringList &hosts, const QList<int> &ports, int connectMs = 300,
                                        const std::function<void(const FoundRotor &)> &onFound = {},
                                        const std::function<bool()> &cancelled = {});

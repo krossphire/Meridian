@@ -540,6 +540,10 @@ Rt21Driver::Rt21Driver(QObject *parent)
     connect(reconnectTimer, &QTimer::timeout, this, [this]() {
         if (retired || !wantLink)
             return;
+        // A serial connect that won the race stops this timer. If a stale
+        // timeout was already queued, leave the live port alone.
+        if (transportOpen() && (link_ == Link::On || link_ == Link::Moving))
+            return;
         commandArmed = false;
         connectEndpoint(endpoint);
     });
@@ -841,6 +845,7 @@ void Rt21Driver::connectEndpoint(const RotorEndpoint &next)
         return;
     }
     reconnectTimer->stop();
+    const quint64 generation = ++linkGeneration;
     endpoint = next;
     bound = true;
     wantLink = true;
@@ -857,9 +862,13 @@ void Rt21Driver::connectEndpoint(const RotorEndpoint &next)
         tcp->setSocketOption(QAbstractSocket::LowDelayOption, 1);
         connect(tcp, &QTcpSocket::connected, this, &Rt21Driver::onConnected);
         connect(tcp, &QTcpSocket::readyRead, this, &Rt21Driver::onReadyRead);
-        connect(tcp, &QTcpSocket::errorOccurred, this, [this](QAbstractSocket::SocketError) { onSocketError(); });
-        connect(tcp, &QTcpSocket::disconnected, this, [this]() {
-            if (suppress || retired || !wantLink || !tcp)
+        connect(tcp, &QTcpSocket::errorOccurred, this, [this, generation](QAbstractSocket::SocketError) {
+            if (generation != linkGeneration)
+                return;
+            onSocketError();
+        });
+        connect(tcp, &QTcpSocket::disconnected, this, [this, generation]() {
+            if (generation != linkGeneration || suppress || retired || !wantLink || !tcp)
                 return;
             const QString err = tcp->errorString();
             endAttempt(QStringLiteral("peer closed"));
@@ -887,7 +896,9 @@ void Rt21Driver::connectEndpoint(const RotorEndpoint &next)
     // an Edgeport port opens and transmits but the RT-21 sends nothing back.
     serial->setFlowControl(QSerialPort::NoFlowControl);
     connect(serial, &QSerialPort::readyRead, this, &Rt21Driver::onReadyRead);
-    connect(serial, &QSerialPort::errorOccurred, this, [this](QSerialPort::SerialPortError error) {
+    connect(serial, &QSerialPort::errorOccurred, this, [this, generation](QSerialPort::SerialPortError error) {
+        if (generation != linkGeneration)
+            return;
         if (error == QSerialPort::NoError || error == QSerialPort::TimeoutError)
             return;
         onSocketError();
@@ -963,6 +974,10 @@ void Rt21Driver::onConnectTimeout()
 
 void Rt21Driver::onConnected()
 {
+    // The IP reconnect timer is armed before this open. A serial success
+    // must not be followed by that timer calling connectEndpoint again.
+    if (reconnectTimer)
+        reconnectTimer->stop();
     endAttempt(QStringLiteral("connected"));
     failures = 0;
     downSinceMs = -1;

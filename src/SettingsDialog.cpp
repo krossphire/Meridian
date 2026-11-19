@@ -22,6 +22,7 @@
 #include <QDesktopServices>
 #include <QCloseEvent>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QFile>
@@ -794,6 +795,15 @@ void SettingsDialog::presentFound(const FoundRotor &found)
     button->setCursor(Qt::PointingHandCursor);
     findResults->addWidget(button);
     connect(button, &QPushButton::clicked, this, [this, found]() { applyFound(found); });
+    const bool linkUp = driver && driver->link() == Rt21Driver::Link::On;
+    const bool replace = rotorIndex >= 0 && rotorIndex < draft.rotors.size()
+                         && findReplacesSavedEndpoint(draft.rotors.at(rotorIndex), linkUp, found.endpoint);
+    if (replace) {
+        findSavedHit = true;
+        findCancel.storeRelaxed(1);
+        applyFound(found);
+        return;
+    }
     if (findNote)
         findNote->setText(QStringLiteral("Pick the RT-21 to use."));
 }
@@ -824,6 +834,7 @@ void SettingsDialog::startFind(bool networkOnly)
         return;
     }
     findCancel.storeRelaxed(0);
+    findSavedHit = false;
     findButton->setText(QStringLiteral("Cancel"));
     networkButton->setEnabled(false);
     if (!networkOnly) {
@@ -898,6 +909,10 @@ void SettingsDialog::startFind(bool networkOnly)
         }
         if (!self)
             return;
+        // Finish the worker's deferred deletes before the thread's dispatcher
+        // goes away. That handoff is where alpha25d died in ntdll.
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
         QMetaObject::invokeMethod(
             self.data(), [self]() {
                 if (self)
@@ -927,7 +942,7 @@ void SettingsDialog::finishFind(const QList<FoundRotor> &found, bool network)
         findNote->setText(QStringLiteral("Scan cancelled."));
     else if (!any)
         findNote->setText(QStringLiteral("No RT-21 found."));
-    else
+    else if (!findSavedHit)
         findNote->setText(QStringLiteral("Pick the RT-21 to use."));
     findCancel.storeRelaxed(0);
     if (resumeSerial && driver) {

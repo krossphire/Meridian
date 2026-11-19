@@ -31,6 +31,7 @@ private slots:
     void unreachableConnectIsQuick();
 #ifdef Q_OS_UNIX
     void serialPty();
+    void serialConnectCancelsIpReconnect();
 #endif
 };
 
@@ -229,6 +230,39 @@ void TestDriver::serialPty()
     QVERIFY(std::abs(*driver.heading() - 33.0) < 1.5);
     driver.goTo(70);
     QTRY_VERIFY_WITH_TIMEOUT(driver.heading() && std::abs(*driver.heading() - 70.0) < 2.0, 4000);
+}
+
+void TestDriver::serialConnectCancelsIpReconnect()
+{
+    Rt21Driver driver;
+    RotorEndpoint tcp;
+    tcp.transport = RotorEndpoint::Transport::Tcp;
+    tcp.host = QStringLiteral("192.0.2.1");
+    tcp.tcpPort = 9;
+    driver.connectEndpoint(tcp);
+    QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::Failed, 5000);
+    bool armed = false;
+    for (QTimer *candidate : driver.findChildren<QTimer *>()) {
+        if (candidate->isActive() && candidate->isSingleShot() && candidate->interval() >= 10000)
+            armed = true;
+    }
+    QVERIFY(armed);
+
+    MockRt21Server server;
+    server.sim()->setHeading(50);
+    const QString pty = server.listenPty();
+    if (pty.isEmpty())
+        QSKIP("pty was not available");
+    RotorEndpoint serial;
+    serial.transport = RotorEndpoint::Transport::Serial;
+    serial.serialPort = pty;
+    serial.baud = 4800;
+    driver.connectEndpoint(serial);
+    QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::On, 3000);
+    for (QTimer *candidate : driver.findChildren<QTimer *>()) {
+        if (candidate->isActive() && candidate->isSingleShot() && candidate->interval() >= 10000)
+            QFAIL("IP reconnect timer still armed after the serial port connected");
+    }
 }
 #endif
 

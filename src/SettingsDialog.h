@@ -134,6 +134,7 @@ private:
     QString serialHold;
     bool continueToNetwork = false;
     bool resumeSerial = false;
+    bool findSavedHit = false;
     RotorEndpoint resumeEndpoint;
 
 protected:

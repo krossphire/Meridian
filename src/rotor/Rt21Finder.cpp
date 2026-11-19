@@ -10,6 +10,7 @@
 #include "SerialLines.h"
 #include "TrafficLog.h"
 
+#include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QEventLoop>
 #include <QHostAddress>
@@ -183,7 +184,13 @@ std::optional<FoundRotor> Rt21Finder::probeSerial(const QString &portName, const
     TrafficLog::instance().recordSession("FIND-RX", rx);
     TrafficLog::instance().recordSession(
         "FIND", heading ? QByteArray("hit ") + where : QByteArray("no reply ") + where);
-    port.close();
+    // Deliver the port's last completion before its notifier is destroyed.
+    // Closing and then destroying it as the worker thread exits crashes in
+    // ntdll on Windows (overlapped I/O into a freed port).
+    port.disconnect();
+    if (port.isOpen())
+        port.close();
+    QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
     if (!heading)
         return std::nullopt;
     FoundRotor found;
@@ -246,6 +253,15 @@ std::optional<FoundRotor> Rt21Finder::probeTcp(const QString &host, int port, in
 QList<int> serialProbeBauds()
 {
     return {4800, 9600, 19200};
+}
+
+bool findReplacesSavedEndpoint(const RotorEndpoint &saved, bool linkUp, const RotorEndpoint &found)
+{
+    if (linkUp || saved.transport != RotorEndpoint::Transport::Tcp || !saved.configured() || !found.configured())
+        return false;
+    if (found.transport == RotorEndpoint::Transport::Tcp && found.host == saved.host && found.tcpPort == saved.tcpPort)
+        return false;
+    return true;
 }
 
 namespace {
@@ -327,33 +343,49 @@ QList<SerialPortChoice> arrangeSerialPorts(QList<SerialPortChoice> present, cons
 }
 
 QList<FoundRotor> Rt21Finder::scanSerialPorts(int timeoutMs, const std::function<void(const FoundRotor &)> &onFound,
-                                               const std::function<bool()> &cancelled)
+                                               const std::function<bool()> &cancelled, const QStringList &onlyPorts)
 {
+    struct Candidate {
+        QString name;
+        QString kind;
+    };
+    QList<Candidate> candidates;
+    if (!onlyPorts.isEmpty()) {
+        for (const QString &name : onlyPorts) {
+            if (!name.trimmed().isEmpty())
+                candidates.append({name, QStringLiteral("serial")});
+        }
+    } else {
+        // Copy the names out and drop QSerialPortInfo before any probe. Holding
+        // that list until the thread ends, while the live connection has the
+        // winning COM port open, crashes in ntdll on Windows.
+        auto ports = QSerialPortInfo::availablePorts();
+        std::sort(ports.begin(), ports.end(), [](const QSerialPortInfo &a, const QSerialPortInfo &b) {
+            return portLess(a.portName(), b.portName());
+        });
+        for (const QSerialPortInfo &info : ports) {
+            const QString chip = usbChipName(info.manufacturer(), info.description());
+            const QString blob = (info.manufacturer() + info.description() + info.portName()).toLower();
+            const bool usb = info.hasVendorIdentifier() || blob.contains(QStringLiteral("usb"))
+                             || blob.contains(QStringLiteral("ttyusb")) || blob.contains(QStringLiteral("ttyacm"));
+            QString kind = chip;
+            if (kind.isEmpty() && usb)
+                kind = QStringLiteral("USB");
+            else if (kind.isEmpty())
+                kind = QStringLiteral("serial");
+            candidates.append({info.portName(), kind});
+        }
+    }
     QList<FoundRotor> found;
-    // Edgeport/8 shows up as ordinary COM1–COM8. Every present port is probed.
-    // FTDI and CP210x are not treated differently once a COM port exists.
-    auto ports = QSerialPortInfo::availablePorts();
-    std::sort(ports.begin(), ports.end(), [](const QSerialPortInfo &a, const QSerialPortInfo &b) {
-        return portLess(a.portName(), b.portName());
-    });
-    for (const QSerialPortInfo &info : ports) {
+    for (const Candidate &candidate : candidates) {
         if (cancelled && cancelled())
             return found;
-        const QString chip = usbChipName(info.manufacturer(), info.description());
-        const QString blob = (info.manufacturer() + info.description() + info.portName()).toLower();
-        const bool usb = info.hasVendorIdentifier() || blob.contains(QStringLiteral("usb"))
-                         || blob.contains(QStringLiteral("ttyusb")) || blob.contains(QStringLiteral("ttyacm"));
-        QString kind = chip;
-        if (kind.isEmpty() && usb)
-            kind = QStringLiteral("USB");
-        else if (kind.isEmpty())
-            kind = QStringLiteral("serial");
         for (int baud : serialProbeBauds()) {
-            if (const auto hit = probeSerial(info.portName(), kind, baud, timeoutMs)) {
+            if (const auto hit = probeSerial(candidate.name, candidate.kind, baud, timeoutMs)) {
                 found.append(*hit);
                 if (onFound)
                     onFound(*hit);
-                break;
+                return found;
             }
         }
     }
@@ -406,13 +438,20 @@ QList<FoundRotor> Rt21Finder::scanHosts(const QStringList &hosts, const QList<in
     constexpr int kParallel = 32;
     QElapsedTimer budget;
     budget.start();
-    for (int start = 0; start < targets.size() && budget.elapsed() < 14000; start += kParallel) {
+    for (int start = 0; start < targets.size() && found.isEmpty() && budget.elapsed() < 14000; start += kParallel) {
         if (cancelled && cancelled())
             break;
         const int end = std::min(start + kParallel, int(targets.size()));
         QEventLoop loop;
         int pending = 0;
-        QList<QTcpSocket *> sockets;
+        bool stop = false;
+        struct Probe {
+            QTcpSocket *socket = nullptr;
+            Rt21::Framer *framer = nullptr;
+            QTimer *readTimer = nullptr;
+            QTimer *connectTimer = nullptr;
+        };
+        QList<Probe> probes;
         QTimer cap;
         cap.setSingleShot(true);
         QObject::connect(&cap, &QTimer::timeout, &loop, &QEventLoop::quit);
@@ -420,18 +459,24 @@ QList<FoundRotor> Rt21Finder::scanHosts(const QStringList &hosts, const QList<in
         QTimer watch;
         watch.setInterval(50);
         QObject::connect(&watch, &QTimer::timeout, &loop, [&]() {
-            if (cancelled && cancelled())
+            if (stop || (cancelled && cancelled()))
                 loop.quit();
         });
         watch.start();
         for (int i = start; i < end; ++i) {
-            auto *socket = new QTcpSocket;
-            sockets.append(socket);
+            Probe probe;
+            probe.socket = new QTcpSocket;
+            probe.framer = new Rt21::Framer;
+            probe.readTimer = new QTimer(probe.socket);
+            probe.readTimer->setSingleShot(true);
+            probe.connectTimer = new QTimer(probe.socket);
+            probe.connectTimer->setSingleShot(true);
+            probes.append(probe);
             ++pending;
-            auto *framer = new Rt21::Framer;
-            QObject::connect(socket, &QObject::destroyed, [framer]() { delete framer; });
-            auto *readTimer = new QTimer(socket);
-            readTimer->setSingleShot(true);
+            QTcpSocket *socket = probe.socket;
+            Rt21::Framer *framer = probe.framer;
+            QTimer *readTimer = probe.readTimer;
+            QTimer *connectTimer = probe.connectTimer;
             const QString host = targets.at(i).host;
             const int port = targets.at(i).port;
             auto note = [socket, host, port](const QByteArray &result) {
@@ -444,13 +489,16 @@ QList<FoundRotor> Rt21Finder::scanHosts(const QStringList &hosts, const QList<in
                 if (!rx.isEmpty())
                     TrafficLog::instance().recordSession("FIND-NET", rx);
             };
-            auto settle = [&, socket](const QByteArray &result) {
+            // Slots capture the loop by reference and are disconnected before
+            // the sockets are deleted. deleteLater across thread shutdown was
+            // invoking them after this stack frame was gone.
+            auto settle = [&loop, &pending, &stop, socket, note](const QByteArray &result) {
                 if (socket->property("done").toBool())
                     return;
                 socket->setProperty("done", true);
                 note(result);
                 socket->abort();
-                if (--pending <= 0)
+                if (--pending <= 0 || stop)
                     loop.quit();
             };
             QObject::connect(socket, &QTcpSocket::connected, socket, [=]() {
@@ -459,7 +507,9 @@ QList<FoundRotor> Rt21Finder::scanHosts(const QStringList &hosts, const QList<in
                 socket->flush();
                 readTimer->start(400);
             });
-            QObject::connect(socket, &QTcpSocket::readyRead, socket, [=, &found]() {
+            QObject::connect(socket, &QTcpSocket::readyRead, socket, [=, &found, &stop]() {
+                if (stop || socket->property("done").toBool())
+                    return;
                 const QByteArray chunk = socket->readAll();
                 socket->setProperty("rx", socket->property("rx").toByteArray() + chunk);
                 framer->append(chunk);
@@ -487,6 +537,7 @@ QList<FoundRotor> Rt21Finder::scanHosts(const QStringList &hosts, const QList<in
                     hit.label = foundRotorLabel(QStringLiteral("%1:%2").arg(host).arg(port), QString(), 0, hit.heading)
                                 + QStringLiteral(", ") + text;
                     found.append(hit);
+                    stop = true;
                     if (onFound)
                         onFound(hit);
                     settle(QByteArray("hit ") + text.toLatin1());
@@ -502,19 +553,27 @@ QList<FoundRotor> Rt21Finder::scanHosts(const QStringList &hosts, const QList<in
                                            : QByteArray("no heading");
                 settle(why);
             });
-            QTimer::singleShot(connectMs, socket, [=]() {
+            QObject::connect(connectTimer, &QTimer::timeout, socket, [=]() {
                 if (socket->state() != QAbstractSocket::ConnectedState)
                     settle(QByteArray("connect failed"));
             });
+            connectTimer->start(connectMs);
             socket->connectToHost(host, quint16(port));
         }
         if (pending > 0)
             loop.exec();
-        for (QTcpSocket *socket : sockets) {
-            socket->abort();
-            socket->deleteLater();
+        watch.stop();
+        cap.stop();
+        for (const Probe &probe : probes) {
+            probe.socket->disconnect();
+            probe.readTimer->stop();
+            probe.connectTimer->stop();
+            probe.socket->abort();
+            delete probe.framer;
+            delete probe.socket;
         }
-        if (cancelled && cancelled())
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        if (stop || (cancelled && cancelled()))
             break;
     }
     return found;

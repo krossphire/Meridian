@@ -77,7 +77,7 @@ The network read, on a USB or serial connection only:
 
 ## Bench test
 
-Quit the setup utility so it is not holding COM6. Unzip `Meridian-0.1.0-alpha25d-win64.zip`. The title bar should read `Meridian 0.1.0-alpha25d`. Connect the Edgeport on COM6 at 4800 and wait until headings are moving. Read the network once. Do not click the map.
+Quit the setup utility so it is not holding COM6. Unzip `Meridian-0.1.0-alpha25e-win64.zip`. The title bar should read `Meridian 0.1.0-alpha25e`. The network-read path is the alpha25d path below. Find now stops at the first port that answers. If the saved IP connection is down, that hit is written to the ini and connected, and the 15 s IP reconnect is cancelled. Connect the Edgeport on COM6 at 4800 and wait until headings are moving. Read the network once. Do not click the map.
 
 The log is beside the exe, or under `%APPDATA%\Meridian\logs`. A good try has, in order: `network open lines: DTR low 20 ms`, `network lead-in ESC ESC`, `network lead-in ;`, only `R21;` and `R01;`, `network pre-AT quiet` near 650 ms, `AT;`, `<uart2>;`, `variant D`, `network raw handle overlapped`, one 17-byte echo ending `30 0a`, then `ERROR 1` or `OK` within about 100 ms, then the `AT*KEY?` lines, then ESC. The serial-port read-back should be 6665. The log should contain no `W0`, no `T11`, and no second `AT;` inside 35 s.
 

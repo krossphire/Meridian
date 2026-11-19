@@ -10,11 +10,15 @@
 #include "rotor/UserFiles.h"
 
 #include <QDir>
+#include <QElapsedTimer>
+#include <QEventLoop>
 #include <QFile>
 #include <QFileInfo>
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QThread>
+#include <QTimer>
 
 #include <cmath>
 
@@ -30,6 +34,11 @@ private slots:
     void serialProbe();
 #endif
     void missingPortIsQuiet();
+    void networkScanStopsAtFirstHit();
+    void savedIpIsReplacedOnlyWhenDown();
+#ifdef Q_OS_UNIX
+    void serialScanStopsAtFirstHit();
+#endif
     void settingsFileBesideExe();
     void settingsRoundTrip();
 };
@@ -116,6 +125,83 @@ void TestFinder::missingPortIsQuiet()
 {
     QVERIFY(!Rt21Finder::probeSerial(QStringLiteral("meridian-no-such-port"), QStringLiteral("USB"), 4800, 200));
 }
+
+void TestFinder::networkScanStopsAtFirstHit()
+{
+    MockRt21Server server;
+    server.sim()->setHeading(132);
+    QVERIFY(server.listenTcp(0));
+    qint64 elapsed = -1;
+    QList<FoundRotor> found;
+    // The dead host would otherwise hold the batch for the full connect timeout.
+    // alpha25d then destroyed those sockets as the worker thread exited.
+    QThread *thread = QThread::create([&]() {
+        QElapsedTimer timer;
+        timer.start();
+        found = Rt21Finder::scanHosts({QStringLiteral("127.0.0.1"), QStringLiteral("192.0.2.1")},
+                                      {int(server.port()), 9}, 3000);
+        elapsed = timer.elapsed();
+    });
+    QEventLoop loop;
+    QObject::connect(thread, &QThread::finished, &loop, &QEventLoop::quit);
+    QTimer::singleShot(8000, &loop, &QEventLoop::quit);
+    thread->start();
+    loop.exec();
+    QVERIFY(thread->isFinished());
+    delete thread;
+    QCOMPARE(found.size(), 1);
+    QCOMPARE(found.at(0).endpoint.host, QStringLiteral("127.0.0.1"));
+    QCOMPARE(found.at(0).endpoint.tcpPort, int(server.port()));
+    QVERIFY2(elapsed >= 0 && elapsed < 2000, qPrintable(QString::number(elapsed)));
+}
+
+void TestFinder::savedIpIsReplacedOnlyWhenDown()
+{
+    RotorEndpoint saved;
+    saved.transport = RotorEndpoint::Transport::Tcp;
+    saved.host = QStringLiteral("192.168.1.106");
+    saved.tcpPort = 6555;
+    RotorEndpoint serial;
+    serial.transport = RotorEndpoint::Transport::Serial;
+    serial.serialPort = QStringLiteral("COM6");
+    serial.baud = 4800;
+    RotorEndpoint otherPort = saved;
+    otherPort.tcpPort = 6665;
+    QVERIFY(findReplacesSavedEndpoint(saved, false, serial));
+    QVERIFY(findReplacesSavedEndpoint(saved, false, otherPort));
+    QVERIFY(!findReplacesSavedEndpoint(saved, true, serial));
+    QVERIFY(!findReplacesSavedEndpoint(saved, false, saved));
+    RotorEndpoint blank;
+    QVERIFY(!findReplacesSavedEndpoint(blank, false, serial));
+}
+
+#ifdef Q_OS_UNIX
+void TestFinder::serialScanStopsAtFirstHit()
+{
+    MockRt21Server first;
+    MockRt21Server second;
+    first.sim()->setHeading(11);
+    second.sim()->setHeading(22);
+    const QString primary = first.listenPty();
+    const QString extra = second.listenPty();
+    if (primary.isEmpty() || extra.isEmpty())
+        QSKIP("pty was not available");
+    QList<FoundRotor> found;
+    QThread *thread = QThread::create([&]() {
+        found = Rt21Finder::scanSerialPorts(1000, {}, {}, {primary, extra});
+    });
+    QEventLoop loop;
+    QObject::connect(thread, &QThread::finished, &loop, &QEventLoop::quit);
+    QTimer::singleShot(8000, &loop, &QEventLoop::quit);
+    thread->start();
+    loop.exec();
+    QVERIFY(thread->isFinished());
+    delete thread;
+    QCOMPARE(found.size(), 1);
+    QCOMPARE(found.at(0).endpoint.serialPort, primary);
+    QCOMPARE(second.sim()->trace().size(), 0);
+}
+#endif
 
 void TestFinder::settingsFileBesideExe()
 {

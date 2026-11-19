@@ -203,6 +203,7 @@ private:
 
     RotorEndpoint endpoint;
     bool wantLink = false;
+    quint64 linkGeneration = 0;
     Link link_ = Link::Off;
     QString detail_;
     QTcpSocket *tcp = nullptr;
