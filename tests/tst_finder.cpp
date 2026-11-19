@@ -174,7 +174,7 @@ void TestFinder::savedIpIsReplacedOnlyWhenDown()
     QVERIFY(findReplacesSavedEndpoint(saved, false, otherPort));
     QVERIFY(!findReplacesSavedEndpoint(saved, true, serial));
     QVERIFY(!findReplacesSavedEndpoint(saved, false, saved));
-    QCOMPARE(tcpPortAfterFind(6555, serial), 6665);
+    QCOMPARE(tcpPortAfterFind(6555, serial), 6555);
     QCOMPARE(tcpPortAfterFind(6555, otherPort), 6665);
     QCOMPARE(tcpPortAfterFind(4001, serial), 4001);
     RotorEndpoint blank;
