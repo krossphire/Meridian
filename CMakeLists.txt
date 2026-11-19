@@ -30,6 +30,8 @@ add_library(meridian-core STATIC
     src/rotor/UsbHint.cpp
     src/rotor/Rt21Setup.cpp
     src/rotor/UserFiles.cpp
+    src/rotor/IntelHex.cpp
+    src/rotor/FirmwareUpdater.cpp
 )
 target_include_directories(meridian-core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(meridian-core PUBLIC Qt6::Widgets Qt6::Network Qt6::SerialPort)
@@ -69,6 +71,7 @@ add_executable(meridian
     src/ControllerColumn.cpp
     src/SetupPanel.cpp
     src/AboutDialog.cpp
+    src/FirmwarePage.cpp
     resources.qrc
 )
 target_link_libraries(meridian PRIVATE meridian-core meridian-mocklib Qt6::Svg)
@@ -116,6 +119,8 @@ target_sources(tst_settings PRIVATE
     src/AboutDialog.cpp
     src/GlobeWidget.cpp)
 meridian_test(tst_setup)
+meridian_test(tst_hex)
+target_sources(tst_settings PRIVATE src/FirmwarePage.cpp)
 target_link_libraries(tst_settings PRIVATE Qt6::Svg)
 set_tests_properties(tst_usb tst_settings tst_setup PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()

@@ -10,6 +10,7 @@
 
 #include "AboutDialog.h"
 #include "ControllerColumn.h"
+#include "FirmwarePage.h"
 #include "SetupPanel.h"
 #include "core/Coordinates.h"
 #include "rotor/Rt21Driver.h"
@@ -127,6 +128,11 @@ SettingsDialog::SettingsDialog(const AppConfig &config, const ZipDatabase *zipDb
     if (setupColumn)
         setupColumn->addTail(setupPanel->portsPage(), setupPanel->networkPage());
     tabs->addTab(setupTabs, QStringLiteral("Setup"));
+    buildFirmware();
+    if (firmwarePage) {
+        connect(firmwarePage, &FirmwarePage::statusMessage, this, [this](const QString &text) { setStatus(text); });
+        connect(firmwarePage, &FirmwarePage::preflightRequested, this, [this]() { runFirmwarePreflight(); });
+    }
     connect(setupPanel, &SetupPanel::statusMessage, this, [this](const QString &text) { setStatus(text); });
     connect(setupPanel, &SetupPanel::networkWriteRequested, this,
             [this](const QString &key, const QString &value, const QString &settingName) {
@@ -250,6 +256,8 @@ void SettingsDialog::setDriver(Rt21Driver *next)
         setupPanel->setDriver(driver);
     if (setupColumn)
         setupColumn->setDriver(driver);
+    if (firmwarePage)
+        firmwarePage->setCurrentVersion(versionReport);
     if (!driver)
         return;
     connect(driver, &Rt21Driver::configField, this,
@@ -299,7 +307,9 @@ void SettingsDialog::setDriver(Rt21Driver *next)
         connect(driver, &Rt21Driver::configNote, this, [this](const QString &text) {
             if (text.startsWith(QStringLiteral("Version ")))
                 versionReport = text.mid(QStringLiteral("Version ").size());
-            else if (text.startsWith(QStringLiteral("Pot A/D ")))
+            if (firmwarePage)
+                firmwarePage->setCurrentVersion(versionReport);
+            if (text.startsWith(QStringLiteral("Pot A/D ")))
                 potReport = text.mid(QStringLiteral("Pot A/D ").size());
             else if (text.startsWith(QStringLiteral("Last reset ")))
                 resetReport = text.mid(QStringLiteral("Last reset ").size());
@@ -317,6 +327,16 @@ void SettingsDialog::setDriver(Rt21Driver *next)
             refreshDisplayCallout();
         });
         connect(driver, &Rt21Driver::configFinished, this, [this](bool ok, const QString &message) {
+            if (firmwareAwaitingRead) {
+                firmwareAwaitingRead = false;
+                if (!ok) {
+                    setStatus(message.isEmpty() ? QStringLiteral("The rotor stopped answering configuration reads.")
+                                                : message);
+                    return;
+                }
+                finishFirmwareUpdate();
+                return;
+            }
             if (!ok) {
                 continueToNetwork = false;
                 if (!message.isEmpty())
@@ -1067,4 +1087,84 @@ QString SettingsDialog::backupConfig(const QString &path) const
     if (!QFile::rename(tmp, path))
         return QStringLiteral("Couldn't write %1.").arg(path);
     return {};
+}
+
+void SettingsDialog::buildFirmware()
+{
+    firmwarePage = new FirmwarePage;
+    tabs->addTab(firmwarePage, QStringLiteral("Firmware"));
+}
+
+bool SettingsDialog::haveReadableSettings() const
+{
+    if (!versionReport.trimmed().isEmpty() && versionReport != QLatin1String("no reply"))
+        return true;
+    for (auto it = eeRaw.cbegin(); it != eeRaw.cend(); ++it) {
+        const QString value = it.value().trimmed();
+        if (value.isEmpty() || value == QLatin1String("…") || value == QLatin1String("—")
+            || value == QLatin1String("timeout") || value == QLatin1String("no reply"))
+            continue;
+        return true;
+    }
+    if (!setupPanel)
+        return false;
+    const QMap<QString, QString> network = setupPanel->networkValues();
+    for (auto it = network.cbegin(); it != network.cend(); ++it) {
+        if (!it.value().trimmed().isEmpty())
+            return true;
+    }
+    return false;
+}
+
+void SettingsDialog::runFirmwarePreflight()
+{
+    if (!firmwarePage || !firmwarePage->image().ok)
+        return;
+    if (firmwareAwaitingRead) {
+        setStatus(QStringLiteral("Reading the RT-21 before the firmware backup…"));
+        return;
+    }
+    if (!haveReadableSettings()) {
+        const bool live = driver
+                          && (driver->link() == Rt21Driver::Link::On || driver->link() == Rt21Driver::Link::Moving);
+        if (!live) {
+            setStatus(QStringLiteral("Connect to a rotor and read it before a firmware update."));
+            return;
+        }
+        firmwareAwaitingRead = true;
+        setStatus(QStringLiteral("Reading the RT-21 before the firmware backup…"));
+        driver->readConfiguration();
+        return;
+    }
+    finishFirmwareUpdate();
+}
+
+void SettingsDialog::finishFirmwareUpdate()
+{
+    if (!firmwarePage)
+        return;
+    QMap<QString, QString> controller = eeRaw;
+    if (!versionReport.isEmpty())
+        controller.insert(QStringLiteral("version"), versionReport);
+    if (!potReport.isEmpty())
+        controller.insert(QStringLiteral("pot"), potReport);
+    if (!resetReport.isEmpty())
+        controller.insert(QStringLiteral("reset"), resetReport);
+    const QMap<QString, QString> network = setupPanel ? setupPanel->networkValues() : QMap<QString, QString>();
+    if (!haveReadableSettings()) {
+        setStatus(QStringLiteral("No reply with settings to back up."));
+        return;
+    }
+    QString error;
+    const QString path = Rt21::saveSetupBackup(controller, network, &error);
+    if (path.isEmpty()) {
+        setStatus(error.isEmpty() ? QStringLiteral("Couldn't write the settings copy.") : error);
+        return;
+    }
+    firmwarePage->setBackupPath(path);
+    firmwarePage->setCurrentVersion(versionReport);
+    QString status;
+    firmwareUpdater.flash(firmwarePage->image(), &status);
+    firmwarePage->setOutcome(status);
+    setStatus(status);
 }

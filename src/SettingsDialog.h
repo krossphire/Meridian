@@ -8,6 +8,7 @@
 
 #include "StatusTone.h"
 #include "rotor/AppConfig.h"
+#include "rotor/FirmwareUpdater.h"
 #include "rotor/Rt21Finder.h"
 #include "rotor/UsbHint.h"
 
@@ -19,6 +20,7 @@
 
 class QCloseEvent;
 class ControllerColumn;
+class FirmwarePage;
 class SetupPanel;
 
 class QComboBox;
@@ -75,6 +77,10 @@ private:
     void exportSetup();
     void refreshDisplayCallout();
     QString backupConfig(const QString &path) const;
+    void buildFirmware();
+    bool haveReadableSettings() const;
+    void runFirmwarePreflight();
+    void finishFirmwareUpdate();
 
     AppConfig draft;
     const ZipDatabase *zips = nullptr;
@@ -120,6 +126,9 @@ private:
     class QThread *findThread = nullptr;
     QAtomicInt findCancel = 0;
     QStringList foundKeys;
+    FirmwarePage *firmwarePage = nullptr;
+    Rt21::RefusingFirmwareUpdater firmwareUpdater;
+    bool firmwareAwaitingRead = false;
     QLabel *versionLabel = nullptr;
     QLabel *displayCallout = nullptr;
     QString versionReport;

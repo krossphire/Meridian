@@ -8,6 +8,8 @@
  * retires the old driver before a new one exists.
  */
 
+#include "FirmwareHexFixture.h"
+#include "FirmwarePage.h"
 #include "MainWindow.h"
 #include "SettingsDialog.h"
 #include "mock/Rt21Simulator.h"
@@ -18,6 +20,10 @@
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDialogButtonBox>
+#include <QDir>
+#include <QFile>
+#include <QLabel>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QSerialPort>
 #include <QTcpSocket>
@@ -30,6 +36,7 @@ class TestSettings : public QObject
     Q_OBJECT
 private slots:
     void transportFlickKeepsOneConnection();
+    void firmwareUpdateBacksUpThenRefuses();
 };
 
 void TestSettings::transportFlickKeepsOneConnection()
@@ -134,6 +141,75 @@ void TestSettings::transportFlickKeepsOneConnection()
     QCOMPARE(Rt21Driver::transportHighWater(), 1);
     QCOMPARE(window.driver()->findChildren<QTcpSocket *>().size(), 1);
     QCOMPARE(window.findChildren<QSerialPort *>().size(), 0);
+}
+
+void TestSettings::firmwareUpdateBacksUpThenRefuses()
+{
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+
+    MockRt21Server server;
+    QVERIFY(server.listenTcp(0));
+
+    AppConfig config = AppConfig::defaults();
+    config.rotors[0].transport = RotorEndpoint::Transport::Tcp;
+    config.rotors[0].host = QStringLiteral("127.0.0.1");
+    config.rotors[0].tcpPort = int(server.port());
+
+    MainWindow window(config, nullptr);
+    QTRY_VERIFY_WITH_TIMEOUT(server.hasClient(), 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(window.driver()->link(), Rt21Driver::Link::On, 3000);
+
+    SettingsDialog *dialog = window.settingsDialog();
+    auto *page = dialog->findChild<FirmwarePage *>();
+    QVERIFY(page);
+    page->loadHexText(validFirmwareHex(), QStringLiteral("fixture.hex"));
+    auto *current = dialog->findChild<QLabel *>(QStringLiteral("firmwareCurrent"));
+    auto *target = dialog->findChild<QLabel *>(QStringLiteral("firmwareTarget"));
+    auto *report = dialog->findChild<QLabel *>(QStringLiteral("firmwareReport"));
+    auto *confirm = dialog->findChild<QLineEdit *>(QStringLiteral("firmwareConfirm"));
+    auto *update = dialog->findChild<QPushButton *>(QStringLiteral("firmwareUpdate"));
+    auto *banner = dialog->findChild<QLabel *>(QStringLiteral("firmwareBanner"));
+    QVERIFY(current);
+    QVERIFY(target);
+    QVERIFY(report);
+    QVERIFY(confirm);
+    QVERIFY(update);
+    QVERIFY(banner);
+    QVERIFY(banner->text().contains(QStringLiteral("Experimental")));
+    QVERIFY(report->text().contains(QStringLiteral("CRC: 9241")));
+    QVERIFY(report->text().contains(QStringLiteral("Created: 2026-11-19")));
+    QVERIFY(report->text().contains(QStringLiteral("Hex file is valid.")));
+    QCOMPARE(target->text(), QStringLiteral("Target in the hex file: RT-21 4.13.2"));
+    QVERIFY(current->text().contains(QStringLiteral("R1;")));
+    QVERIFY(!update->isEnabled());
+
+    confirm->setText(QStringLiteral("flash"));
+    QVERIFY(!update->isEnabled());
+    confirm->setText(QStringLiteral("FLASH"));
+    QVERIFY(update->isEnabled());
+    update->click();
+
+    auto *status = dialog->findChild<QLabel *>(QStringLiteral("setupStatus"));
+    QVERIFY(status);
+    QTRY_VERIFY_WITH_TIMEOUT(status->text().contains(QStringLiteral("Bootloader protocol not yet captured")), 8000);
+    QVERIFY(status->styleSheet().contains(statusToneColor(StatusTone::Failure).name()));
+    QCOMPARE(current->text(), QStringLiteral("Current controller (R1;): RT-21 4.13.2"));
+
+    const QStringList copies = QDir(UserFiles::backupDirectory()).entryList(QStringList() << QStringLiteral("meridian-setup-*.txt"));
+    QCOMPARE(copies.size(), 1);
+    QFile copy(QDir(UserFiles::backupDirectory()).filePath(copies.first()));
+    QVERIFY(copy.open(QIODevice::ReadOnly));
+    const QString body = QString::fromUtf8(copy.readAll());
+    QVERIFY(body.contains(QStringLiteral("Firmware: RT-21 4.13.2")));
+    QVERIFY(body.contains(QStringLiteral("[controller]")));
+    QVERIFY(body.contains(QStringLiteral("Screen saver (W)")));
+
+    for (const QByteArray &command : server.sim()->trace()) {
+        QVERIFY(!command.startsWith("B2"));
+        QVERIFY(!command.startsWith("BU"));
+    }
 }
 
 QTEST_MAIN(TestSettings)
