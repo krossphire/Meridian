@@ -6,11 +6,15 @@
 
 #include "mock/Rt21Simulator.h"
 #include "rotor/Rt21Driver.h"
+#include "rotor/Rt21Finder.h"
 
+#include <QCoreApplication>
 #include <QElapsedTimer>
+#include <QEventLoop>
 #include <QSignalSpy>
 #include <QTcpSocket>
 #include <QTest>
+#include <QThread>
 #include <QTimer>
 
 #include <cmath>
@@ -32,6 +36,7 @@ private slots:
 #ifdef Q_OS_UNIX
     void serialPty();
     void serialConnectCancelsIpReconnect();
+    void findHitConnectsWhileIpReconnectIsArmed();
 #endif
 };
 
@@ -61,6 +66,8 @@ void TestDriver::tcpMoveAndStop()
     QTRY_VERIFY_WITH_TIMEOUT(driver.link() == Rt21Driver::Link::Moving || driver.target().has_value(), 2000);
     driver.stopMotion();
     QTRY_COMPARE_WITH_TIMEOUT(server.sim()->moving(), false, 2000);
+    for (const QByteArray &cmd : server.sim()->trace())
+        QVERIFY(cmd != "T11");
 }
 
 void TestDriver::hardwareReplyBytes()
@@ -228,6 +235,15 @@ void TestDriver::serialPty()
         QSKIP(qPrintable(driver.detail()));
     QTRY_VERIFY_WITH_TIMEOUT(driver.heading().has_value(), 3000);
     QVERIFY(std::abs(*driver.heading() - 33.0) < 1.5);
+    const QList<QByteArray> trace = server.sim()->trace();
+    const int r11 = trace.indexOf(QByteArray("R11"));
+    const int t11 = trace.indexOf(QByteArray("T11"));
+    const int r01 = trace.indexOf(QByteArray("R01"));
+    const int bi = trace.indexOf(QByteArray("BI1"));
+    QVERIFY(r11 >= 0);
+    QCOMPARE(t11, r11 + 1);
+    QCOMPARE(r01, t11 + 1);
+    QVERIFY(bi > r01);
     driver.goTo(70);
     QTRY_VERIFY_WITH_TIMEOUT(driver.heading() && std::abs(*driver.heading() - 70.0) < 2.0, 4000);
 }
@@ -263,6 +279,66 @@ void TestDriver::serialConnectCancelsIpReconnect()
         if (candidate->isActive() && candidate->isSingleShot() && candidate->interval() >= 10000)
             QFAIL("IP reconnect timer still armed after the serial port connected");
     }
+}
+
+void TestDriver::findHitConnectsWhileIpReconnectIsArmed()
+{
+    Rt21Driver driver;
+    RotorEndpoint tcp;
+    tcp.transport = RotorEndpoint::Transport::Tcp;
+    tcp.host = QStringLiteral("192.0.2.1");
+    tcp.tcpPort = 9;
+    driver.connectEndpoint(tcp);
+    QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::Failed, 5000);
+    QTimer *backoff = nullptr;
+    for (QTimer *candidate : driver.findChildren<QTimer *>()) {
+        if (candidate->isActive() && candidate->isSingleShot() && candidate->interval() >= 10000)
+            backoff = candidate;
+    }
+    QVERIFY(backoff);
+
+    MockRt21Server server;
+    server.sim()->setHeading(36.7);
+    const QString pty = server.listenPty();
+    if (pty.isEmpty())
+        QSKIP("pty was not available");
+
+    // The GUI must not open the port until this thread has exited. Opening
+    // COM6 while the probe's QSerialPort was still winding down is the crash.
+    QThread *thread = QThread::create([&]() {
+        Rt21Finder::scanSerialPorts(1000, {}, {}, {pty});
+    });
+    QEventLoop loop;
+    QObject::connect(thread, &QThread::finished, &loop, &QEventLoop::quit);
+    QTimer::singleShot(8000, &loop, &QEventLoop::quit);
+    thread->start();
+    loop.exec();
+    QVERIFY(thread->isFinished());
+    thread->deleteLater();
+
+    RotorEndpoint serial;
+    serial.transport = RotorEndpoint::Transport::Serial;
+    serial.serialPort = pty;
+    serial.baud = 4800;
+    driver.connectEndpoint(serial);
+    QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::On, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(driver.heading().has_value(), 3000);
+    for (QTimer *candidate : driver.findChildren<QTimer *>()) {
+        if (candidate->isActive() && candidate->isSingleShot() && candidate->interval() >= 10000)
+            QFAIL("IP reconnect timer still armed after Find's serial hit connected");
+    }
+    backoff->start(0);
+    QCoreApplication::processEvents();
+    QCOMPARE(driver.link(), Rt21Driver::Link::On);
+    QVERIFY(driver.detail().contains(pty));
+
+    const QList<QByteArray> trace = server.sim()->trace();
+    const int r11 = trace.indexOf(QByteArray("R11"));
+    const int t11 = trace.indexOf(QByteArray("T11"));
+    const int r01 = trace.indexOf(QByteArray("R01"));
+    QVERIFY(r11 >= 0);
+    QCOMPARE(t11, r11 + 1);
+    QCOMPARE(r01, t11 + 1);
 }
 #endif
 

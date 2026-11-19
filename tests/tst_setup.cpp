@@ -35,7 +35,6 @@ private slots:
     void serialPortsStayOnTheSavedName();
     void silentPortSkipsSetupReads();
     void silentModuleSkipsQueries();
-    void registerWMustParseBeforeEntry();
     void brightnessWriteReadsBack();
     void statusToneStaysOffThePrimaryInk();
 };
@@ -201,18 +200,14 @@ void TestSetup::mockNetworkRead()
             sawQuery = true;
             QVERIFY(!cmd.contains(';'));
         }
-        QVERIFY(cmd != "T11");
         QVERIFY(cmd != "T01");
+        QVERIFY(!cmd.startsWith("WW"));
         QVERIFY(!cmd.startsWith("W0"));
     }
-    const int firstRead = server.sim()->trace().indexOf(QByteArray("RW1"));
-    const int writeBack = server.sim()->trace().indexOf(QByteArray("WW02"));
-    const int secondRead = server.sim()->trace().indexOf(QByteArray("RW1"), firstRead + 1);
-    const int enter = server.sim()->trace().indexOf(QByteArray("AT"));
-    QVERIFY(firstRead >= 0);
-    QCOMPARE(writeBack, firstRead + 1);
-    QCOMPARE(secondRead, writeBack + 1);
-    QVERIFY(enter > secondRead);
+    const QList<QByteArray> trace = server.sim()->trace();
+    const int enter = trace.indexOf(QByteArray("AT"));
+    QVERIFY(enter > 0);
+    QCOMPARE(trace.at(enter - 1), QByteArray("T11"));
     QVERIFY(sawEnter);
     QVERIFY(sawEcho);
     QVERIFY(sawEsc);
@@ -222,6 +217,8 @@ void TestSetup::mockNetworkRead()
     const QString log = QString::fromUtf8(logFile.readAll());
     QVERIFY(log.contains(QStringLiteral("network lead-in ESC ESC")));
     QVERIFY(log.contains(QStringLiteral("network lead-in ;")));
+    QVERIFY(log.contains(QStringLiteral("network variant F T11;")));
+    QVERIFY(!log.contains(QStringLiteral("network bridge write")));
     const auto phaseMs = [&](const QString &label, bool *ok) {
         const QString key = QStringLiteral("network ") + label + QStringLiteral(" ");
         const int at = log.lastIndexOf(key);
@@ -458,51 +455,26 @@ void TestSetup::silentModuleSkipsQueries()
     int queries = 0;
     int exits = 0;
     int enters = 0;
-    for (const QByteArray &cmd : server.sim()->trace()) {
+    const QList<QByteArray> trace = server.sim()->trace();
+    for (int i = 0; i < trace.size(); ++i) {
+        const QByteArray &cmd = trace.at(i);
         if (cmd.startsWith("AT*"))
             ++queries;
         if (cmd == "ESC")
             ++exits;
-        if (cmd == "AT")
+        if (cmd == "AT") {
             ++enters;
+            QVERIFY(i > 0);
+            QCOMPARE(trace.at(i - 1), QByteArray("T11"));
+        }
         QVERIFY(cmd != "T01");
-        QVERIFY(cmd != "T11");
+        QVERIFY(!cmd.startsWith("WW"));
+        QVERIFY(!cmd.startsWith("W0"));
     }
     QCOMPARE(queries, 0);
     // Two lead-in ESC bytes plus the exit ESC, on each of the 12 tries.
     QCOMPARE(exits, 36);
     QCOMPARE(enters, 12);
-}
-
-void TestSetup::registerWMustParseBeforeEntry()
-{
-    MockRt21Server server;
-    server.sim()->setMuteRegisterW(true);
-    const QString pty = server.listenPty();
-    if (pty.isEmpty())
-        QSKIP("pty was not available");
-    Rt21Driver driver;
-    RotorEndpoint endpoint;
-    endpoint.transport = RotorEndpoint::Transport::Serial;
-    endpoint.serialPort = pty;
-    endpoint.baud = 4800;
-    driver.connectEndpoint(endpoint);
-    QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::On, 3000);
-    QSignalSpy done(&driver, &Rt21Driver::networkFinished);
-    driver.readNetwork();
-    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 15000);
-    QVERIFY(!done.at(0).at(0).toBool());
-    QCOMPARE(done.at(0).at(1).toString(),
-             QStringLiteral("Register W did not answer, so the network read was not started."));
-    bool sawRead = false;
-    for (const QByteArray &cmd : server.sim()->trace()) {
-        if (cmd == "RW1")
-            sawRead = true;
-        QVERIFY(cmd != "AT");
-        QVERIFY(!cmd.startsWith("WW"));
-        QVERIFY(!cmd.startsWith("W0"));
-    }
-    QVERIFY(sawRead);
 }
 
 void TestSetup::brightnessWriteReadsBack()

@@ -102,6 +102,18 @@ void AppConfig::save(QSettings &settings) const
     settings.setValue(QStringLiteral("link/idlePoll"), idlePollSeconds);
 }
 
+bool AppConfig::migrateModulePort()
+{
+    bool changed = false;
+    for (RotorEndpoint &rotor : rotors) {
+        if (rotor.tcpPort == 6555) {
+            rotor.tcpPort = 6665;
+            changed = true;
+        }
+    }
+    return changed;
+}
+
 bool RotorEndpoint::configured() const
 {
     if (transport == Transport::Tcp)

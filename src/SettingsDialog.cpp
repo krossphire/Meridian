@@ -801,7 +801,10 @@ void SettingsDialog::presentFound(const FoundRotor &found)
     if (replace) {
         findSavedHit = true;
         findCancel.storeRelaxed(1);
-        applyFound(found);
+        // The probe's QSerialPort is still winding down on the finder thread.
+        // Opening COM6 from here is the ntdll crash (c0000005 at 0x69a21).
+        pendingApply = found;
+        havePendingApply = true;
         return;
     }
     if (findNote)
@@ -810,6 +813,11 @@ void SettingsDialog::presentFound(const FoundRotor &found)
 
 void SettingsDialog::applyFound(const FoundRotor &found)
 {
+    if (findThread && findThread->isRunning()) {
+        pendingApply = found;
+        havePendingApply = true;
+        return;
+    }
     if (rotorIndex < 0 || rotorIndex >= draft.rotors.size())
         return;
     RotorEndpoint &rotor = draft.rotors[rotorIndex];
@@ -838,6 +846,7 @@ void SettingsDialog::startFind(bool networkOnly)
     }
     findCancel.storeRelaxed(0);
     findSavedHit = false;
+    havePendingApply = false;
     findButton->setText(QStringLiteral("Cancel"));
     networkButton->setEnabled(false);
     if (!networkOnly) {
@@ -927,6 +936,11 @@ void SettingsDialog::startFind(bool networkOnly)
     connect(thread, &QThread::finished, this, [this, thread]() {
         if (findThread == thread)
             findThread = nullptr;
+        if (havePendingApply) {
+            const FoundRotor hit = pendingApply;
+            havePendingApply = false;
+            applyFound(hit);
+        }
         thread->deleteLater();
     });
     thread->start();
@@ -948,7 +962,7 @@ void SettingsDialog::finishFind(const QList<FoundRotor> &found, bool network)
     else if (!findSavedHit)
         findNote->setText(QStringLiteral("Pick the RT-21 to use."));
     findCancel.storeRelaxed(0);
-    if (resumeSerial && driver) {
+    if (resumeSerial && driver && !havePendingApply) {
         const RotorEndpoint again = resumeEndpoint;
         resumeSerial = false;
         driver->connectEndpoint(again);

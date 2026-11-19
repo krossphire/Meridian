@@ -135,6 +135,8 @@ private:
     bool continueToNetwork = false;
     bool resumeSerial = false;
     bool findSavedHit = false;
+    bool havePendingApply = false;
+    FoundRotor pendingApply;
     RotorEndpoint resumeEndpoint;
 
 protected:

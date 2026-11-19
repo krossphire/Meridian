@@ -229,6 +229,9 @@ void TestFinder::settingsRoundTrip()
     config.homeText = QStringLiteral("EM26ul");
     config.rotors[0].transport = RotorEndpoint::Transport::Tcp;
     config.rotors[0].host = QStringLiteral("10.0.0.8");
+    config.rotors[0].tcpPort = 4001;
+    UserFiles::save(config);
+    QCOMPARE(UserFiles::load().rotors.at(0).tcpPort, 4001);
     config.rotors[0].tcpPort = 6555;
     config.showSun = false;
     UserFiles::save(config);
@@ -238,7 +241,13 @@ void TestFinder::settingsRoundTrip()
     const AppConfig loaded = UserFiles::load();
     QCOMPARE(loaded.homeText, QStringLiteral("EM26ul"));
     QCOMPARE(loaded.rotors.at(0).host, QStringLiteral("10.0.0.8"));
-    QCOMPARE(loaded.rotors.at(0).tcpPort, 6555);
+    QCOMPARE(loaded.rotors.at(0).tcpPort, 6665);
+    QFile migrated(UserFiles::settingsPath());
+    QVERIFY(migrated.open(QIODevice::ReadOnly));
+    const QString migratedText = QString::fromUtf8(migrated.readAll());
+    migrated.close();
+    QVERIFY(migratedText.contains(QStringLiteral("6665")));
+    QVERIFY(!migratedText.contains(QStringLiteral("6555")));
     QVERIFY(!loaded.showSun);
 
     config.homeText = QStringLiteral("FN42");

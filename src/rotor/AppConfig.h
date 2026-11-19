@@ -34,6 +34,9 @@ struct AppConfig {
     static AppConfig defaults();
     static AppConfig load(QSettings &settings);
     void save(QSettings &settings) const;
+    // The module on this station listens on 6665. An ini saved at the old
+    // factory port 6555 is rewritten when it is loaded.
+    bool migrateModulePort();
 
     const RotorEndpoint *activeRotor() const;
 };

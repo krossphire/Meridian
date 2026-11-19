@@ -158,6 +158,7 @@ private:
     void sendWarmupPoll();
     void onWarmupAnswer(const QByteArray &command);
     void onWarmupMiss();
+    void beginSerialRoute();
     void beginBridgeRearm();
     void sendBridgeCommand(const QByteArray &bytes, const QByteArray &note);
     void onBridgeReply(const QByteArray &frame);
@@ -208,6 +209,10 @@ private:
     RotorEndpoint endpoint;
     bool wantLink = false;
     quint64 linkGeneration = 0;
+    quint64 reconnectGeneration = 0;
+    bool serialRoute = false;
+    bool serialRouteT11 = false;
+    bool networkT11Watch = false;
     Link link_ = Link::Off;
     QString detail_;
     QTcpSocket *tcp = nullptr;

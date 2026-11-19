@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
     QApplication::setOrganizationName(QStringLiteral("K5PO"));
     QApplication::setOrganizationDomain(QStringLiteral("k5po.example"));
     QApplication::setApplicationName(QStringLiteral("Meridian"));
-    QApplication::setApplicationVersion(QStringLiteral("0.1.0-alpha25e"));
+    QApplication::setApplicationVersion(QStringLiteral("0.1.0-alpha25f"));
     QApplication::setWindowIcon(appIcon());
     installFonts();
     installPalette(app);

@@ -86,6 +86,23 @@ constexpr int kPairAfterR01Ms = 210;
 constexpr int kEchoReplyMs = 700;
 // DTR is low for about 20 ms at the utility's open, before any AT;.
 constexpr int kOpenDtrLowMs = 20;
+// Cap9's RW1/WW0n/RW1 write-back matched the utility and the module still
+// stayed silent. It is an EEPROM write. Left in place, not sent.
+constexpr bool kRearmRegisterW = false;
+
+QByteArray takeLeadingOk(QByteArray *received)
+{
+    if (!received || !received->startsWith("OK"))
+        return {};
+    int end = 2;
+    if (end < received->size() && received->at(end) == '\r')
+        ++end;
+    if (end < received->size() && received->at(end) == '\n')
+        ++end;
+    const QByteArray ok = received->left(end);
+    *received = received->mid(end);
+    return ok;
+}
 
 void preciseSleepMs(int ms)
 {
@@ -320,6 +337,13 @@ Rt21Driver::Rt21Driver(QObject *parent)
             onWarmupMiss();
             return;
         }
+        if (note == QLatin1String("route-version") || note == QLatin1String("route-pot")) {
+            TrafficLog::instance().recordSession("NOTE", QByteArray("serial route no reply"));
+            serialRoute = false;
+            serialRouteT11 = false;
+            startPoll();
+            return;
+        }
         if (note == QLatin1String("bridge")) {
             abortNetworkRead(QStringLiteral("Register W did not answer, so the network read was not started."));
             return;
@@ -544,9 +568,11 @@ Rt21Driver::Rt21Driver(QObject *parent)
     connect(reconnectTimer, &QTimer::timeout, this, [this]() {
         if (retired || !wantLink)
             return;
-        // A serial connect that won the race stops this timer. If a stale
-        // timeout was already queued, leave the live port alone.
-        if (transportOpen() && (link_ == Link::On || link_ == Link::Moving))
+        // connectEndpoint bumps linkGeneration and stops this timer. A timeout
+        // already queued from the failed IP attempt must not open the port again.
+        if (linkGeneration != reconnectGeneration)
+            return;
+        if (link_ == Link::Connecting || link_ == Link::On || link_ == Link::Moving)
             return;
         commandArmed = false;
         connectEndpoint(endpoint);
@@ -1004,6 +1030,10 @@ void Rt21Driver::onConnected()
         commandArmed = false;
         awaitPrePoll = false;
     }
+    if (endpoint.transport == RotorEndpoint::Transport::Serial) {
+        beginSerialRoute();
+        return;
+    }
     startPoll();
     pump();
 }
@@ -1095,11 +1125,21 @@ void Rt21Driver::scheduleReconnect()
                                     .arg(down)
                                     .arg(linkDownOutage ? QStringLiteral("link down") : QStringLiteral("session closed"))
                                     .arg(detail_));
+    reconnectGeneration = linkGeneration;
     reconnectTimer->start(delay);
 }
 
-void Rt21Driver::ingestReceived(const QByteArray &received, bool fromSerial)
+void Rt21Driver::ingestReceived(const QByteArray &receivedIn, bool fromSerial)
 {
+    QByteArray received = receivedIn;
+    if ((serialRouteT11 || networkT11Watch)) {
+        const QByteArray ok = takeLeadingOk(&received);
+        if (!ok.isEmpty()) {
+            TrafficLog::instance().recordSession(
+                "NOTE", (serialRouteT11 ? QByteArray("serial route T11 rx ") : QByteArray("network variant F T11 rx "))
+                            + ok.toHex(' '));
+        }
+    }
     if (received.isEmpty())
         return;
     if (countingHandshakeBytes)
@@ -1205,6 +1245,12 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
     const QByteArray upper = frame.toUpper();
     if (upper == "BI1" || upper == "AI1" || upper == "R21" || upper == "R11" || upper == "R01" || upper == "R41")
         return;
+    if (upper == "T11" && (serialRouteT11 || networkT11Watch)) {
+        TrafficLog::instance().recordSession(
+            "NOTE", (serialRouteT11 ? QByteArray("serial route T11 rx ") : QByteArray("network variant F T11 rx "))
+                        + frame.toHex(' '));
+        return;
+    }
 
     if (inflight && inflight->note == QLatin1String("bridge")) {
         onBridgeReply(frame);
@@ -1395,6 +1441,42 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
                 emit configFinished(true, QString());
             startPoll();
         }
+        return;
+    }
+
+    if (inflight && inflight->kind == Kind::Note && inflight->note == QLatin1String("route-version")) {
+        failures = 0;
+        const QString payload = Rt21::payloadAfterSoh(frame);
+        firmwareReport = payload;
+        TrafficLog::instance().recordSession("NOTE", QByteArray("serial route R11 ") + payload.toLatin1());
+        replyTimer->stop();
+        inflight.reset();
+        if (endpoint.transport != RotorEndpoint::Transport::Tcp && io) {
+            const QByteArray t11("T11;");
+            serialRouteT11 = true;
+            TrafficLog::instance().recordSession("NOTE", QByteArray("serial route T11;"));
+            TrafficLog::instance().recordSession("SER-TX", t11);
+            io->write(t11);
+            if (serial)
+                serial->flush();
+        }
+        Job pot;
+        pot.kind = Kind::Note;
+        pot.bytes = Rt21::queryPot();
+        pot.note = QStringLiteral("route-pot");
+        queue.enqueue(pot);
+        pump();
+        return;
+    }
+
+    if (inflight && inflight->kind == Kind::Note && inflight->note == QLatin1String("route-pot")) {
+        failures = 0;
+        serialRoute = false;
+        serialRouteT11 = false;
+        const QString payload = Rt21::payloadAfterSoh(frame);
+        TrafficLog::instance().recordSession("NOTE", QByteArray("serial route R01 ") + payload.toLatin1());
+        finishInflight();
+        startPoll();
         return;
     }
 
@@ -1851,6 +1933,8 @@ void Rt21Driver::beginNetworkLeadIn()
     networkPhase = NetworkPhase::LeadIn;
     networkMode = true;
     configMode = true;
+    serialRoute = false;
+    serialRouteT11 = false;
     if (pollTimer)
         pollTimer->stop();
     replyTimer->stop();
@@ -2529,6 +2613,7 @@ bool Rt21Driver::handleNetworkFrame(const QByteArray &frame)
             networkTimer->stop();
         networkPhase = NetworkPhase::AfterUart;
         networkUart2Ms = QDateTime::currentMSecsSinceEpoch();
+        networkT11Watch = false;
         TrafficLog::instance().recordSession("NOTE", QByteArray("network uart2"));
         QTimer::singleShot(0, this, [this]() {
             if (retired || networkPhase != NetworkPhase::AfterUart)
@@ -2740,8 +2825,30 @@ void Rt21Driver::onWarmupMiss()
     });
 }
 
+void Rt21Driver::beginSerialRoute()
+{
+    serialRoute = true;
+    serialRouteT11 = false;
+    if (!io || endpoint.transport == RotorEndpoint::Transport::Tcp) {
+        startPoll();
+        return;
+    }
+    Job version;
+    version.kind = Kind::Note;
+    version.bytes = Rt21::queryVersion();
+    version.note = QStringLiteral("route-version");
+    queue.clear();
+    inflight.reset();
+    queue.enqueue(version);
+    pump();
+}
+
 void Rt21Driver::beginBridgeRearm()
 {
+    if (!kRearmRegisterW) {
+        holdQuietThenEnter();
+        return;
+    }
     if (retired || networkCancel || !io) {
         abortNetworkRead(QStringLiteral("Register W did not answer, so the network read was not started."));
         return;
@@ -2830,7 +2937,7 @@ void Rt21Driver::onBridgeReply(const QByteArray &frame)
 
 void Rt21Driver::holdQuietThenEnter()
 {
-    if (networkPhase != NetworkPhase::BridgeW || retired)
+    if (retired || (networkPhase != NetworkPhase::Warmup && networkPhase != NetworkPhase::BridgeW))
         return;
     const qint64 replyMs = QDateTime::currentMSecsSinceEpoch();
     networkPhase = NetworkPhase::PreAt;
@@ -2870,6 +2977,13 @@ void Rt21Driver::startNetworkPass()
     networkPhase = NetworkPhase::WaitUart;
     networkMode = true;
     configMode = true;
+    if (endpoint.transport != RotorEndpoint::Transport::Tcp && io) {
+        const QByteArray t11("T11;");
+        networkT11Watch = true;
+        networkVariant = 'F';
+        TrafficLog::instance().recordSession("NOTE", QByteArray("network variant F T11;"));
+        sendNetworkBytes(t11);
+    }
     const QByteArray enter("AT;");
     networkEntered = true;
     networkAtMs = QDateTime::currentMSecsSinceEpoch();
