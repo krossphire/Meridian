@@ -202,6 +202,8 @@ void TestSetup::mockNetworkRead()
         }
         QVERIFY(cmd != "T11");
         QVERIFY(cmd != "T01");
+        QVERIFY(!cmd.startsWith("W0"));
+        QVERIFY(!cmd.startsWith("WW"));
     }
     QVERIFY(sawEnter);
     QVERIFY(sawEcho);
@@ -210,6 +212,8 @@ void TestSetup::mockNetworkRead()
     QFile logFile(TrafficLog::instance().filePath());
     QVERIFY(logFile.open(QIODevice::ReadOnly));
     const QString log = QString::fromUtf8(logFile.readAll());
+    QVERIFY(log.contains(QStringLiteral("network lead-in ESC ESC")));
+    QVERIFY(log.contains(QStringLiteral("network lead-in ;")));
     const auto phaseMs = [&](const QString &label, bool *ok) {
         const QString key = QStringLiteral("network ") + label + QStringLiteral(" ");
         const int at = log.lastIndexOf(key);
@@ -439,7 +443,7 @@ void TestSetup::silentModuleSkipsQueries()
     QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::On, 3000);
     QSignalSpy done(&driver, &Rt21Driver::networkFinished);
     driver.readNetwork();
-    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 120000);
+    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 180000);
     QVERIFY(!done.at(0).at(0).toBool());
     QCOMPARE(done.at(0).at(1).toString(), QStringLiteral("Network module didn't answer after 12 tries"));
     QCOMPARE(driver.link(), Rt21Driver::Link::On);
@@ -457,7 +461,8 @@ void TestSetup::silentModuleSkipsQueries()
         QVERIFY(cmd != "T11");
     }
     QCOMPARE(queries, 0);
-    QCOMPARE(exits, 12);
+    // Two lead-in ESC bytes plus the exit ESC, on each of the 12 tries.
+    QCOMPARE(exits, 36);
     QCOMPARE(enters, 12);
 }
 

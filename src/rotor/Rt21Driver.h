@@ -25,6 +25,7 @@ class QIODevice;
 class QTcpSocket;
 class QSerialPort;
 class QTimer;
+struct WinRawSerial;
 
 class Rt21Driver : public QObject
 {
@@ -144,10 +145,14 @@ private:
         WriteRead,
         Exiting,
         Quiet,
-        PreAt
+        PreAt,
+        LeadIn
     };
 
     void startNetworkPass();
+    void primeUtilityLines();
+    void beginNetworkLeadIn();
+    void finishNetworkLeadIn();
     void beginNetworkWarmup(int ms);
     void sendWarmupPoll();
     void onWarmupAnswer(const QByteArray &command);
@@ -275,7 +280,8 @@ private:
     int networkEchoSends = 0;
     qint64 networkEchoTxMs = 0;
     int networkVariantOrigin = 0;
-    void *networkRawHandle = nullptr;
+    WinRawSerial *winRaw = nullptr;
+    qint64 networkAtMs = 0;
     QTimer *networkRawTimer = nullptr;
     qint64 networkUart2Ms = 0;
     qint64 networkDtrLowMs = 0;

@@ -3,7 +3,7 @@
  * Copyright (C) 2026 Andrew, K5PO
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Find an RT-21. USB and COM ports are checked first. A TCP 6555 scan of the
+ * Find an RT-21. USB and COM ports are checked first. A TCP scan of the
  * local subnet runs only when those find nothing. Nothing is selected on its own.
  */
 

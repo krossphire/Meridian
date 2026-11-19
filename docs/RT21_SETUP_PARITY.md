@@ -57,7 +57,7 @@ The utility's constructor, then `PollWiFiValues`, then the Wi-Fi form's close:
 8. Escape and `;` leave AT mode (form close)
 9. `T01;` on the main window close — put TCP mode back
 
-The list above is the utility's older IL. Captures of 4.B12 on 4.13.2 serial do not use `T11;` or `T01;` for the read. Meridian follows the capture: poll, `AT;` and `<uart2>;`, close and reopen, `AT*SERIAL_ECHO=0` plus LF, then `AT*KEY?` plus LF, then ESC, close and reopen, and a poll. See [RT21_PROTOCOL.md](RT21_PROTOCOL.md). The Wi-Fi key and the web password are replaced with `****` in the traffic log.
+The list above is the utility's older IL. Captures of 4.B12 on 4.13.2 serial do not use `T11;` or `T01;` for the read. Meridian follows those captures: DTR low for 20 ms, ESC ESC, `;`, a short `R21;`/`R01;` poll, `AT;` and `<uart2>;`, close and reopen, one `AT*SERIAL_ECHO=0` plus LF (a second only after `ERROR 1`), then `AT*KEY?` plus LF, then ESC. See [RT21_PROTOCOL.md](RT21_PROTOCOL.md) and [REVIEW-D.md](../REVIEW-D.md). The Wi-Fi key and the web password are replaced with `****` in the traffic log.
 
 `AT*` commands in that capture end in a line feed and not a semicolon. A semicolon on those lines failed. Semicolon remains the rotator-command terminator.
 

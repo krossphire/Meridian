@@ -147,7 +147,7 @@ bool isVirtualAdapterName(const QString &name)
 
 QList<int> networkCandidatePorts(const QList<int> &extra)
 {
-    QList<int> ports = {23, 4001, 5000, 6555, 8080, 10001};
+    QList<int> ports = {23, 4001, 5000, 6665, 6555, 8080, 10001};
     for (int port : extra) {
         if (port > 0 && port <= 65535 && !ports.contains(port))
             ports.append(port);

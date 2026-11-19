@@ -59,3 +59,14 @@ inline void dropDtr(QSerialPort *port)
     port->setDataTerminalReady(false);
 #endif
 }
+
+// A read completion's buffer is often larger than the bytes the driver
+// transferred. Only the transferred count is payload. A zero count is an
+// empty completion, not a received 0x00.
+inline QByteArray serialBytesTaken(const char *data, int capacity, int transferred)
+{
+    if (!data || transferred <= 0 || capacity <= 0)
+        return {};
+    const int count = transferred < capacity ? transferred : capacity;
+    return QByteArray(data, count);
+}

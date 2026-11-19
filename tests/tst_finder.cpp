@@ -54,6 +54,7 @@ void TestFinder::labelText()
     const QList<int> ports = networkCandidatePorts({6555, 7000});
     QVERIFY(ports.contains(23));
     QVERIFY(ports.contains(6555));
+    QVERIFY(ports.contains(6665));
     QVERIFY(ports.contains(8080));
     QVERIFY(ports.contains(10001));
     QCOMPARE(ports.count(6555), 1);
