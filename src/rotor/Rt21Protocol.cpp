@@ -254,46 +254,60 @@ std::optional<int> parseIntegerPayload(const QByteArray &frame)
     return value;
 }
 
+void Framer::commit(const QByteArray &body)
+{
+    if (body.isEmpty())
+        return;
+    const int prompt = body.indexOf("<uart2>");
+    if (prompt > 0) {
+        frames.append(body.left(prompt));
+        frames.append(body.mid(prompt));
+        return;
+    }
+    frames.append(body);
+}
+
 void Framer::append(const QByteArray &bytes)
 {
+    // Frames end on ';'. A bare CR still finishes a heading ("37.7\r") because
+    // that is how some serial BI1 replies arrive. A leading ';' is only a
+    // separator, so ";131.9;" is one heading and never a short ghost.
+    constexpr int kMaxFrame = 256;
     for (unsigned char c : bytes) {
         if (c == '\n' || c == '\r') {
-            if (lineMode && !buffer.isEmpty()) {
-                frames.append(buffer);
+            if (lineMode && !dropping && !buffer.isEmpty()) {
+                commit(buffer);
                 buffer.clear();
+                dropping = false;
                 continue;
             }
             if (c == '\n')
                 continue;
-            // "100.0\r;" still terminates on the semicolon. A bare CR after a
-            // heading is also accepted so a short reply is not stuck.
-            if (parseHeading(buffer)) {
-                frames.append(buffer);
+            if (!dropping && parseHeading(buffer)) {
+                commit(buffer);
                 buffer.clear();
             }
             continue;
         }
         if (c == ';') {
-            if (buffer.isEmpty()) {
-                buffer = ";"; // DCU-1 replies start with ';' and have no trailer.
-                continue;
+            if (!dropping && !buffer.isEmpty() && buffer != ";") {
+                const QByteArray body = buffer.startsWith(';') ? buffer.mid(1) : buffer;
+                commit(body);
             }
-            if (buffer == ";") {
-                buffer.clear();
-                continue;
-            }
-            frames.append(buffer.startsWith(';') ? buffer.mid(1) : buffer);
+            buffer.clear();
+            dropping = false;
+            continue;
+        }
+        if (c == '<' && !dropping && !buffer.isEmpty() && buffer.at(0) != '<') {
+            commit(buffer);
+            buffer.clear();
+        }
+        if (dropping || buffer.size() >= kMaxFrame) {
+            dropping = true;
             buffer.clear();
             continue;
         }
         buffer.append(char(c));
-        if (buffer.size() == 4 && buffer.at(0) == ';'
-            && std::isdigit(static_cast<unsigned char>(buffer.at(1)))
-            && std::isdigit(static_cast<unsigned char>(buffer.at(2)))
-            && std::isdigit(static_cast<unsigned char>(buffer.at(3)))) {
-            frames.append(buffer.mid(1));
-            buffer.clear();
-        }
     }
 }
 
@@ -309,6 +323,7 @@ void Framer::clear()
     buffer.clear();
     frames.clear();
     lineMode = false;
+    dropping = false;
 }
 
 } // namespace Rt21

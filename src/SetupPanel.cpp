@@ -383,8 +383,15 @@ void SetupPanel::refreshNetworkRead()
     const bool ip = ipOnlyLink();
     const bool readOk = driver && driver->networkReadOk();
     const bool reading = readNetwork && readNetwork->text() == QStringLiteral("Cancel");
+    bool serialUp = false;
+    if (driver) {
+        const RotorEndpoint live = driver->linkEndpoint();
+        const auto state = driver->link();
+        serialUp = live.transport == RotorEndpoint::Transport::Serial && live.configured()
+                   && (state == Rt21Driver::Link::On || state == Rt21Driver::Link::Moving);
+    }
     if (readNetwork && !reading)
-        readNetwork->setEnabled(!ip);
+        readNetwork->setEnabled(serialUp && !ip);
     for (QLineEdit *edit : values)
         edit->setEnabled(!ip);
     for (QWidget *widget : networkWrites) {

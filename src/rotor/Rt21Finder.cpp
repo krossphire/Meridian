@@ -269,6 +269,21 @@ int tcpPortAfterFind(int savedPort, const RotorEndpoint &found)
     return savedPort;
 }
 
+int baudKeptAfterFind(int savedBaud, int foundBaud)
+{
+    if (foundBaud == 4800 || foundBaud == 9600)
+        return foundBaud;
+    return savedBaud == 9600 ? 9600 : 4800;
+}
+
+QString plainLinkFailure(const QString &message)
+{
+    const QString trimmed = message.trimmed();
+    if (trimmed.isEmpty() || trimmed.compare(QStringLiteral("Unknown error"), Qt::CaseInsensitive) == 0)
+        return QStringLiteral("The rotor closed the connection.");
+    return trimmed;
+}
+
 namespace {
 
 bool portLess(const QString &a, const QString &b)

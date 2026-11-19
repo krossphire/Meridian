@@ -45,6 +45,8 @@ public:
 
 signals:
     void configSaved(const AppConfig &config);
+    // The probe thread has emitted finished. A live serial link is reopened after this.
+    void findProbeSettled();
 
 private:
     struct FieldRow {

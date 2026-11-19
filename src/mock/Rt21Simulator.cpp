@@ -111,6 +111,11 @@ void Rt21Simulator::setMuteRegisterW(bool mute)
     muteRegisterW = mute;
 }
 
+void Rt21Simulator::setMute(const QByteArray &prefix)
+{
+    mutePrefix = prefix.toUpper();
+}
+
 void Rt21Simulator::clearTrace()
 {
     trace_.clear();
@@ -176,8 +181,12 @@ void Rt21Simulator::feed(const QByteArray &bytes)
 void Rt21Simulator::handle(const QByteArray &command, bool immediate)
 {
     const QByteArray cmd = command.toUpper().trimmed();
-    if (!cmd.isEmpty())
+    if (cmd.isEmpty())
+        trace_.append(QByteArray(";"));
+    else
         trace_.append(immediate ? cmd + QByteArray("\r") : cmd);
+    if (!mutePrefix.isEmpty() && cmd.startsWith(mutePrefix))
+        return;
     if (ignoreModule && (cmd.startsWith("AT") || cmd.startsWith("T0") || cmd.startsWith("T1")))
         return;
     if ((cmd.startsWith("BI") || cmd.startsWith("AI")) && ignoreQueries)
@@ -328,10 +337,9 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
                 const qint64 rose = networkDtrRoseProbeMs().load();
                 const qint64 sinceRise = rose > 0 ? now - rose : 9999;
                 ++echoSends;
-                // Variant D echoes as soon as the port is open, about 520 ms plus
-                // the close/open, so the first byte can land well before 700 ms.
-                // A and B still land in the 700–760 ms window. Either way the
-                // first echo is within a few milliseconds of DTR rising.
+                // The live reopen holds DTR low for about 195 ms after the 520 ms
+                // uart2 gap, so the first echo lands near 715 ms and within a
+                // few milliseconds of DTR rising.
                 const bool prompt = uart2AtMs > 0 && rose > 0 && sinceRise <= 40 && sinceUart >= 480
                                     && sinceUart <= 800;
                 if (echoSends == 1 && prompt) {

@@ -17,8 +17,13 @@
 #include "rotor/Rt21Finder.h"
 #include "rotor/Rt21Setup.h"
 
+#include <QDateTime>
+#include <QElapsedTimer>
 #include <QSignalSpy>
 #include <QTest>
+#include <QTimer>
+
+#include <algorithm>
 
 class TestSetup : public QObject
 {
@@ -163,8 +168,20 @@ void TestSetup::mockNetworkRead()
     QSignalSpy status(&driver, &Rt21Driver::networkStatus);
     QSettings cycleSettings(UserFiles::settingsPath(), QSettings::IniFormat);
     cycleSettings.remove(QStringLiteral("net_cycle_mode"));
+    qint64 lastTick = QDateTime::currentMSecsSinceEpoch();
+    int maxGap = 0;
+    QTimer tick;
+    tick.setInterval(30);
+    QObject::connect(&tick, &QTimer::timeout, &tick, [&]() {
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
+        maxGap = std::max(maxGap, int(now - lastTick));
+        lastTick = now;
+    });
+    tick.start();
     driver.readNetwork();
     QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 20000);
+    tick.stop();
+    QVERIFY2(maxGap < 500, qPrintable(QStringLiteral("event loop stalled %1 ms").arg(maxGap)));
     QCOMPARE(status.at(0).at(0).toString(), QStringLiteral("Reading network (try 1 of 12)…"));
     QCOMPARE(got.value(QStringLiteral("id")), QStringLiteral("RT-21"));
     QCOMPARE(got.value(QStringLiteral("dhcp")), QStringLiteral("0"));
@@ -236,9 +253,9 @@ void TestSetup::mockNetworkRead()
     const int preAtQuiet = phaseMs(QStringLiteral("pre-AT quiet"), &timingOk);
     QVERIFY(timingOk);
     QVERIFY(uartToDtr >= 490 && uartToDtr <= 560);
-    QVERIFY(dtrLow >= 0 && dtrLow <= 150);
+    QVERIFY(dtrLow >= 180 && dtrLow <= 210);
     QVERIFY(dtrToEcho >= 0 && dtrToEcho <= 15);
-    QVERIFY(uartToEcho >= 500 && uartToEcho <= 720);
+    QVERIFY(uartToEcho >= 700 && uartToEcho <= 760);
     QVERIFY(log.contains(QStringLiteral("variant D")));
     QVERIFY(log.contains(QStringLiteral("network echo rx ERROR 1")));
     QVERIFY(log.contains(QStringLiteral("network echo send 2")));
@@ -446,6 +463,7 @@ void TestSetup::silentModuleSkipsQueries()
     endpoint.baud = 4800;
     driver.connectEndpoint(endpoint);
     QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::On, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(driver.heading().has_value(), 3000);
     QSignalSpy done(&driver, &Rt21Driver::networkFinished);
     driver.readNetwork();
     QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 180000);
@@ -472,8 +490,9 @@ void TestSetup::silentModuleSkipsQueries()
         QVERIFY(!cmd.startsWith("W0"));
     }
     QCOMPARE(queries, 0);
-    // Two lead-in ESC bytes plus the exit ESC, on each of the 12 tries.
-    QCOMPARE(exits, 36);
+    // The serial route releases T11 with one ESC, then each of the 12 tries
+    // sends two lead-in ESC bytes plus the exit ESC.
+    QCOMPARE(exits, 37);
     QCOMPARE(enters, 12);
 }
 

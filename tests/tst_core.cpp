@@ -35,6 +35,7 @@ private slots:
     void projectionRoundTrip();
     void countryHit();
     void framing();
+    void strictSemicolonFrames();
     void commands();
     void headingParse();
     void hardwareRx();
@@ -221,6 +222,35 @@ void TestCore::framing()
     QCOMPARE(frames.size(), 2);
     QCOMPARE(frames.at(0), QByteArray(" 45.0"));
     QCOMPARE(frames.at(1), QByteArray("BI1"));
+}
+
+void TestCore::strictSemicolonFrames()
+{
+    Rt21::Framer headed;
+    headed.append(";131.9;");
+    const QList<QByteArray> one = headed.take();
+    QCOMPARE(one.size(), 1);
+    QCOMPARE(one.at(0), QByteArray("131.9"));
+    const auto heading = Rt21::parseHeadingFrame(one.at(0));
+    QVERIFY(heading);
+    QVERIFY(std::abs(*heading - 131.9) < 1e-9);
+
+    Rt21::Framer split;
+    split.append("OK");
+    split.append("<uart2>;");
+    const QList<QByteArray> prompt = split.take();
+    QCOMPARE(prompt.size(), 2);
+    QCOMPARE(prompt.at(0), QByteArray("OK"));
+    QCOMPARE(prompt.at(1), QByteArray("<uart2>"));
+
+    Rt21::Framer capped;
+    capped.append(QByteArray(300, 'A'));
+    capped.append(";");
+    QVERIFY(capped.take().isEmpty());
+    capped.append("131.9;");
+    const QList<QByteArray> after = capped.take();
+    QCOMPARE(after.size(), 1);
+    QCOMPARE(after.at(0), QByteArray("131.9"));
 }
 
 void TestCore::commands()

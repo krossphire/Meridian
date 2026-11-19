@@ -29,7 +29,7 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
     , config(std::move(initial))
     , settings(store)
 {
-    setWindowTitle(QStringLiteral("Meridian 0.1.0-alpha25h"));
+    setWindowTitle(QStringLiteral("Meridian 0.1.0-alpha25i"));
     TrafficLog::instance().setEnabled(config.trafficLog);
     globe = new GlobeWidget;
     setCentralWidget(globe);
@@ -163,8 +163,8 @@ void MainWindow::refreshStatus()
         }
     }
     globe->setStatusLine(line, tone);
-    bool stale = false;
-    if (link && link->lastSeenMs() >= 0
+    bool stale = link && link->link() == Rt21Driver::Link::Failed;
+    if (!stale && link && link->lastSeenMs() >= 0
         && (link->link() == Rt21Driver::Link::On || link->link() == Rt21Driver::Link::Moving)) {
         const qint64 age = QDateTime::currentMSecsSinceEpoch() - link->lastSeenMs();
         stale = age > qint64(link->currentPollMs()) * 2;

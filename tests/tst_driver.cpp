@@ -7,12 +7,15 @@
 #include "mock/Rt21Simulator.h"
 #include "rotor/Rt21Driver.h"
 #include "rotor/Rt21Finder.h"
+#include "rotor/TrafficLog.h"
 
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QEventLoop>
+#include <QFile>
 #include <QSignalSpy>
 #include <QTcpSocket>
+#include <QTemporaryDir>
 #include <QTest>
 #include <QThread>
 #include <QTimer>
@@ -33,10 +36,16 @@ private slots:
     void prePollThenOneGoto();
     void dropCommandWithoutReplay();
     void unreachableConnectIsQuick();
+    void readNetworkWithoutAPortFinishes();
+    void failureNoteClearsOnConnect();
+    void abortClearsTheTarget();
+    void trafficLogWritesAreLocked();
 #ifdef Q_OS_UNIX
     void serialPty();
     void serialConnectCancelsIpReconnect();
     void findHitConnectsWhileIpReconnectIsArmed();
+    void bridgeEscBeforePollWhenRouteIsSilent();
+    void stopOnALiveSerialLink();
 #endif
 };
 
@@ -340,7 +349,148 @@ void TestDriver::findHitConnectsWhileIpReconnectIsArmed()
     QCOMPARE(t11, r11 + 1);
     QCOMPARE(r01, t11 + 1);
 }
+
+void TestDriver::bridgeEscBeforePollWhenRouteIsSilent()
+{
+    MockRt21Server server;
+    server.sim()->setHeading(18);
+    server.sim()->setMute(QByteArray("R01"));
+    const QString pty = server.listenPty();
+    if (pty.isEmpty())
+        QSKIP("pty was not available");
+    Rt21Driver driver;
+    RotorEndpoint endpoint;
+    endpoint.transport = RotorEndpoint::Transport::Serial;
+    endpoint.serialPort = pty;
+    endpoint.baud = 4800;
+    driver.connectEndpoint(endpoint);
+    QTRY_VERIFY_WITH_TIMEOUT(server.sim()->trace().contains(QByteArray("T11")), 3000);
+    driver.disconnectLink();
+    QTRY_VERIFY_WITH_TIMEOUT(server.sim()->trace().contains(QByteArray("ESC")), 2000);
+    const QList<QByteArray> closed = server.sim()->trace();
+    const int firstT11 = closed.indexOf(QByteArray("T11"));
+    const int esc = closed.indexOf(QByteArray("ESC"));
+    QVERIFY(firstT11 >= 0);
+    QVERIFY(esc > firstT11);
+    for (int i = firstT11 + 1; i < esc; ++i)
+        QVERIFY(closed.at(i) != QByteArray("T11"));
+
+    server.sim()->setMute(QByteArray());
+    server.sim()->clearTrace();
+    driver.connectEndpoint(endpoint);
+    QTRY_VERIFY_WITH_TIMEOUT(driver.heading().has_value(), 4000);
+    const QList<QByteArray> again = server.sim()->trace();
+    const int t11 = again.indexOf(QByteArray("T11"));
+    const int release = again.indexOf(QByteArray("ESC"));
+    const int bi = again.indexOf(QByteArray("BI1"));
+    QVERIFY(t11 >= 0);
+    QVERIFY(release > t11);
+    QVERIFY(bi > release);
+    for (int i = t11 + 1; i < release; ++i)
+        QVERIFY(again.at(i) != QByteArray("T11"));
+}
+
+void TestDriver::stopOnALiveSerialLink()
+{
+    MockRt21Server server;
+    server.sim()->setHeading(22);
+    const QString pty = server.listenPty();
+    if (pty.isEmpty())
+        QSKIP("pty was not available");
+    Rt21Driver driver;
+    RotorEndpoint endpoint;
+    endpoint.transport = RotorEndpoint::Transport::Serial;
+    endpoint.serialPort = pty;
+    endpoint.baud = 4800;
+    driver.connectEndpoint(endpoint);
+    QTRY_VERIFY_WITH_TIMEOUT(driver.heading().has_value(), 3000);
+    server.sim()->clearTrace();
+    driver.stopMotion();
+    QTRY_VERIFY_WITH_TIMEOUT(server.sim()->trace().contains(QByteArray(";")), 2000);
+}
 #endif
+
+void TestDriver::readNetworkWithoutAPortFinishes()
+{
+    Rt21Driver driver;
+    QSignalSpy done(&driver, &Rt21Driver::networkFinished);
+    driver.readNetwork();
+    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 2000);
+    QVERIFY(!done.at(0).at(0).toBool());
+    QVERIFY(done.at(0).at(1).toString().contains(QStringLiteral("Connect to a rotor")));
+}
+
+void TestDriver::failureNoteClearsOnConnect()
+{
+    Rt21Driver driver;
+    RotorEndpoint down;
+    down.transport = RotorEndpoint::Transport::Tcp;
+    down.host = QStringLiteral("192.0.2.1");
+    down.tcpPort = 9;
+    driver.connectEndpoint(down);
+    QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::Failed, 5000);
+    driver.goTo(15);
+    QTRY_VERIFY_WITH_TIMEOUT(driver.transientNote().contains(QStringLiteral("not connected")), 4000);
+
+    MockRt21Server server;
+    server.sim()->setHeading(11);
+    QVERIFY(server.listenTcp(0));
+    RotorEndpoint up;
+    up.transport = RotorEndpoint::Transport::Tcp;
+    up.host = QStringLiteral("127.0.0.1");
+    up.tcpPort = int(server.port());
+    driver.connectEndpoint(up);
+    QTRY_VERIFY_WITH_TIMEOUT(driver.heading().has_value(), 3000);
+    QCOMPARE(driver.transientNote(), QString());
+}
+
+void TestDriver::abortClearsTheTarget()
+{
+    auto *server = new MockRt21Server;
+    server->sim()->setHeading(16);
+    QVERIFY(server->listenTcp(0));
+    Rt21Driver driver;
+    RotorEndpoint endpoint;
+    endpoint.transport = RotorEndpoint::Transport::Tcp;
+    endpoint.host = QStringLiteral("127.0.0.1");
+    endpoint.tcpPort = int(server->port());
+    driver.connectEndpoint(endpoint);
+    QTRY_VERIFY_WITH_TIMEOUT(driver.heading().has_value(), 3000);
+    driver.goTo(40);
+    QTRY_VERIFY_WITH_TIMEOUT(driver.target().has_value(), 2000);
+    delete server;
+    QCoreApplication::processEvents();
+    QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::Failed, 3000);
+    QVERIFY(!driver.target().has_value());
+    QVERIFY(!driver.detail().contains(QStringLiteral("Unknown error"), Qt::CaseInsensitive));
+}
+
+void TestDriver::trafficLogWritesAreLocked()
+{
+    TrafficLog &log = TrafficLog::instance();
+    log.setEnabled(true);
+    constexpr int count = 40;
+    auto *left = QThread::create([&log]() {
+        for (int i = 0; i < count; ++i)
+            log.recordSession("NOTE", QByteArray("lock-left"));
+    });
+    auto *right = QThread::create([&log]() {
+        for (int i = 0; i < count; ++i)
+            log.recordSession("NOTE", QByteArray("lock-right"));
+    });
+    left->start();
+    right->start();
+    QVERIFY(left->wait(3000));
+    QVERIFY(right->wait(3000));
+    log.flush();
+    QFile file(log.filePath());
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QString text = QString::fromUtf8(file.readAll());
+    QCOMPARE(text.count(QStringLiteral("lock-left")), count);
+    QCOMPARE(text.count(QStringLiteral("lock-right")), count);
+    delete left;
+    delete right;
+}
 
 QTEST_GUILESS_MAIN(TestDriver)
 #include "tst_driver.moc"

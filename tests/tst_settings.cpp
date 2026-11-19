@@ -30,6 +30,11 @@ class TestSettings : public QObject
     Q_OBJECT
 private slots:
     void transportFlickKeepsOneConnection();
+    void foundBaudIsKeptWhenItIs4800Or9600();
+    void readNetworkStaysOffUntilSerialIsUp();
+#ifdef Q_OS_UNIX
+    void liveSerialFindStopsAndResumesAfterTheProbe();
+#endif
 };
 
 void TestSettings::transportFlickKeepsOneConnection()
@@ -135,6 +140,95 @@ void TestSettings::transportFlickKeepsOneConnection()
     QCOMPARE(window.driver()->findChildren<QTcpSocket *>().size(), 1);
     QCOMPARE(window.findChildren<QSerialPort *>().size(), 0);
 }
+
+void TestSettings::foundBaudIsKeptWhenItIs4800Or9600()
+{
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+    AppConfig config = AppConfig::defaults();
+    config.rotors[0].transport = RotorEndpoint::Transport::Serial;
+    config.rotors[0].serialPort = QStringLiteral("COM6");
+    config.rotors[0].baud = 4800;
+    SettingsDialog dialog(config, nullptr, nullptr);
+
+    FoundRotor hit;
+    hit.endpoint.transport = RotorEndpoint::Transport::Serial;
+    hit.endpoint.serialPort = QStringLiteral("COM6");
+    hit.endpoint.baud = 9600;
+    hit.label = QStringLiteral("9600 hit");
+    dialog.presentFound(hit);
+    auto *button = dialog.findChild<QPushButton *>(QStringLiteral("findResult"));
+    QVERIFY(button);
+    button->click();
+    QCOMPARE(dialog.config().rotors.at(0).baud, 9600);
+
+    FoundRotor fast = hit;
+    fast.endpoint.baud = 19200;
+    fast.label = QStringLiteral("19200 hit");
+    dialog.presentFound(fast);
+    const auto buttons = dialog.findChildren<QPushButton *>(QStringLiteral("findResult"));
+    QCOMPARE(buttons.size(), 2);
+    buttons.last()->click();
+    QCOMPARE(dialog.config().rotors.at(0).baud, 9600);
+    QVERIFY(dialog.config().rotors.at(0).baud != 19200);
+}
+
+void TestSettings::readNetworkStaysOffUntilSerialIsUp()
+{
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+    SettingsDialog dialog(AppConfig::defaults(), nullptr, nullptr);
+    auto *readNetwork = dialog.findChild<QPushButton *>(QStringLiteral("readNetwork"));
+    QVERIFY(readNetwork);
+    QVERIFY(!readNetwork->isEnabled());
+}
+
+#ifdef Q_OS_UNIX
+void TestSettings::liveSerialFindStopsAndResumesAfterTheProbe()
+{
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+    MockRt21Server server;
+    server.sim()->setHeading(14);
+    const QString pty = server.listenPty();
+    if (pty.isEmpty())
+        QSKIP("pty was not available");
+
+    AppConfig config = AppConfig::defaults();
+    config.rotors[0].transport = RotorEndpoint::Transport::Serial;
+    config.rotors[0].serialPort = pty;
+    config.rotors[0].baud = 4800;
+    MainWindow window(config, nullptr);
+    QTRY_VERIFY_WITH_TIMEOUT(window.driver()->heading().has_value(), 3000);
+    auto *readNetwork = window.settingsDialog()->findChild<QPushButton *>(QStringLiteral("readNetwork"));
+    QVERIFY(readNetwork);
+    QVERIFY(readNetwork->isEnabled());
+
+    bool settled = false;
+    bool released = false;
+    bool resumedEarly = false;
+    QObject::connect(window.settingsDialog(), &SettingsDialog::findProbeSettled, &window, [&]() { settled = true; });
+    QObject::connect(window.driver(), &Rt21Driver::linkChanged, &window,
+                     [&](Rt21Driver::Link state, const QString &) {
+                         if (state == Rt21Driver::Link::Off)
+                             released = true;
+                         if (released && state == Rt21Driver::Link::Connecting && !settled)
+                             resumedEarly = true;
+                     });
+    auto *find = window.settingsDialog()->findChild<QPushButton *>(QStringLiteral("findRt21"));
+    QVERIFY(find);
+    find->click();
+    QTRY_VERIFY_WITH_TIMEOUT(server.sim()->trace().contains(QByteArray(";")), 2000);
+    QCOMPARE(window.driver()->link(), Rt21Driver::Link::Off);
+    find->click();
+    QTRY_VERIFY_WITH_TIMEOUT(settled, 15000);
+    QTRY_COMPARE_WITH_TIMEOUT(window.driver()->link(), Rt21Driver::Link::On, 5000);
+    QVERIFY(!resumedEarly);
+}
+#endif
 
 QTEST_MAIN(TestSettings)
 #include "tst_settings.moc"

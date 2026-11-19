@@ -12,6 +12,7 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
+#include <QMutexLocker>
 
 namespace {
 
@@ -71,6 +72,7 @@ QString TrafficLog::directory() const
 
 void TrafficLog::setEnabled(bool on)
 {
+    QMutexLocker locker(&mutex);
     enabled = on;
     if (enabled)
         ensureOpen();
@@ -87,11 +89,12 @@ void TrafficLog::ensureOpen()
     logFile().setFileName(path);
     opened = logFile().open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Unbuffered);
     if (opened)
-        writeLine(QStringLiteral("NOTE Meridian 0.1.0-alpha25h traffic log ") + path);
+        writeLine(QStringLiteral("NOTE Meridian 0.1.0-alpha25i traffic log ") + path);
 }
 
 void TrafficLog::flush()
 {
+    QMutexLocker locker(&mutex);
     if (opened)
         logFile().flush();
 }
@@ -107,6 +110,7 @@ void TrafficLog::writeLine(const QString &line)
 
 void TrafficLog::note(const QString &text)
 {
+    QMutexLocker locker(&mutex);
     if (!enabled)
         return;
     ensureOpen();
@@ -115,14 +119,21 @@ void TrafficLog::note(const QString &text)
 
 void TrafficLog::recordSession(const char *direction, const QByteArray &bytes)
 {
+    QMutexLocker locker(&mutex);
     const bool was = enabled;
     enabled = true;
-    record(direction, bytes);
+    if (enabled && !bytes.isEmpty()) {
+        ensureOpen();
+        const QByteArray safe = Rt21::redactForLog(bytes);
+        writeLine(stamp() + QLatin1Char(' ') + QLatin1String(direction) + QLatin1Char(' ') + QString::number(safe.size())
+                  + QStringLiteral(" |") + printable(safe) + QStringLiteral("| ") + hexBytes(safe));
+    }
     enabled = was;
 }
 
 void TrafficLog::record(const char *direction, const QByteArray &bytes)
 {
+    QMutexLocker locker(&mutex);
     if (!enabled || bytes.isEmpty())
         return;
     ensureOpen();

@@ -49,6 +49,13 @@ bool findReplacesSavedEndpoint(const RotorEndpoint &saved, bool linkUp, const Ro
 // A TCP hit keeps the port that answered. A serial hit leaves the saved port as it was.
 int tcpPortAfterFind(int savedPort, const RotorEndpoint &found);
 
+// Find stores 4800 or 9600 when that is the baud that answered. Any other
+// probe baud (19200) leaves the saved baud alone.
+int baudKeptAfterFind(int savedBaud, int foundBaud);
+
+// Qt reports a dropped socket as "Unknown error". Say what happened.
+QString plainLinkFailure(const QString &message);
+
 struct SerialPortChoice {
     QString port;
     QString label;

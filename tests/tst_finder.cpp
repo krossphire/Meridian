@@ -36,6 +36,7 @@ private slots:
     void missingPortIsQuiet();
     void networkScanStopsAtFirstHit();
     void savedIpIsReplacedOnlyWhenDown();
+    void foundBaudStays4800Or9600();
 #ifdef Q_OS_UNIX
     void serialScanStopsAtFirstHit();
 #endif
@@ -182,6 +183,18 @@ void TestFinder::savedIpIsReplacedOnlyWhenDown()
 }
 
 #ifdef Q_OS_UNIX
+void TestFinder::foundBaudStays4800Or9600()
+{
+    QCOMPARE(baudKeptAfterFind(4800, 4800), 4800);
+    QCOMPARE(baudKeptAfterFind(4800, 9600), 9600);
+    QCOMPARE(baudKeptAfterFind(9600, 4800), 4800);
+    QCOMPARE(baudKeptAfterFind(9600, 19200), 9600);
+    QCOMPARE(baudKeptAfterFind(4800, 19200), 4800);
+    QVERIFY(baudKeptAfterFind(4800, 19200) != 19200);
+    QCOMPARE(plainLinkFailure(QStringLiteral("Unknown error")), QStringLiteral("The rotor closed the connection."));
+    QCOMPARE(plainLinkFailure(QStringLiteral("Connection timed out")), QStringLiteral("Connection timed out"));
+}
+
 void TestFinder::serialScanStopsAtFirstHit()
 {
     MockRt21Server first;

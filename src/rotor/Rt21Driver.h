@@ -179,6 +179,9 @@ private:
     void networkReopenFailed();
     void cycleSerialPort(const std::function<void(bool)> &done);
     void raiseLinesAndFinish(const std::function<void(bool)> &done);
+    void afterDeadline(qint64 deadlineMs, const std::function<void()> &fn);
+    bool bridgeMayBeOpen() const;
+    void releaseBridge();
     void loadCycleOrigin();
     char variantForThisTry() const;
     void rememberCycleVariant();
@@ -213,6 +216,8 @@ private:
     bool serialRoute = false;
     bool serialRouteT11 = false;
     bool networkT11Watch = false;
+    // Set when T11 has been written. Cleared only after ESC 0x1b is written.
+    bool bridgeLatched = false;
     Link link_ = Link::Off;
     QString detail_;
     QTcpSocket *tcp = nullptr;

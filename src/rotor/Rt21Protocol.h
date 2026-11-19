@@ -63,9 +63,12 @@ public:
     void setLineMode(bool on) { lineMode = on; }
 
 private:
+    void commit(const QByteArray &body);
+
     QByteArray buffer;
     QList<QByteArray> frames;
     bool lineMode = false;
+    bool dropping = false;
 };
 
 } // namespace Rt21

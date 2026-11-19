@@ -32,6 +32,8 @@ public:
     void setIgnoreModule(bool ignore);
     void setEe(QChar id, int value);
     void setMuteRegisterW(bool mute);
+    // Record the command and send nothing back. Used when R01 must time out.
+    void setMute(const QByteArray &prefix);
     void clearTrace();
     QList<QByteArray> trace() const { return trace_; }
     double heading() const { return heading_; }
@@ -70,6 +72,7 @@ private:
     bool ignoreQueries = false;
     bool ignoreModule = false;
     bool muteRegisterW = false;
+    QByteArray mutePrefix;
     QList<QByteArray> trace_;
 };
 

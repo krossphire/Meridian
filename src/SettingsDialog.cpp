@@ -829,7 +829,7 @@ void SettingsDialog::applyFound(const FoundRotor &found)
     if (!found.endpoint.serialPort.isEmpty())
         rotor.serialPort = found.endpoint.serialPort;
     if (found.endpoint.baud > 0)
-        rotor.baud = found.endpoint.baud;
+        rotor.baud = baudKeptAfterFind(rotor.baud, found.endpoint.baud);
     loadRotor(rotorIndex);
     commitDraft(false);
     if (findNote)
@@ -864,6 +864,7 @@ void SettingsDialog::startFind(bool networkOnly)
                 resumeEndpoint = live;
                 resumeSerial = true;
                 TrafficLog::instance().recordSession("FIND", QByteArray("release ") + live.serialPort.toLatin1());
+                driver->stopMotion();
                 driver->disconnectLink();
             }
         }
@@ -936,10 +937,16 @@ void SettingsDialog::startFind(bool networkOnly)
     connect(thread, &QThread::finished, this, [this, thread]() {
         if (findThread == thread)
             findThread = nullptr;
+        emit findProbeSettled();
         if (havePendingApply) {
+            resumeSerial = false;
             const FoundRotor hit = pendingApply;
             havePendingApply = false;
             applyFound(hit);
+        } else if (resumeSerial && driver) {
+            const RotorEndpoint again = resumeEndpoint;
+            resumeSerial = false;
+            driver->connectEndpoint(again);
         }
         thread->deleteLater();
     });
@@ -962,11 +969,6 @@ void SettingsDialog::finishFind(const QList<FoundRotor> &found, bool network)
     else if (!findSavedHit)
         findNote->setText(QStringLiteral("Pick the RT-21 to use."));
     findCancel.storeRelaxed(0);
-    if (resumeSerial && driver && !havePendingApply) {
-        const RotorEndpoint again = resumeEndpoint;
-        resumeSerial = false;
-        driver->connectEndpoint(again);
-    }
 }
 
 void SettingsDialog::storeRotor(int index)

@@ -11,6 +11,7 @@
 #pragma once
 
 #include <QByteArray>
+#include <QRecursiveMutex>
 #include <QString>
 
 class TrafficLog
@@ -37,4 +38,5 @@ private:
     bool enabled = false;
     QString path;
     bool opened = false;
+    QRecursiveMutex mutex;
 };
