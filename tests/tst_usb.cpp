@@ -143,5 +143,5 @@ void TestUsb::sysfsTree()
     QVERIFY(withPort.at(0).hasSerialPort);
 }
 
-QTEST_MAIN(TestUsb)
+QTEST_GUILESS_MAIN(TestUsb)
 #include "tst_usb.moc"
