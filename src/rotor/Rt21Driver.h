@@ -146,7 +146,8 @@ private:
         Exiting,
         Quiet,
         PreAt,
-        LeadIn
+        LeadIn,
+        BridgeW
     };
 
     void startNetworkPass();
@@ -157,6 +158,9 @@ private:
     void sendWarmupPoll();
     void onWarmupAnswer(const QByteArray &command);
     void onWarmupMiss();
+    void beginBridgeRearm();
+    void sendBridgeCommand(const QByteArray &bytes, const QByteArray &note);
+    void onBridgeReply(const QByteArray &frame);
     void holdQuietThenEnter();
     void armNetworkTimer(int ms);
     void onNetworkTimeout();
@@ -272,6 +276,8 @@ private:
     bool networkWarmupSawHeading = false;
     bool networkWarmupSawR01 = false;
     bool networkWarmupSawR21 = false;
+    int networkBridgeStep = 0;
+    int networkBridgeValue = -1;
     qint64 networkWarmupHardStartMs = 0;
     bool networkTxQuiet = false;
     bool networkQuietFromWarmup = false;

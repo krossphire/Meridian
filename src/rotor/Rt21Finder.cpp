@@ -23,8 +23,6 @@
 #include <QTimer>
 
 #include <algorithm>
-
-#include <algorithm>
 #include <cmath>
 
 namespace {
@@ -262,6 +260,15 @@ bool findReplacesSavedEndpoint(const RotorEndpoint &saved, bool linkUp, const Ro
     if (found.transport == RotorEndpoint::Transport::Tcp && found.host == saved.host && found.tcpPort == saved.tcpPort)
         return false;
     return true;
+}
+
+int tcpPortAfterFind(int savedPort, const RotorEndpoint &found)
+{
+    if (found.transport == RotorEndpoint::Transport::Tcp && found.tcpPort > 0 && found.tcpPort <= 65535)
+        return found.tcpPort;
+    if (savedPort == 6555)
+        return 6665;
+    return savedPort;
 }
 
 namespace {

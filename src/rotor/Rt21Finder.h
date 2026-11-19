@@ -46,6 +46,10 @@ QList<int> serialProbeBauds();
 // session is left alone.
 bool findReplacesSavedEndpoint(const RotorEndpoint &saved, bool linkUp, const RotorEndpoint &found);
 
+// A TCP hit keeps the port that answered. A serial hit leaves a saved 6555 as
+// 6665, which is the module port on this controller. Any other saved port stays.
+int tcpPortAfterFind(int savedPort, const RotorEndpoint &found);
+
 struct SerialPortChoice {
     QString port;
     QString label;

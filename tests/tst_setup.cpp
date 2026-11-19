@@ -35,6 +35,7 @@ private slots:
     void serialPortsStayOnTheSavedName();
     void silentPortSkipsSetupReads();
     void silentModuleSkipsQueries();
+    void registerWMustParseBeforeEntry();
     void brightnessWriteReadsBack();
     void statusToneStaysOffThePrimaryInk();
 };
@@ -203,8 +204,15 @@ void TestSetup::mockNetworkRead()
         QVERIFY(cmd != "T11");
         QVERIFY(cmd != "T01");
         QVERIFY(!cmd.startsWith("W0"));
-        QVERIFY(!cmd.startsWith("WW"));
     }
+    const int firstRead = server.sim()->trace().indexOf(QByteArray("RW1"));
+    const int writeBack = server.sim()->trace().indexOf(QByteArray("WW02"));
+    const int secondRead = server.sim()->trace().indexOf(QByteArray("RW1"), firstRead + 1);
+    const int enter = server.sim()->trace().indexOf(QByteArray("AT"));
+    QVERIFY(firstRead >= 0);
+    QCOMPARE(writeBack, firstRead + 1);
+    QCOMPARE(secondRead, writeBack + 1);
+    QVERIFY(enter > secondRead);
     QVERIFY(sawEnter);
     QVERIFY(sawEcho);
     QVERIFY(sawEsc);
@@ -464,6 +472,37 @@ void TestSetup::silentModuleSkipsQueries()
     // Two lead-in ESC bytes plus the exit ESC, on each of the 12 tries.
     QCOMPARE(exits, 36);
     QCOMPARE(enters, 12);
+}
+
+void TestSetup::registerWMustParseBeforeEntry()
+{
+    MockRt21Server server;
+    server.sim()->setMuteRegisterW(true);
+    const QString pty = server.listenPty();
+    if (pty.isEmpty())
+        QSKIP("pty was not available");
+    Rt21Driver driver;
+    RotorEndpoint endpoint;
+    endpoint.transport = RotorEndpoint::Transport::Serial;
+    endpoint.serialPort = pty;
+    endpoint.baud = 4800;
+    driver.connectEndpoint(endpoint);
+    QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::On, 3000);
+    QSignalSpy done(&driver, &Rt21Driver::networkFinished);
+    driver.readNetwork();
+    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 15000);
+    QVERIFY(!done.at(0).at(0).toBool());
+    QCOMPARE(done.at(0).at(1).toString(),
+             QStringLiteral("Register W did not answer, so the network read was not started."));
+    bool sawRead = false;
+    for (const QByteArray &cmd : server.sim()->trace()) {
+        if (cmd == "RW1")
+            sawRead = true;
+        QVERIFY(cmd != "AT");
+        QVERIFY(!cmd.startsWith("WW"));
+        QVERIFY(!cmd.startsWith("W0"));
+    }
+    QVERIFY(sawRead);
 }
 
 void TestSetup::brightnessWriteReadsBack()

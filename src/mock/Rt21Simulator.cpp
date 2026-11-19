@@ -38,7 +38,8 @@ void Rt21Simulator::restoreDefaults()
     const QList<QPair<QChar, int>> defaults = {
         {'A', 0},   {'B', 950}, {'C', 0},   {'D', 180}, {'E', 3},   {'F', 3},   {'G', 10},
         {'H', 180}, {'I', 180}, {'K', 3960}, {'L', 360}, {'N', 3},  {'O', 8},   {'P', 4},
-        {'R', 361}, {'S', 361}, {'T', 0},   {'U', 90},  {'V', 10},  {'X', 1},   {'Y', 40},
+        {'R', 361}, {'S', 361}, {'T', 0},   {'U', 90},  {'V', 10},  {'W', 2},   {'X', 1},
+        {'Y', 40},
     };
     for (const auto &item : defaults)
         ee.insert(item.first, item.second);
@@ -98,6 +99,16 @@ void Rt21Simulator::setIgnoreQueries(bool ignore)
 void Rt21Simulator::setIgnoreModule(bool ignore)
 {
     ignoreModule = ignore;
+}
+
+void Rt21Simulator::setEe(QChar id, int value)
+{
+    ee.insert(id.toUpper(), value);
+}
+
+void Rt21Simulator::setMuteRegisterW(bool mute)
+{
+    muteRegisterW = mute;
 }
 
 void Rt21Simulator::clearTrace()
@@ -252,6 +263,8 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
         return;
     }
     if (cmd.size() >= 2 && cmd.at(0) == 'R' && cmd.at(1) >= 'A' && cmd.at(1) <= 'Z') {
+        if (muteRegisterW && cmd.at(1) == 'W')
+            return;
         const QChar id(cmd.at(1));
         echo(cmd.at(1), QByteArray::number(ee.value(id, 0)));
         return;

@@ -320,6 +320,10 @@ Rt21Driver::Rt21Driver(QObject *parent)
             onWarmupMiss();
             return;
         }
+        if (note == QLatin1String("bridge")) {
+            abortNetworkRead(QStringLiteral("Register W did not answer, so the network read was not started."));
+            return;
+        }
         if (kind == Kind::Probe) {
             queue.clear();
             const QString message = noReplyMessage();
@@ -1201,6 +1205,11 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
     const QByteArray upper = frame.toUpper();
     if (upper == "BI1" || upper == "AI1" || upper == "R21" || upper == "R11" || upper == "R01" || upper == "R41")
         return;
+
+    if (inflight && inflight->note == QLatin1String("bridge")) {
+        onBridgeReply(frame);
+        return;
+    }
 
     if (inflight && inflight->note == QLatin1String("warmup")) {
         failures = 0;
@@ -2497,7 +2506,7 @@ bool Rt21Driver::handleNetworkFrame(const QByteArray &frame)
 {
     if (networkPhase == NetworkPhase::Idle || networkPhase == NetworkPhase::Warmup
         || networkPhase == NetworkPhase::Quiet || networkPhase == NetworkPhase::PreAt
-        || networkPhase == NetworkPhase::LeadIn)
+        || networkPhase == NetworkPhase::LeadIn || networkPhase == NetworkPhase::BridgeW)
         return false;
     if (networkPhase == NetworkPhase::Exiting || networkPhase == NetworkPhase::AfterUart)
         return true;
@@ -2701,7 +2710,7 @@ void Rt21Driver::onWarmupAnswer(const QByteArray &command)
     if (elapsed >= networkWarmupMs && networkWarmupSawR01 && networkWarmupSawR21) {
         TrafficLog::instance().recordSession(
             "NOTE", QByteArray("network warmup done ") + QByteArray::number(int(elapsed)) + " ms");
-        holdQuietThenEnter();
+        beginBridgeRearm();
         return;
     }
     const int gap = upper.contains("R21") ? kPairAfterR21Ms : kPairAfterR01Ms;
@@ -2731,9 +2740,97 @@ void Rt21Driver::onWarmupMiss()
     });
 }
 
+void Rt21Driver::beginBridgeRearm()
+{
+    if (retired || networkCancel || !io) {
+        abortNetworkRead(QStringLiteral("Register W did not answer, so the network read was not started."));
+        return;
+    }
+    networkPhase = NetworkPhase::BridgeW;
+    networkBridgeStep = 1;
+    networkBridgeValue = -1;
+    sendBridgeCommand(QByteArray("RW1;"), QByteArray("network bridge read RW1;"));
+}
+
+void Rt21Driver::sendBridgeCommand(const QByteArray &bytes, const QByteArray &note)
+{
+    Job job;
+    job.kind = Kind::Read;
+    job.id = QLatin1Char('W');
+    job.bytes = bytes;
+    job.note = QStringLiteral("bridge");
+    TrafficLog::instance().recordSession("NOTE", note);
+    queue.clear();
+    inflight.reset();
+    replyTimer->stop();
+    queue.enqueue(job);
+    pump();
+}
+
+void Rt21Driver::onBridgeReply(const QByteArray &frame)
+{
+    if (networkPhase != NetworkPhase::BridgeW || retired)
+        return;
+    const QByteArray upper = frame.toUpper();
+    if (upper == "RW1" || upper.startsWith("WW0"))
+        return;
+    if (networkBridgeStep == 1 || networkBridgeStep == 3) {
+        const bool marked = !frame.isEmpty() && (frame.at(0) == 'W' || frame.at(0) == 'w');
+        const auto value = marked ? Rt21::parseIntegerPayload(frame) : std::nullopt;
+        if (!value) {
+            TrafficLog::instance().recordSession(
+                "NOTE", QByteArray("network bridge RW1 unparsed ") + frame.toHex(' '));
+            abortNetworkRead(QStringLiteral("Register W did not parse, so the network read was not started."));
+            return;
+        }
+        replyTimer->stop();
+        inflight.reset();
+        if (networkBridgeStep == 1) {
+            networkBridgeValue = *value;
+            const QByteArray write = Rt21::registerWriteCommand(QLatin1Char('W'), *value);
+            if (!write.startsWith("WW0")) {
+                abortNetworkRead(QStringLiteral(
+                    "Register W write was not a write-back, so the network read was not started."));
+                return;
+            }
+            networkBridgeStep = 2;
+            TrafficLog::instance().recordSession(
+                "NOTE", QByteArray("network bridge value ") + QByteArray::number(*value));
+            sendBridgeCommand(write, QByteArray("network bridge write ") + write);
+            return;
+        }
+        TrafficLog::instance().recordSession(
+            "NOTE", QByteArray("network bridge reread ") + QByteArray::number(*value));
+        if (*value != networkBridgeValue) {
+            abortNetworkRead(QStringLiteral("Register W read back %1, not %2, so the network read was not started.")
+                                 .arg(*value)
+                                 .arg(networkBridgeValue));
+            return;
+        }
+        holdQuietThenEnter();
+        return;
+    }
+    if (networkBridgeStep == 2) {
+        const bool ack = frame.size() >= 2 && static_cast<unsigned char>(frame.at(0)) == 0x06
+                         && (frame.at(1) == 'W' || frame.at(1) == 'w');
+        if (!ack) {
+            TrafficLog::instance().recordSession(
+                "NOTE", QByteArray("network bridge ack unparsed ") + frame.toHex(' '));
+            abortNetworkRead(QStringLiteral(
+                "Register W write was not acknowledged, so the network read was not started."));
+            return;
+        }
+        replyTimer->stop();
+        inflight.reset();
+        networkBridgeStep = 3;
+        TrafficLog::instance().recordSession("NOTE", QByteArray("network bridge ack <06>W;"));
+        sendBridgeCommand(QByteArray("RW1;"), QByteArray("network bridge reread RW1;"));
+    }
+}
+
 void Rt21Driver::holdQuietThenEnter()
 {
-    if (networkPhase != NetworkPhase::Warmup || retired)
+    if (networkPhase != NetworkPhase::BridgeW || retired)
         return;
     const qint64 replyMs = QDateTime::currentMSecsSinceEpoch();
     networkPhase = NetworkPhase::PreAt;

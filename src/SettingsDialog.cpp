@@ -813,10 +813,13 @@ void SettingsDialog::applyFound(const FoundRotor &found)
     if (rotorIndex < 0 || rotorIndex >= draft.rotors.size())
         return;
     RotorEndpoint &rotor = draft.rotors[rotorIndex];
+    const int savedPort = rotor.tcpPort;
     rotor.transport = found.endpoint.transport;
-    rotor.host = found.endpoint.host;
-    rotor.tcpPort = found.endpoint.tcpPort;
-    rotor.serialPort = found.endpoint.serialPort;
+    if (found.endpoint.transport == RotorEndpoint::Transport::Tcp)
+        rotor.host = found.endpoint.host;
+    rotor.tcpPort = tcpPortAfterFind(savedPort, found.endpoint);
+    if (!found.endpoint.serialPort.isEmpty())
+        rotor.serialPort = found.endpoint.serialPort;
     if (found.endpoint.baud > 0)
         rotor.baud = found.endpoint.baud;
     loadRotor(rotorIndex);

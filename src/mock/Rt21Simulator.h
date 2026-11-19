@@ -30,6 +30,8 @@ public:
     void setFrozen(bool frozen);
     void setIgnoreQueries(bool ignore);
     void setIgnoreModule(bool ignore);
+    void setEe(QChar id, int value);
+    void setMuteRegisterW(bool mute);
     void clearTrace();
     QList<QByteArray> trace() const { return trace_; }
     double heading() const { return heading_; }
@@ -67,6 +69,7 @@ private:
     int biReplies = 0;
     bool ignoreQueries = false;
     bool ignoreModule = false;
+    bool muteRegisterW = false;
     QList<QByteArray> trace_;
 };
 
