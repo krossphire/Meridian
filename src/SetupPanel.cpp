@@ -438,7 +438,7 @@ void SetupPanel::showWizardStep(int step)
         wizardTitle->setText(QStringLiteral("A free TCP port on this computer"));
         QString text;
         if (suggestedPort == 6555) {
-            text = QStringLiteral("6555 is free on this computer. That is the port the setup utility writes when someone resets the module. It is not printed as a factory default in the manual. This station's module was set to 6665 on 18 November 2026.");
+            text = QStringLiteral("6555 is free on this computer. That is the port the setup utility writes when the module is reset. It is not printed as a factory default in the manual.");
         } else if (suggestedPort > 0) {
             text = QStringLiteral("6555 is already in use on this computer. %1 is free. This check does not see every other device on the network.").arg(suggestedPort);
         } else {

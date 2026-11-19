@@ -147,10 +147,7 @@ AppConfig UserFiles::load()
         return config;
     }
     QSettings file(settingsPath(), QSettings::IniFormat);
-    AppConfig config = AppConfig::load(file);
-    if (config.migrateModulePort())
-        save(config);
-    return config;
+    return AppConfig::load(file);
 }
 
 void UserFiles::save(const AppConfig &config)

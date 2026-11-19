@@ -41,6 +41,8 @@ private slots:
 #endif
     void settingsFileBesideExe();
     void settingsRoundTrip();
+    void missingIniHasNoEndpoint();
+    void windowsZipHasNoIni();
 };
 
 void TestFinder::chipNames()
@@ -68,6 +70,7 @@ void TestFinder::labelText()
     QVERIFY(ports.contains(10001));
     QCOMPARE(ports.count(6555), 1);
     QVERIFY(ports.contains(7000));
+    QVERIFY(ports.indexOf(6555) < ports.indexOf(6665));
     QVERIFY(isVirtualAdapterName(QStringLiteral("WireGuard VPN")));
     QVERIFY(!isVirtualAdapterName(QStringLiteral("Ethernet")));
 }
@@ -241,13 +244,12 @@ void TestFinder::settingsRoundTrip()
     const AppConfig loaded = UserFiles::load();
     QCOMPARE(loaded.homeText, QStringLiteral("EM26ul"));
     QCOMPARE(loaded.rotors.at(0).host, QStringLiteral("10.0.0.8"));
-    QCOMPARE(loaded.rotors.at(0).tcpPort, 6665);
+    QCOMPARE(loaded.rotors.at(0).tcpPort, 6555);
     QFile migrated(UserFiles::settingsPath());
     QVERIFY(migrated.open(QIODevice::ReadOnly));
     const QString migratedText = QString::fromUtf8(migrated.readAll());
     migrated.close();
-    QVERIFY(migratedText.contains(QStringLiteral("6665")));
-    QVERIFY(!migratedText.contains(QStringLiteral("6555")));
+    QVERIFY(migratedText.contains(QStringLiteral("6555")));
     QVERIFY(!loaded.showSun);
 
     config.homeText = QStringLiteral("FN42");
@@ -259,6 +261,55 @@ void TestFinder::settingsRoundTrip()
     QVERIFY(text.startsWith(QStringLiteral("; Meridian settings")));
     QVERIFY(text.contains(QStringLiteral("FN42")));
     QVERIFY(!text.contains(QStringLiteral("\npassword="), Qt::CaseInsensitive));
+}
+
+void TestFinder::missingIniHasNoEndpoint()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString missing = dir.filePath(QStringLiteral("absent.ini"));
+    QVERIFY(!QFileInfo::exists(missing));
+    QSettings settings(missing, QSettings::IniFormat);
+    const AppConfig loaded = AppConfig::load(settings);
+    QCOMPARE(loaded.rotors.size(), 1);
+    QVERIFY(loaded.rotors.at(0).host.isEmpty());
+    QVERIFY(loaded.rotors.at(0).serialPort.isEmpty());
+    QCOMPARE(loaded.rotors.at(0).tcpPort, 0);
+
+    UserFiles::setRoot(dir.filePath(QStringLiteral("fresh")));
+    QVERIFY(!QFileInfo::exists(UserFiles::settingsPath()));
+    const AppConfig fromDisk = UserFiles::load();
+    QCOMPARE(fromDisk.rotors.size(), 1);
+    QVERIFY(fromDisk.rotors.at(0).host.isEmpty());
+    QVERIFY(fromDisk.rotors.at(0).serialPort.isEmpty());
+    QCOMPARE(fromDisk.rotors.at(0).tcpPort, 0);
+}
+
+void TestFinder::windowsZipHasNoIni()
+{
+    const QDir root(QStringLiteral(MERIDIAN_SOURCE_DIR));
+    const QStringList zips = root.entryList({QStringLiteral("Meridian-*-win64.zip")}, QDir::Files);
+    QVERIFY2(!zips.isEmpty(), "no Meridian win64 zip next to the sources");
+    for (const QString &name : zips) {
+        QFile zip(root.filePath(name));
+        QVERIFY2(zip.open(QIODevice::ReadOnly), qPrintable(name));
+        const QByteArray data = zip.readAll();
+        int at = 0;
+        int entries = 0;
+        while (true) {
+            at = data.indexOf(QByteArray("PK\x01\x02", 4), at);
+            if (at < 0 || at + 46 > data.size())
+                break;
+            const int nameLen = quint8(data.at(at + 28)) | (quint8(data.at(at + 29)) << 8);
+            QVERIFY2(at + 46 + nameLen <= data.size(), qPrintable(name));
+            const QString entry = QString::fromUtf8(data.mid(at + 46, nameLen));
+            QVERIFY2(!entry.endsWith(QStringLiteral(".ini"), Qt::CaseInsensitive),
+                     qPrintable(name + QStringLiteral(" contains ") + entry));
+            ++entries;
+            at += 46 + nameLen;
+        }
+        QVERIFY2(entries > 0, qPrintable(name + QStringLiteral(" had no zip entries")));
+    }
 }
 
 QTEST_GUILESS_MAIN(TestFinder)

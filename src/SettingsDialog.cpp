@@ -914,7 +914,7 @@ void SettingsDialog::startFind(bool networkOnly)
             QStringList hosts = Rt21Finder::localSubnetHosts();
             if (!typedHost.isEmpty() && !hosts.contains(typedHost))
                 hosts.prepend(typedHost);
-            QList<int> ports = {6665, 6555};
+            QList<int> ports = {6555, 6665};
             if (networkOnly && portOk && customPort > 0 && !ports.contains(customPort))
                 ports.append(customPort);
             Rt21Finder::scanHosts(hosts, ports, 300, post, cancelled);
