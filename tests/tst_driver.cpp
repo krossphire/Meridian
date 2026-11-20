@@ -391,6 +391,10 @@ void TestDriver::repeatedFindHandoffWithReconnectArmed()
         driver.connectEndpoint(serial);
         QTRY_VERIFY_WITH_TIMEOUT(driver.heading().has_value(), 1000);
         QVERIFY(clock.elapsed() < 1000);
+        // The probe writes BI1 before this connect, but the pty reader records it
+        // on a later readyRead. A heading kept from the previous pass must not
+        // let this check run before that read.
+        QTRY_VERIFY_WITH_TIMEOUT(server.sim()->trace().contains(QByteArray("BI1")), 1000);
         QVERIFY(!server.sim()->trace().contains(QByteArray("T11")));
         QCOMPARE(server.sim()->trace().indexOf(QByteArray("BI1")), 0);
         driver.disconnectLink();
