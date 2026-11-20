@@ -89,7 +89,7 @@ void TrafficLog::ensureOpen()
     logFile().setFileName(path);
     opened = logFile().open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Unbuffered);
     if (opened)
-        writeLine(QStringLiteral("NOTE Meridian 0.1.0-alpha27 traffic log ") + path);
+        writeLine(QStringLiteral("NOTE Meridian 0.1.0-alpha28 traffic log ") + path);
 }
 
 void TrafficLog::flush()

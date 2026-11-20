@@ -16,6 +16,9 @@
 #include "rotor/UserFiles.h"
 
 #include <QComboBox>
+#include <QElapsedTimer>
+#include <QFile>
+#include <QFileInfo>
 #include <QLineEdit>
 #include <QSpinBox>
 #include <QCoreApplication>
@@ -23,6 +26,7 @@
 #include <QPushButton>
 #include <QSerialPort>
 #include <QSettings>
+#include <QSignalSpy>
 #include <QTcpSocket>
 #include <QTemporaryDir>
 #include <QTest>
@@ -36,8 +40,12 @@ private slots:
     void foundBaudIsKeptWhenItIs4800Or9600();
     void readNetworkStaysOffUntilSerialIsUp();
     void freshStartSendsNothing();
+    void tcpConfigTurnsNetworkConnectionOn();
+    void tcpConnectTurnsNetworkConnectionOn();
 #ifdef Q_OS_UNIX
     void liveSerialFindStopsAndResumesAfterTheProbe();
+    void networkConnectionDefaultsOffAndBlocksTheModule();
+    void scanNetworkRestoresTcpBeforeTheProbe();
 #endif
 };
 
@@ -240,6 +248,66 @@ void TestSettings::readNetworkStaysOffUntilSerialIsUp()
     QVERIFY(!readNetwork->isEnabled());
 }
 
+void TestSettings::tcpConfigTurnsNetworkConnectionOn()
+{
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+    MainWindow window(AppConfig::defaults(), nullptr);
+    SettingsDialog *dialog = window.settingsDialog();
+    auto *transport = dialog->findChild<QComboBox *>(QStringLiteral("transportPick"));
+    auto *toggle = dialog->findChild<QComboBox *>(QStringLiteral("networkConnection"));
+    QVERIFY(transport);
+    QVERIFY(toggle);
+    QCOMPARE(toggle->currentText(), QStringLiteral("No"));
+    transport->setCurrentIndex(1);
+    QCOMPARE(toggle->currentText(), QStringLiteral("No"));
+    QLineEdit *host = nullptr;
+    for (QLineEdit *edit : dialog->findChildren<QLineEdit *>()) {
+        if (edit->placeholderText() == QStringLiteral("Host name or IP"))
+            host = edit;
+    }
+    QVERIFY(host);
+    host->setText(QStringLiteral("127.0.0.1"));
+    QSpinBox *port = nullptr;
+    for (QSpinBox *spin : dialog->findChildren<QSpinBox *>()) {
+        if (spin->maximum() == 65535)
+            port = spin;
+    }
+    QVERIFY(port);
+    port->setValue(9);
+    QCOMPARE(toggle->currentText(), QStringLiteral("Yes"));
+    QCOMPARE(dialog->config().networkConnection, true);
+    dialog->close();
+    QCOMPARE(UserFiles::load().networkConnection, true);
+    QFile ini(UserFiles::settingsPath());
+    QVERIFY(ini.open(QIODevice::ReadOnly));
+    const QString text = QString::fromUtf8(ini.readAll());
+    QVERIFY(text.contains(QStringLiteral("networkConnection=true")));
+    QVERIFY(!text.contains(QStringLiteral("HKEY"), Qt::CaseInsensitive));
+}
+
+void TestSettings::tcpConnectTurnsNetworkConnectionOn()
+{
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+    MockRt21Server server;
+    QVERIFY(server.listenTcp(0));
+    AppConfig config = AppConfig::defaults();
+    QVERIFY(!config.networkConnection);
+    config.rotors[0].transport = RotorEndpoint::Transport::Tcp;
+    config.rotors[0].host = QStringLiteral("127.0.0.1");
+    config.rotors[0].tcpPort = int(server.port());
+    MainWindow window(config, nullptr);
+    QTRY_COMPARE_WITH_TIMEOUT(window.driver()->link(), Rt21Driver::Link::On, 3000);
+    QCOMPARE(UserFiles::load().networkConnection, true);
+    auto *toggle = window.settingsDialog()->findChild<QComboBox *>(QStringLiteral("networkConnection"));
+    QVERIFY(toggle);
+    QCOMPARE(toggle->currentText(), QStringLiteral("Yes"));
+    QVERIFY(window.driver()->networkModuleEnabled());
+}
+
 #ifdef Q_OS_UNIX
 void TestSettings::liveSerialFindStopsAndResumesAfterTheProbe()
 {
@@ -256,6 +324,7 @@ void TestSettings::liveSerialFindStopsAndResumesAfterTheProbe()
     config.rotors[0].transport = RotorEndpoint::Transport::Serial;
     config.rotors[0].serialPort = pty;
     config.rotors[0].baud = 4800;
+    config.networkConnection = true;
     MainWindow window(config, nullptr);
     QTRY_VERIFY_WITH_TIMEOUT(window.driver()->heading().has_value(), 3000);
     auto *readNetwork = window.settingsDialog()->findChild<QPushButton *>(QStringLiteral("readNetwork"));
@@ -282,6 +351,166 @@ void TestSettings::liveSerialFindStopsAndResumesAfterTheProbe()
     QTRY_VERIFY_WITH_TIMEOUT(settled, 15000);
     QTRY_COMPARE_WITH_TIMEOUT(window.driver()->link(), Rt21Driver::Link::On, 5000);
     QVERIFY(!resumedEarly);
+}
+
+void TestSettings::networkConnectionDefaultsOffAndBlocksTheModule()
+{
+    QCOMPARE(AppConfig::defaults().networkConnection, false);
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+    QCOMPARE(UserFiles::load().networkConnection, false);
+    QVERIFY(!QFileInfo::exists(UserFiles::settingsPath()));
+
+    MockRt21Server serial;
+    serial.sim()->setHeading(20);
+    serial.sim()->setBenchModuleLines(true);
+    const QString pty = serial.listenPty();
+    if (pty.isEmpty())
+        QSKIP("pty was not available");
+
+    AppConfig config = AppConfig::defaults();
+    config.rotors[0].transport = RotorEndpoint::Transport::Serial;
+    config.rotors[0].serialPort = pty;
+    config.rotors[0].baud = 4800;
+    MainWindow window(config, nullptr);
+    QTRY_VERIFY_WITH_TIMEOUT(window.driver()->heading().has_value(), 3000);
+    QVERIFY(!window.driver()->networkModuleEnabled());
+
+    SettingsDialog *dialog = window.settingsDialog();
+    auto *toggle = dialog->findChild<QComboBox *>(QStringLiteral("networkConnection"));
+    auto *readNetwork = dialog->findChild<QPushButton *>(QStringLiteral("readNetwork"));
+    auto *writeGateway = dialog->findChild<QPushButton *>(QStringLiteral("write-net-agw"));
+    QVERIFY(toggle);
+    QVERIFY(readNetwork);
+    QVERIFY(writeGateway);
+    QCOMPARE(toggle->currentText(), QStringLiteral("No"));
+    QVERIFY(readNetwork->isHidden());
+    QVERIFY(!readNetwork->isEnabled());
+    QVERIFY(writeGateway->isHidden());
+    QVERIFY(!writeGateway->isEnabled());
+
+    serial.sim()->clearTrace();
+    QSignalSpy blocked(window.driver(), &Rt21Driver::networkFinished);
+    window.driver()->readNetwork();
+    QTRY_COMPARE_WITH_TIMEOUT(blocked.count(), 1, 1000);
+    QCOMPARE(blocked.at(0).at(1).toString(), QStringLiteral("Network Connection is off."));
+    QVERIFY(!serial.sim()->trace().contains(QByteArray("AT")));
+    QVERIFY(!serial.sim()->trace().contains(QByteArray("T11")));
+    QVERIFY(!serial.sim()->trace().contains(QByteArray("T01")));
+    QSignalSpy writeBlocked(window.driver(), &Rt21Driver::writeFinished);
+    window.driver()->writeNetworkSetting(QStringLiteral("agw"), QStringLiteral("192.168.1.1"),
+                                         QStringLiteral("Gateway"));
+    QTRY_COMPARE_WITH_TIMEOUT(writeBlocked.count(), 1, 1000);
+    QCOMPARE(writeBlocked.at(0).at(1).toString(), QStringLiteral("Network Connection is off."));
+    QVERIFY(!serial.sim()->trace().contains(QByteArray("AT*AGW")));
+
+    toggle->setCurrentIndex(0);
+    dialog->close();
+    QFile ini(UserFiles::settingsPath());
+    QVERIFY(ini.open(QIODevice::ReadOnly));
+    QVERIFY(QString::fromUtf8(ini.readAll()).contains(QStringLiteral("networkConnection=false")));
+    ini.close();
+    QCOMPARE(UserFiles::load().networkConnection, false);
+
+    dialog = window.settingsDialog();
+    toggle = dialog->findChild<QComboBox *>(QStringLiteral("networkConnection"));
+    QVERIFY(toggle);
+    toggle->setCurrentIndex(1);
+    QVERIFY(window.driver()->networkModuleEnabled());
+    readNetwork = dialog->findChild<QPushButton *>(QStringLiteral("readNetwork"));
+    QVERIFY(readNetwork);
+    QVERIFY(!readNetwork->isHidden());
+    QVERIFY(readNetwork->isEnabled());
+
+    toggle->setCurrentIndex(0);
+    QVERIFY(!window.driver()->networkModuleEnabled());
+    window.driver()->setNetworkModuleEnabled(true);
+    QSignalSpy read(window.driver(), &Rt21Driver::networkFinished);
+    window.driver()->readNetwork();
+    QTRY_COMPARE_WITH_TIMEOUT(read.count(), 1, 20000);
+    QVERIFY(read.at(0).at(0).toBool());
+    QCOMPARE(UserFiles::load().networkConnection, true);
+    QCOMPARE(toggle->currentText(), QStringLiteral("Yes"));
+    QVERIFY(window.driver()->networkModuleEnabled());
+}
+
+void TestSettings::scanNetworkRestoresTcpBeforeTheProbe()
+{
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+
+    MockRt21Server serial;
+    serial.sim()->setBenchModuleLines(true);
+    serial.sim()->setColdBootTcp(true);
+    serial.sim()->setHeading(11.5);
+    const QString pty = serial.listenPty();
+    if (pty.isEmpty())
+        QSKIP("pty was not available");
+
+    MockRt21Server tcp;
+    tcp.sim()->setHeading(24.1);
+    QVERIFY(tcp.listenTcp(0));
+
+    AppConfig config = AppConfig::defaults();
+    config.networkConnection = true;
+    config.rotors[0].transport = RotorEndpoint::Transport::Serial;
+    config.rotors[0].serialPort = pty;
+    config.rotors[0].baud = 4800;
+    MainWindow window(config, nullptr);
+    QTRY_VERIFY_WITH_TIMEOUT(window.driver()->heading().has_value(), 3000);
+
+    QSignalSpy readDone(window.driver(), &Rt21Driver::networkFinished);
+    window.driver()->readNetwork();
+    QTRY_COMPARE_WITH_TIMEOUT(readDone.count(), 1, 40000);
+    QVERIFY(readDone.at(0).at(0).toBool());
+    QVERIFY(window.driver()->hasPendingTcpRestore());
+
+    SettingsDialog *dialog = window.settingsDialog();
+    auto *host = dialog->findChild<QLineEdit *>(QStringLiteral("customHost"));
+    auto *port = dialog->findChild<QLineEdit *>(QStringLiteral("customPort"));
+    auto *scan = dialog->findChild<QPushButton *>(QStringLiteral("scanNetwork"));
+    auto *find = dialog->findChild<QPushButton *>(QStringLiteral("findRt21"));
+    QVERIFY(host);
+    QVERIFY(port);
+    QVERIFY(scan);
+    QVERIFY(find);
+    host->setText(QStringLiteral("127.0.0.1"));
+    port->setText(QString::number(tcp.port()));
+
+    const int t01Before = serial.sim()->trace().count(QByteArray("T01"));
+    scan->click();
+    QTRY_COMPARE_WITH_TIMEOUT(window.driver()->link(), Rt21Driver::Link::Off, 1000);
+    QTRY_COMPARE_WITH_TIMEOUT(serial.sim()->trace().count(QByteArray("T01")), t01Before + 1, 1000);
+    QCOMPARE(tcp.accepts(), 0);
+    find->click();
+    QTRY_COMPARE_WITH_TIMEOUT(window.driver()->link(), Rt21Driver::Link::On, 5000);
+    QTest::qWait(1500);
+    QCOMPARE(tcp.accepts(), 0);
+    QCOMPARE(window.driver()->linkEndpoint().serialPort, pty);
+    QVERIFY(!window.driver()->hasPendingTcpRestore());
+
+    window.driver()->readNetwork();
+    QTRY_COMPARE_WITH_TIMEOUT(readDone.count(), 2, 40000);
+    QVERIFY(readDone.at(1).at(0).toBool());
+    QVERIFY(window.driver()->hasPendingTcpRestore());
+
+    QElapsedTimer clock;
+    clock.start();
+    scan->click();
+    QTRY_VERIFY_WITH_TIMEOUT(tcp.accepts() > 0, 15000);
+    QVERIFY2(clock.elapsed() >= 1000, qPrintable(QString::number(clock.elapsed())));
+    QTRY_VERIFY_WITH_TIMEOUT(dialog->findChild<QPushButton *>(QStringLiteral("findResult")) != nullptr, 8000);
+    auto *hit = dialog->findChild<QPushButton *>(QStringLiteral("findResult"));
+    QVERIFY(hit->text().contains(QStringLiteral("127.0.0.1")));
+    QVERIFY(hit->text().contains(QString::number(tcp.port())));
+    QTRY_COMPARE_WITH_TIMEOUT(window.driver()->link(), Rt21Driver::Link::On, 8000);
+    QCOMPARE(window.driver()->linkEndpoint().transport, RotorEndpoint::Transport::Serial);
+    QCOMPARE(window.driver()->linkEndpoint().serialPort, pty);
+    QVERIFY(!window.driver()->hasPendingTcpRestore());
+    QCOMPARE(serial.sim()->trace().count(QByteArray("T01")), t01Before + 2);
+    QVERIFY(serial.sim()->trace().contains(QByteArray("T11")));
 }
 #endif
 

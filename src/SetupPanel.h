@@ -32,6 +32,7 @@ public:
     QWidget *networkPage() const { return network; }
     void setDriver(Rt21Driver *driver);
     void setEndpoint(const RotorEndpoint &endpoint);
+    void setNetworkConnection(bool on);
     void refreshLocalPorts();
     QMap<QString, QString> networkValues() const;
     void showNetwork();
@@ -56,6 +57,7 @@ private:
     Rt21Driver *driver = nullptr;
     RotorEndpoint endpoint;
     bool wired = false;
+    bool networkConnection = false;
 
     QLabel *controllerSpeed = nullptr;
     QLabel *savedLink = nullptr;

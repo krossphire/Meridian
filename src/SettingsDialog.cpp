@@ -141,6 +141,10 @@ SettingsDialog::SettingsDialog(const AppConfig &config, const ZipDatabase *zipDb
                     return;
                 }
                 const RotorEndpoint live = driver->linkEndpoint();
+                if (!draft.networkConnection) {
+                    setStatus(QStringLiteral("Network Connection is off."));
+                    return;
+                }
                 if (live.transport == RotorEndpoint::Transport::Tcp && live.configured()) {
                     setStatus(QStringLiteral(
                         "Needs a USB or serial connection; changing network settings over IP can drop the link."));
@@ -238,8 +242,10 @@ SettingsDialog::SettingsDialog(const AppConfig &config, const ZipDatabase *zipDb
 
 void SettingsDialog::setDriver(Rt21Driver *next)
 {
-    if (driverWired && driver == next)
+    if (driverWired && driver == next) {
+        applyNetworkConnection();
         return;
+    }
     if (driverWired && driver)
         disconnect(driver, nullptr, this, nullptr);
     driver = next;
@@ -248,6 +254,7 @@ void SettingsDialog::setDriver(Rt21Driver *next)
         setupPanel->setDriver(driver);
     if (setupColumn)
         setupColumn->setDriver(driver);
+    applyNetworkConnection();
     if (!driver)
         return;
     connect(driver, &Rt21Driver::configField, this,
@@ -323,6 +330,10 @@ void SettingsDialog::setDriver(Rt21Driver *next)
             }
             if (continueToNetwork && driver) {
                 continueToNetwork = false;
+                if (!draft.networkConnection) {
+                    setStatus(QStringLiteral("Controller settings read. Nothing was written."));
+                    return;
+                }
                 const RotorEndpoint live = driver->linkEndpoint();
                 if (live.transport == RotorEndpoint::Transport::Tcp && live.configured()) {
                     setStatus(QStringLiteral(
@@ -466,6 +477,11 @@ void SettingsDialog::setConfig(const AppConfig &config)
         sunBox->setChecked(draft.showSun);
     if (idleSpin)
         idleSpin->setValue(draft.idlePollSeconds);
+    if (networkConnectionBox) {
+        const QSignalBlocker blocker(networkConnectionBox);
+        networkConnectionBox->setCurrentIndex(draft.networkConnection ? 1 : 0);
+    }
+    applyNetworkConnection();
     rotorList->clear();
     for (const RotorEndpoint &rotor : draft.rotors)
         rotorList->addItem(rotor.name.isEmpty() ? QStringLiteral("RT-21") : rotor.name);
@@ -648,8 +664,20 @@ void SettingsDialog::buildRotors()
     form->addRow(QStringLiteral("Connection"), transport);
     layout->addWidget(rotorList);
     layout->addLayout(buttons);
+    networkConnectionBox = new QComboBox;
+    networkConnectionBox->setObjectName(QStringLiteral("networkConnection"));
+    networkConnectionBox->addItem(QStringLiteral("No"));
+    networkConnectionBox->addItem(QStringLiteral("Yes"));
+    networkConnectionBox->setCurrentIndex(draft.networkConnection ? 1 : 0);
+    auto *networkHint = new QLabel(QStringLiteral(
+        "No for a serial RT-21 with no network board. Read and write stay hidden, so Meridian does not send AT, T11, or T01. "
+        "Yes is set when you use an IP connection or a network read succeeds."));
+    networkHint->setWordWrap(true);
+    networkHint->setObjectName(QStringLiteral("hint"));
+    form->addRow(QStringLiteral("Network Connection"), networkConnectionBox);
     layout->addLayout(form);
     layout->addWidget(transportPages);
+    layout->addWidget(networkHint);
     layout->addStretch();
     tabs->addTab(page, QStringLiteral("Rotors"));
 
@@ -657,6 +685,13 @@ void SettingsDialog::buildRotors()
     // until Save or the dialog closes.
     connect(transport, qOverload<int>(&QComboBox::currentIndexChanged), transportPages,
             &QStackedWidget::setCurrentIndex);
+    connect(transport, qOverload<int>(&QComboBox::currentIndexChanged), this, [this](int) { noteTcpEndpoint(); });
+    connect(networkConnectionBox, qOverload<int>(&QComboBox::currentIndexChanged), this, [this](int index) {
+        draft.networkConnection = index == 1;
+        applyNetworkConnection();
+    });
+    connect(hostEdit, &QLineEdit::textChanged, this, [this](const QString &) { noteTcpEndpoint(); });
+    connect(portSpin, qOverload<int>(&QSpinBox::valueChanged), this, [this](int) { noteTcpEndpoint(); });
     connect(add, &QPushButton::clicked, this, [this]() {
         if (rotorIndex >= 0)
             storeRotor(rotorIndex);
@@ -747,6 +782,7 @@ void SettingsDialog::loadRotor(int index)
     if (index < 0 || index >= draft.rotors.size())
         return;
     rotorIndex = index;
+    fillingForm = true;
     const RotorEndpoint &rotor = draft.rotors.at(index);
     nameEdit->setText(rotor.name);
     int transportIndex = 0;
@@ -759,6 +795,7 @@ void SettingsDialog::loadRotor(int index)
     portSpin->setValue(rotor.tcpPort);
     showSerialPort(rotor.serialPort);
     baudCombo->setCurrentText(QString::number(rotor.baud == 9600 ? 9600 : 4800));
+    fillingForm = false;
     if (setupPanel)
         setupPanel->setEndpoint(rotor);
     if (setupColumn)
@@ -833,8 +870,45 @@ void SettingsDialog::applyFound(const FoundRotor &found)
         findNote->setText(found.label);
 }
 
+void SettingsDialog::setNetworkConnection(bool on)
+{
+    draft.networkConnection = on;
+    if (networkConnectionBox && networkConnectionBox->currentIndex() != (on ? 1 : 0)) {
+        const QSignalBlocker blocker(networkConnectionBox);
+        networkConnectionBox->setCurrentIndex(on ? 1 : 0);
+    }
+    applyNetworkConnection();
+}
+
+void SettingsDialog::applyNetworkConnection()
+{
+    if (driver)
+        driver->setNetworkModuleEnabled(draft.networkConnection);
+    if (setupPanel)
+        setupPanel->setNetworkConnection(draft.networkConnection);
+}
+
+void SettingsDialog::noteTcpEndpoint()
+{
+    if (fillingForm || !transport || transport->currentIndex() != 1 || !hostEdit || !portSpin)
+        return;
+    const QString host = hostEdit->text().trimmed();
+    const int port = portSpin->value();
+    if (host.isEmpty() || port <= 0 || port > 65535)
+        return;
+    setNetworkConnection(true);
+}
+
 void SettingsDialog::startFind(bool networkOnly)
 {
+    if (findRestoreWait) {
+        findRestoreWait = false;
+        findStopRequested = true;
+        if (findNote)
+            findNote->setText(QStringLiteral("Cancelling…"));
+        onFindSettled();
+        return;
+    }
     if (findScan && findScan->running()) {
         findStopRequested = true;
         findScan->cancel();
@@ -879,6 +953,21 @@ void SettingsDialog::startFind(bool networkOnly)
         foundKeys.clear();
         findNote->setText(QStringLiteral("Scanning local network…"));
     }
+    bool waitForListener = false;
+    if (networkOnly && driver && driver->hasPendingTcpRestore()) {
+        const RotorEndpoint live = driver->linkEndpoint();
+        if (live.transport == RotorEndpoint::Transport::Serial && live.configured()
+            && driver->link() != Rt21Driver::Link::Off) {
+            resumeEndpoint = live;
+            resumeSerial = true;
+            TrafficLog::instance().recordSession("FIND", QByteArray("release ") + live.serialPort.toLatin1());
+            if (driver->link() == Rt21Driver::Link::On || driver->link() == Rt21Driver::Link::Moving)
+                driver->stopMotion();
+            driver->disconnectLink();
+            findNote->setText(QStringLiteral("Restoring TCP mode before the scan…"));
+            waitForListener = driver->link() == Rt21Driver::Link::Off;
+        }
+    }
     bool portOk = false;
     const int customPort = customPortEdit ? customPortEdit->text().trimmed().toInt(&portOk) : 0;
     const QString typedHost = customHostEdit ? customHostEdit->text().trimmed() : QString();
@@ -895,7 +984,7 @@ void SettingsDialog::startFind(bool networkOnly)
     request.doSerial = !networkOnly;
     request.doNetwork = true;
     request.serialTimeoutMs = 650;
-    request.connectMs = 300;
+    request.connectMs = 500;
     if (!networkOnly)
         request.serial = serialFindCandidates();
     QStringList hosts = Rt21Finder::localSubnetHosts();
@@ -905,6 +994,20 @@ void SettingsDialog::startFind(bool networkOnly)
     request.ports = {6555, 6665};
     if (networkOnly && portOk && customPort > 0 && !request.ports.contains(customPort))
         request.ports.append(customPort);
+    if (waitForListener) {
+        findRestoreWait = true;
+        QTimer::singleShot(1200, this, [this, request]() {
+            if (!findRestoreWait)
+                return;
+            findRestoreWait = false;
+            if (findStopRequested || !findScan)
+                return;
+            if (findNote && !findStopRequested)
+                findNote->setText(QStringLiteral("Scanning local network…"));
+            findScan->start(request);
+        });
+        return;
+    }
     findScan->start(request);
 }
 
@@ -962,6 +1065,8 @@ void SettingsDialog::storeRotor(int index)
     rotor.serialPort = serialName;
     rotor.baud = baudCombo->currentText().toInt() == 9600 ? 9600 : 4800;
     draft.active = rotorList->currentRow() >= 0 ? rotorList->currentRow() : index;
+    if (rotor.transport == RotorEndpoint::Transport::Tcp && rotor.configured())
+        setNetworkConnection(true);
 }
 
 void SettingsDialog::showSerialPort(const QString &port)

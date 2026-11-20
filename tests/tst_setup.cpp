@@ -237,7 +237,7 @@ void TestSetup::mockNetworkRead()
     QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 20000);
     tick.stop();
     QVERIFY2(maxGap < 500, qPrintable(QStringLiteral("event loop stalled %1 ms").arg(maxGap)));
-    QCOMPARE(status.at(0).at(0).toString(), QStringLiteral("Reading network (try 1 of 12)…"));
+    QCOMPARE(status.at(0).at(0).toString(), QStringLiteral("Reading network (try 1 of 3)…"));
     QCOMPARE(got.value(QStringLiteral("id")), QStringLiteral("RT-21"));
     QCOMPARE(got.value(QStringLiteral("dhcp")), QStringLiteral("0"));
     QCOMPARE(got.value(QStringLiteral("ip")), QStringLiteral("192.168.1.106"));
@@ -553,7 +553,7 @@ void TestSetup::networkWriteNeedsAReadThenReadsBack()
     QTRY_COMPARE_WITH_TIMEOUT(wrote.count(), 4, 40000);
     QVERIFY(wrote.at(3).at(0).toBool());
     QCOMPARE(wrote.at(3).at(1).toString(), QStringLiteral("Saved Gateway"));
-    QCOMPARE(status.at(0).at(0).toString(), QStringLiteral("Writing Gateway (try 1 of 12)…"));
+    QCOMPARE(status.at(0).at(0).toString(), QStringLiteral("Writing Gateway (try 1 of 3)…"));
     const QList<QByteArray> trace = server.sim()->trace();
     int setAt = -1;
     for (int i = 0; i < trace.size(); ++i) {
@@ -713,10 +713,18 @@ void TestSetup::silentModuleSkipsQueries()
     QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::On, 3000);
     QTRY_VERIFY_WITH_TIMEOUT(driver.heading().has_value(), 3000);
     QSignalSpy done(&driver, &Rt21Driver::networkFinished);
+    QSignalSpy status(&driver, &Rt21Driver::networkStatus);
     driver.readNetwork();
     QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 180000);
     QVERIFY(!done.at(0).at(0).toBool());
-    QCOMPARE(done.at(0).at(1).toString(), QStringLiteral("Network module didn't answer after 12 tries"));
+    QCOMPARE(done.at(0).at(1).toString(), QStringLiteral("No network board responded after 3 tries"));
+    QStringList tries;
+    for (int i = 0; i < status.count(); ++i)
+        tries.append(status.at(i).at(0).toString());
+    QVERIFY(tries.contains(QStringLiteral("Reading network (try 1 of 3)…")));
+    QVERIFY(tries.contains(QStringLiteral("Reading network (try 2 of 3)…")));
+    QVERIFY(tries.contains(QStringLiteral("Reading network (try 3 of 3)…")));
+    QVERIFY(!tries.contains(QStringLiteral("Reading network (try 4 of 3)…")));
     QCOMPARE(driver.link(), Rt21Driver::Link::On);
     int queries = 0;
     int exits = 0;
@@ -742,10 +750,10 @@ void TestSetup::silentModuleSkipsQueries()
         QVERIFY(!cmd.startsWith("W0"));
     }
     QCOMPARE(queries, 0);
-    // Each of the 12 tries sends two lead-in ESC bytes plus the exit ESC.
+    // Each of the 3 tries sends two lead-in ESC bytes plus the exit ESC.
     // Connect does not send T11, so there is no extra route ESC.
-    QCOMPARE(exits, 36);
-    QCOMPARE(enters, 12);
+    QCOMPARE(exits, 9);
+    QCOMPARE(enters, 3);
 }
 
 void TestSetup::brightnessWriteReadsBack()
@@ -803,10 +811,11 @@ void TestSetup::statusToneStaysOffThePrimaryInk()
     QCOMPARE(statusTone(QStringLiteral("Controller settings read. Nothing was written.")), StatusTone::Success);
     QCOMPARE(statusTone(QStringLiteral("RT-21 not connected")), StatusTone::Failure);
     QCOMPARE(statusTone(QStringLiteral("Set up your RT-21 in settings")), StatusTone::Neutral);
-    QCOMPARE(statusTone(QStringLiteral("Reading network (try 3 of 12)…")), StatusTone::Busy);
-    QCOMPARE(statusTone(QStringLiteral("Writing DHCP (try 1 of 12)…")), StatusTone::Busy);
+    QCOMPARE(statusTone(QStringLiteral("Reading network (try 3 of 3)…")), StatusTone::Busy);
+    QCOMPARE(statusTone(QStringLiteral("Writing DHCP (try 1 of 3)…")), StatusTone::Busy);
     QCOMPARE(statusTone(QStringLiteral("Network module answered. Nothing was written.")), StatusTone::Success);
-    QCOMPARE(statusTone(QStringLiteral("Network module didn't answer after 12 tries")), StatusTone::Failure);
+    QCOMPARE(statusTone(QStringLiteral("No network board responded after 3 tries")), StatusTone::Failure);
+    QCOMPARE(statusTone(QStringLiteral("Network Connection is off.")), StatusTone::Failure);
     QCOMPARE(statusTone(QStringLiteral("Read the network module before writing it.")), StatusTone::Failure);
     QCOMPARE(statusTone(QStringLiteral("The link dropped while talking to the network module.")), StatusTone::Failure);
     apart(StatusTone::Neutral);

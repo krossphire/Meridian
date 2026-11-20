@@ -30,6 +30,8 @@ struct AppConfig {
     bool trafficLog = true;
     bool showSun = true;
     int idlePollSeconds = 30;
+    // Serial RT-21s with no network board stay No. meridian.ini is the only store.
+    bool networkConnection = false;
 
     static AppConfig defaults();
     static AppConfig load(QSettings &settings);

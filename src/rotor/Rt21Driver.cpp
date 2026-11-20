@@ -69,7 +69,7 @@ int g_alive = 0;
 constexpr int kUartToDtrLowMs = 520;
 constexpr int kDtrLowMs = 195;
 constexpr int kOpenAfterCloseMs = 40;
-constexpr int kNetworkTries = 12;
+constexpr int kNetworkTries = 3;
 constexpr int kWarmupFirstMs = 3000;
 constexpr int kWarmupRetryMs = 5000;
 constexpr int kWarmupGapMs = 400;
@@ -1900,7 +1900,7 @@ void Rt21Driver::finishNetwork(bool ok, const QString &message)
         rememberCycleVariant();
         finalText = QStringLiteral("Network module answered. Nothing was written.");
     } else {
-        finalText = QStringLiteral("Network module didn't answer after 12 tries");
+        finalText = QStringLiteral("No network board responded after 3 tries");
     }
     TrafficLog::instance().recordSession("NOTE", finalText.toLatin1());
     const bool writing = networkWriting;
@@ -3280,8 +3280,17 @@ void Rt21Driver::startNetworkPass()
     armNetworkTimer(1000);
 }
 
+void Rt21Driver::setNetworkModuleEnabled(bool enabled)
+{
+    networkModuleCommands = enabled;
+}
+
 void Rt21Driver::readNetwork()
 {
+    if (!networkModuleCommands) {
+        emit networkFinished(false, QStringLiteral("Network Connection is off."));
+        return;
+    }
     if (networkMode || networkAnotherCycle) {
         cancelNetwork();
         return;
@@ -3425,6 +3434,10 @@ void Rt21Driver::writeNetworkSetting(const QString &key, const QString &value, c
 {
     if (retired)
         return;
+    if (!networkModuleCommands) {
+        emit writeFinished(false, QStringLiteral("Network Connection is off."));
+        return;
+    }
     if (endpoint.transport == RotorEndpoint::Transport::Tcp && endpoint.configured()) {
         emit writeFinished(false, QStringLiteral(
             "Needs a USB or serial connection; changing network settings over IP can drop the link."));
@@ -3550,7 +3563,7 @@ void Rt21Driver::afterNetworkHeading(bool headingSeen)
             abortNetworkRead(QStringLiteral("Controller stopped answering. Power-cycle the RT-21."));
             return;
         }
-        // One missed BI1 is not the end of the 12 tries.
+        // One missed BI1 is not the end of the 3 tries.
     }
     if (networkQuietFromWarmup && !networkCancel && io && networkCycle <= kNetworkTries) {
         networkQuietFromWarmup = false;

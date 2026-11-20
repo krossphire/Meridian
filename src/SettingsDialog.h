@@ -37,6 +37,7 @@ public:
 
     void setConfig(const AppConfig &config);
     void setDriver(Rt21Driver *driver);
+    void setNetworkConnection(bool on);
     AppConfig config() const { return draft; }
     void showPage(int index);
     void presentFound(const FoundRotor &found);
@@ -70,6 +71,8 @@ private:
     void renderUsbHints(const QList<UsbHint> &hints);
     void startFind(bool network);
     void finishFind(const QList<FoundRotor> &found, bool network);
+    void applyNetworkConnection();
+    void noteTcpEndpoint();
     void onFindSettled();
     void applyFound(const FoundRotor &found);
     void styleFindButton();
@@ -104,6 +107,7 @@ private:
     QListWidget *rotorList = nullptr;
     QLineEdit *nameEdit = nullptr;
     QComboBox *transport = nullptr;
+    QComboBox *networkConnectionBox = nullptr;
     QStackedWidget *transportPages = nullptr;
     QLineEdit *hostEdit = nullptr;
     QLineEdit *customHostEdit = nullptr;
@@ -136,6 +140,8 @@ private:
     QString serialHold;
     bool continueToNetwork = false;
     bool resumeSerial = false;
+    bool findRestoreWait = false;
+    bool fillingForm = false;
     bool findSavedHit = false;
     bool havePendingApply = false;
     FoundRotor pendingApply;

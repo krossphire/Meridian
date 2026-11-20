@@ -57,6 +57,11 @@ public:
 
     Link link() const { return link_; }
     bool networkReadOk() const { return networkReadOkThisSession; }
+    // True after this serial connection sent T11; and has not closed yet.
+    bool hasPendingTcpRestore() const { return sentT11InSession; }
+    // False blocks AT;, T11;, and the other network-module commands.
+    void setNetworkModuleEnabled(bool enabled);
+    bool networkModuleEnabled() const { return networkModuleCommands; }
     RotorEndpoint linkEndpoint() const { return endpoint; }
     std::optional<double> heading() const { return heading_; }
     std::optional<double> target() const { return target_; }
@@ -286,6 +291,8 @@ private:
     bool networkEchoSawReply = false;
     // T11 went out on this serial connection. T01; is sent once, on close.
     bool sentT11InSession = false;
+    // Direct driver tests stay enabled. Settings turns this off when Network Connection is No.
+    bool networkModuleCommands = true;
     int networkWarmupLimitMs = 15000;
     int networkWarmupCapActive = 15000;
     bool networkReadOkThisSession = false;

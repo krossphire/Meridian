@@ -283,6 +283,10 @@ void SetupPanel::buildNetwork()
             driver->cancelNetwork();
             return;
         }
+        if (!networkConnection) {
+            setStatus(QStringLiteral("Network Connection is off."));
+            return;
+        }
         if (ipOnlyLink()) {
             setStatus(QStringLiteral("Needs a USB or serial connection; reading over IP drops the link."));
             return;
@@ -333,7 +337,7 @@ void SetupPanel::setDriver(Rt21Driver *next)
         if (!message.isEmpty())
             setStatus(message);
         else if (!ok)
-            setStatus(QStringLiteral("Network module didn't answer after 12 tries"));
+            setStatus(QStringLiteral("No network board responded after 3 tries"));
         else if (rawNetwork.value(QStringLiteral("id")).isEmpty())
             setStatus(QStringLiteral("The module didn't return a name. USB is the reliable way to read it."));
         else
@@ -344,6 +348,12 @@ void SetupPanel::setDriver(Rt21Driver *next)
             readNetwork->setText(QStringLiteral("Read network"));
         refreshNetworkRead();
     });
+}
+
+void SetupPanel::setNetworkConnection(bool on)
+{
+    networkConnection = on;
+    refreshNetworkRead();
 }
 
 void SetupPanel::setEndpoint(const RotorEndpoint &next)
@@ -393,15 +403,20 @@ void SetupPanel::refreshNetworkRead()
         serialUp = live.transport == RotorEndpoint::Transport::Serial && live.configured()
                    && (state == Rt21Driver::Link::On || state == Rt21Driver::Link::Moving);
     }
-    if (readNetwork && !reading)
-        readNetwork->setEnabled(serialUp && !ip);
+    if (readNetwork) {
+        readNetwork->setVisible(networkConnection || reading);
+        if (!reading)
+            readNetwork->setEnabled(networkConnection && serialUp && !ip);
+    }
     for (QLineEdit *edit : values)
         edit->setEnabled(!ip);
     for (QWidget *widget : networkWrites) {
-        if (qobject_cast<QPushButton *>(widget))
-            widget->setEnabled(!ip && readOk && !reading);
-        else
+        if (qobject_cast<QPushButton *>(widget)) {
+            widget->setVisible(networkConnection);
+            widget->setEnabled(networkConnection && !ip && readOk && !reading);
+        } else {
             widget->setEnabled(!ip);
+        }
     }
     if (!networkLinkNote)
         return;

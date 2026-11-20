@@ -29,7 +29,7 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
     , config(std::move(initial))
     , settings(store)
 {
-    setWindowTitle(QStringLiteral("Meridian 0.1.0-alpha27"));
+    setWindowTitle(QStringLiteral("Meridian 0.1.0-alpha28"));
     TrafficLog::instance().setEnabled(config.trafficLog);
     globe = new GlobeWidget;
     setCentralWidget(globe);
@@ -222,7 +222,16 @@ void MainWindow::adopt(Rt21Driver *driver)
     });
     connect(link, &Rt21Driver::statusNote, this, [this](const QString &) { refreshStatus(); });
     connect(link, &Rt21Driver::headingChanged, this, [this](double) { refreshStatus(); });
+    connect(link, &Rt21Driver::networkFinished, this, [this](bool ok, const QString &) {
+        if (!ok || config.networkConnection)
+            return;
+        config.networkConnection = true;
+        UserFiles::save(config);
+        if (settingsUi)
+            settingsUi->setNetworkConnection(true);
+    });
     link->setIdlePollSeconds(config.idlePollSeconds);
+    link->setNetworkModuleEnabled(config.networkConnection);
 }
 
 void MainWindow::syncDrivers()
@@ -247,6 +256,14 @@ void MainWindow::syncDrivers()
             drivers.insert(rotor.id, driver);
         }
         driver->setIdlePollSeconds(config.idlePollSeconds);
+        if (isActive && rotor.transport == RotorEndpoint::Transport::Tcp && rotor.configured()
+            && !config.networkConnection) {
+            config.networkConnection = true;
+            UserFiles::save(config);
+            if (settingsUi)
+                settingsUi->setNetworkConnection(true);
+        }
+        driver->setNetworkModuleEnabled(config.networkConnection);
         if (isActive)
             want = driver;
         else if (driver->link() != Rt21Driver::Link::Off)
