@@ -1,64 +1,75 @@
 # Meridian
 
-Meridian is a small, fast rotator controller for the Green Heron RT-21 (Traditional and Deluxe / RT-21D, which speak the same protocol). It is aimed at one job: show where the antenna is pointed, and turn it.
+Meridian is a rotator controller for the Green Heron RT-21 and RT-21D. Those two speak the same protocol. Other rotors are not supported.
 
-The window is the azimuthal map. The heading is a number over the globe. Click the number to type a heading, or click the map to turn to that bearing. Esc or Space stops the rotor. A gear in the corner opens settings. Nothing else sits on the map.
-
-Written for Andrew, K5PO. Licensed under GPL-3.0-or-later. Meridian is designed and tested with RT-21 firmware 4.13.2, the current public release ([download](https://www.greenheronengineering.com/rotator-controllers-software/)). 4.14 is a pre-release. On 4.14.g1 the screen saver and register writes hang serial. Setup locks writes unless a read reports 4.13.2, and says so when it sees 4.14.
-
-On 4.13.2 the rotor's screen saver blanks the panel and serial keeps answering. Polls do not count as activity, and a turn command wakes the display. On 4.14.g1 a 1-minute saver stops serial until a power cycle. OLED units should run 4.13.2. The screen-saver control is shown and is not written.
-
-Limits and offset are three registers: H is the CCW limit, I is the CW limit, and D is the offset. They are read with `RH1;`, `RI1;`, and `RD1;`. On this station the utility has shown 174 for all three, which is three stored values, not one value copied across the row. The spin boxes start at those reads. CCW sits at the left of the travel bar, CW at the right, and the offset is a separate mark under the bar.
-
-On firmware 4.13.2, Setup can write each confirmed register from its own Write button. The command is `W` plus the letter, digit `0`, the value, and `;` (`WO010;` for brightness 10). Meridian waits for an idle poll and five seconds with no AT traffic, waits for the ack `06` plus the letter plus `;`, pauses 150 ms, reads `R` plus the letter plus `;`, then watches heading polls for 10 seconds. The status line says `Saved <setting>` or `Write not confirmed: <setting>`. There are no pop-ups. 4.14 stays locked. Brightness has no visible effect on OLED RT-21 units (LCD units only, unverified).
-
-Network settings (DHCP, static IP, mask, gateway, HTTP port, UDP port, and the serial TCP port) can be read or written only over USB or serial. On an IP-only link they are greyed out: "Needs a USB or serial connection; changing network settings over IP can drop the link." A serial read follows the bytes captured from Setup Utility 4.B12 on 18 November 2026. It drops DTR for 20 ms with RTS on, sends ESC twice, then `;` about 1.5 s later, then a short run of answered `R21;` and `R01;` polls (3 s the first time, 5 s on a retry), then 650 ms with nothing sent, then a bare `AT;` answered by `<uart2>;`. `T11;` is not sent: it mutes the controller. A fresh serial connect sends `BI1;` first, shows the heading, then `R11;`. About 520 ms later it closes and reopens the port the way the utility does and sends one `AT*SERIAL_ECHO=0` plus a line feed. `ERROR 1` gets one resend. Silence does not. Then `AT*KEY?` plus a line feed (including `AT*AGW?` after `AT*GW?`), then ESC. No `T01;` and no `W0`. The `WW0` write-back of register W is not sent. A saved TCP port is used as it was saved. A fresh install has no host, COM port, or TCP port until Find or Settings fills them in. Every try uses that same close and open, and the read on the reopened port is overlapped. If `<uart2>;` arrived and the echo got no OK, the next `AT;` waits until 35 s after the previous one. A try that never got `<uart2>;` starts again as soon as a heading is back. The cap is 12 tries. If the controller stops answering, Meridian sends ESC again, stays quiet for 35 seconds, and polls once. The power-cycle line is shown only after BI1; has failed three times across at least 10 seconds. The status line says `Reading network (try n of 12)…`, then either `Network module answered. Nothing was written.` or `Network module didn't answer after 12 tries`. The gateway can be written after a read has succeeded on this connection. The write enters the module the same way a read does, sends `AT*AGW=` plus a line feed, and checks `AT*AGW?` and `AT*GW?`. Other network settings stay read-only. Nothing pre-fills an address or a port.
-
-Tested with RT-21 firmware 4.13.2 and display firmware 3.1. On 4.13.2 the screen saver is safe over serial and over IP: it blanks the panel and replies keep coming. On 4.14.g1 the saver and register writes hang serial until a power cycle. Users report 4.13.2 feels snappier. That has not been measured.
-
-The Network page keeps this line visible: "Network settings can only be read or changed while connected by USB or serial." On an IP-only link it is normal text and the network fields and buttons are grey. On USB or serial the same line stays, in a quieter color.
-
-The 0.1.0-alpha24 build records raw rotor traffic in `%APPDATA%\Meridian\logs` by default (a `Record rotor traffic` checkbox turns that off). Each log line is flushed immediately. Min speed, rotor type, mode, security, the advanced bitfield, the limit switch, magnetic variation, and the multiplier stay locked because their encodings are not confirmed.
-
-Every TCP connect is limited to 3 seconds. If the rotor closed the session or stopped answering, the next background try waits 20 seconds, then backs off up to 5 minutes. If the host does not answer, tries are 15 seconds apart for the first 2 minutes, then use that same backoff. A click, a typed heading, opening the app, or leaving settings tries immediately. A goto is never resent on a later reconnect. Idle polls are every 30 seconds (30–60 in Settings). Settings has one map switch, **Show sun & day/night**, on by default. The sun and the day/night tint are not clickable. See [docs/ROADMAP.md](docs/ROADMAP.md) for what comes after this alpha.
+The window is an azimuthal map. The heading is a number over the globe. Click the number to type a heading, or click the map to turn to that bearing. Esc or Space stops the rotor. A gear in the corner opens settings.
 
 ![Main window](docs/screenshots/main-large.png)
 
-| Tiny | Medium | Editing a heading |
-| --- | --- | --- |
-| ![180 px](docs/screenshots/main-180.png) | ![400 px](docs/screenshots/main-400.png) | ![Heading](docs/screenshots/heading-edit.png) |
+Written by Andrew Holmes, K5PO. Licensed under the GNU General Public License, version 3 or any later version. See [LICENSE](LICENSE).
 
-The 180 px window drops country borders and labels, thickens the beam, and hides the gear until the pointer is over the window. Larger windows use the 1:50m Natural Earth set, with borders and the names of the larger countries. Lines are drawn in device-independent pixels, so a Retina or 5K display gets a sharp stroke instead of a scaled-up picture. [`docs/screenshots/main-2x.png`](docs/screenshots/main-2x.png) is a 760×760 window rendered at 2× (1520×1520 pixels).
+Meridian was tested with RT-21 firmware 4.13.2, the current public release ([Green Heron software page](https://www.greenheronengineering.com/rotator-controllers-software/)). 4.14 is a pre-release. On 4.14.g1 the screen saver and register writes hang the serial port until the controller is power-cycled. Setup will not write unless a read reports 4.13.2, and it says so when it sees 4.14.
 
-## Build
+On 4.13.2 the screen saver blanks the panel and serial keeps answering. Polls do not count as activity, and a turn command wakes the display. OLED units should run 4.13.2. Brightness has no visible effect on an OLED RT-21 (LCD units only; that has not been checked).
 
-Qt 6 (Widgets, Network, SerialPort, Svg), a C++17 compiler, and CMake 3.16+.
+## Download and run
 
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
-./build/meridian
-```
+The Windows download is one zip, `Meridian-1.0.0-win64.zip`. Unzip it anywhere and run `meridian.exe`. There is no installer.
 
-Ubuntu packages: `qt6-base-dev`, `qt6-serialport-dev`, `qt6-svg-dev`, `cmake`, `ninja-build`, `g++`.
+The zip does not contain `meridian.ini`. Meridian keeps settings in `meridian.ini` in the same folder as `meridian.exe`. It does not use the Windows registry. Copy that file to back the settings up or move them to another computer.
 
-On Windows, install Qt 6 with MinGW or MSVC and add its `bin` directory to `PATH` before configuring. On macOS, the Qt online installer or `brew install qt` both work; pass `-DCMAKE_PREFIX_PATH` to the Qt prefix if CMake does not find it. A tag `v*` builds a Windows zip and installer and a macOS `.dmg` in GitHub Actions. Those artifacts are unsigned.
+If the folder next to the program cannot be written, Meridian uses `%APPDATA%\Meridian` instead. Settings shows the folder in use. An unzipped copy is writable, so the file stays next to the program.
 
-Linux is a first-class build. The release workflows only package Windows and macOS.
+Logs and setup backups use that same folder: `logs/` and `backups/`.
 
-## Use
+## First run
 
-On first launch the home location is grid **EM26** (Bella Vista, Arkansas) and the rotor is not connected yet. The status line says **Set up your RT-21 in settings**. The station rotor is on an Edgeport/8 serial port (COM1 at 4800). Find RT-21 probes every present COM port, Edgeport ports included, at 4800, then 9600, and keeps a port only when `BI1;` parses. Setup is one tall column of the same groups as the Green Heron utility. Network settings are read over that serial link with retries; the raw bytes are in `logs/` next to the program. A gateway that is not on the address subnet is called out. The web password is never shown.
+The home location starts at grid **EM26**. No host, COM port, or TCP port is filled in. The status line says **Set up your RT-21 in settings**.
 
-In Settings, **Find RT-21** checks USB and COM ports first (4800, then 9600). FTDI ports (older units; serial numbers under 2000 need Green Heron's INF, and 2000 and up use the Windows Update FTDI driver) and CP210x ports (units shipped from November 2022, including this station) are probed the same way. A chip with no COM port is only called a possible RT-21, with the driver page for that chip. A USB device that failed its descriptor request is not called an RT-21. If nothing answers on USB or a COM port, Find says so and scans the computer's local IPv4 subnets for TCP 6555, then 6665. A hit is listed only after `BI1;` and `R11;` both answer. No AT command is sent. Find stops at the first port that answers. If the saved IP connection is not up, that hit is saved and connected. Otherwise the result is a button, and the address is saved when that button is clicked. If the scan finds nothing, the status line says **No RT-21 found.** COM ports in the dropdown and under **Serial ports on this computer** are listed COM1, COM2, COM10, not in Windows' enumeration order. Mac device names sort the same way. **Read network** stays off while the live link is IP only, because `T11` drops TCP mode. Manual entry stays underneath. A rotor you already saved is left as it was. `meridian.ini`, `logs/`, and `backups/` sit next to `meridian.exe` (or inside the `.app` only when that folder can be written). If the program folder is read-only, they fall back to `%APPDATA%\Meridian` on Windows and `~/Library/Application Support/Meridian` on macOS. Settings shows the file in use. An older registry entry from alpha1–3 is copied into that file once.
+**Find RT-21** checks USB and COM ports first, in numeric order (COM1, COM2, COM10), at 4800 and then 9600. It stops at the first port that answers. If none do, it scans the computer's local network. A hit is a button. The address is saved when that button is clicked. If a saved IP connection is down, Find saves the hit it confirmed and connects. If nothing answers, the line says **No RT-21 found.**
+
+A USB serial chip with no COM port is only called a possible RT-21, with the driver page for that chip. Older units use FTDI (serial numbers under 2000 need Green Heron's INF; 2000 and up use the FTDI driver from Windows Update). Units shipped from November 2022 use a Silicon Labs CP210x. A USB device that failed its descriptor request is not called an RT-21.
+
+**Scan the network** skips the serial ports and looks on the local network. You can type a host and a custom port under the button. Find tries TCP 6555, then 6665, plus a custom port when one was typed. A network hit is listed only after both a heading and a version answer. No AT command is sent during Find.
+
+## Serial and network
+
+A serial connection is USB or a COM port, 8 data bits, no parity, 1 stop bit. The baud choices are 4800 and 9600. 4800 is the RT-21's usual speed.
+
+A network connection is the same commands over TCP, on the controller's serial TCP port. That port is **6665** unless the network module was set to something else. The Green Heron setup utility writes 6555 when the module is reset, which is why Find tries 6555 and then 6665. Meridian does not fill in a host or a port on its own.
+
+**Network Connection** is **No** or **Yes**.
+
+- **No** is for a serial RT-21 with no network board. Network read and write stay hidden, so Meridian does not send `AT`, `T11`, or `T01`.
+- **Yes** is set when you use an IP connection, or when a network read succeeds. You can set it yourself in Settings.
+
+## Setup
+
+The Setup page reads the controller: version, the pot, and the stored settings. On firmware 4.13.2, each **Write** button stores that one setting and says **Saved** when the read-back matches. There is no factory reset and no bootloader command.
+
+These are shown and not written: min speed, rotor type, mode, security, the advanced options, the limit switch, and magnetic variation.
+
+The network module (address, mask, gateway, ports, Wi-Fi, and the rest) can be read or changed only over USB or serial, and only while **Network Connection** is **Yes**. On an IP-only link the page says network settings need USB or serial, and the fields stay grey: changing them over IP can drop the link. **Read network** talks to the module and does not write it. After that read has succeeded on the serial connection, the gateway can be written. Other network settings stay read-only. The web password is reported as set or not set. The Wi-Fi key is not shown in clear text.
+
+**Save backup** and **Save a copy** write a text copy under `backups/`. **Guide me** only suggests a port and an address. It does not send them.
+
+The command bytes are in [docs/RT21_PROTOCOL.md](docs/RT21_PROTOCOL.md). How the Setup page lines up with Green Heron's utility is in [docs/RT21_SETUP_PARITY.md](docs/RT21_SETUP_PARITY.md).
+
+## Logs
+
+**Record rotor traffic** is on by default. Each session writes `logs/meridian-YYYYMMDD-HHMMSS.log` next to the program (or under `%APPDATA%\Meridian\logs` when that folder is the one in use). Lines are written as they happen. Network reads and Find probes are still logged when the checkbox is off. Passwords are redacted.
+
+## Using the map
 
 - Click the globe to turn to that bearing. The orange line is where the rotor is now. A short tick on the rim is the heading it is moving toward.
 - Click the heading number. Enter, or clicking elsewhere, sends it. Esc cancels the edit.
-- Esc or Space, while not editing, sends `;` and stops the rotor.
-- The gear opens settings. On a tiny window it stays hidden until the pointer is over the map. Ctrl+, opens settings too.
+- Esc or Space, while not editing, stops the rotor.
+- The gear opens settings. On a very small window it stays hidden until the pointer is over the map. Ctrl+, opens settings too.
 - A rotor menu appears only when more than one rotor is saved.
-- The dot is the link: green connected, amber moving or connecting, red failed. The tooltip has the reason, including a refused TCP connection.
+- The dot is the link: green connected, amber moving or connecting, red failed. The tooltip has the reason.
+- **Show sun & day/night** is on by default. The sun and the day/night tint are not clickable.
+
+Idle polls go out every 30 seconds. Settings can set that from 30 to 60 seconds. A TCP connect waits at most 3 seconds. If the link drops, Meridian tries again on its own. A click, a typed heading, opening the program, or leaving settings tries immediately. A goto is not sent again on a later reconnect.
 
 The home location accepts any of:
 
@@ -68,41 +79,32 @@ The home location accepts any of:
 
 The resolved latitude, longitude, and grid are shown under the field before you save.
 
-Each rotor is an RT-21 on TCP (`host` and port) or on a serial / USB-serial port. The port list refreshes while the dialog is open. Baud is 4800 by default, or 9600. The frame is 8N1.
+## Build
 
-### Without a rotor
+Qt 6 (Widgets, Network, SerialPort, Svg), a C++17 compiler, and CMake 3.16 or newer.
 
 ```bash
-./build/meridian-mock --tcp 6555 --heading 52 --speed 20
-./build/meridian --connect tcp://127.0.0.1:6555
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+./build/meridian
 ```
 
-`meridian --mock` starts that mock itself and points the session at it, without rewriting saved settings. `meridian-mock --pty` also prints a pseudo-terminal path on Linux and macOS.
+The version in the window title, `meridian --version`, and the traffic-log header is the CMake project version.
 
-### Controller setup
+Ubuntu packages: `qt6-base-dev`, `qt6-serialport-dev`, `qt6-svg-dev`, `cmake`, `ninja-build`, `g++`.
 
-The Controller tab reads the documented queries (`R11;`, `R01;`, `R41;`, and `RA1;` through `RZ1;`) and can write the numeric EEPROM fields from Appendix F. Apply writes a JSON backup first and asks before sending. Factory reset and the bootloader are not sent. Network settings are read and written only over USB or serial, as described above. The on-wire shape of an EEPROM write is documented in [docs/RT21_PROTOCOL.md](docs/RT21_PROTOCOL.md).
+On Windows, install Qt 6 with MinGW or MSVC and add its `bin` directory to `PATH` before configuring. On macOS, the Qt online installer or `brew install qt` both work. Pass `-DCMAKE_PREFIX_PATH` to the Qt prefix if CMake does not find it. macOS builds, and it has not been tried on a Mac. The release workflow does not package it.
 
-![Controller setup read from the mock](docs/screenshots/settings-controller.png)
+Linux is what the tests run on. A tag `v*` (for example `v1.0.0`) builds a draft GitHub release whose asset is `Meridian-1.0.0-win64.zip`, plus a SHA-256 file for that zip. The release stays a draft until it is published by hand. The zip is `meridian.exe`, `meridian-mock.exe`, and the Qt files `windeployqt` copies. It does not contain `meridian.ini`.
 
-## Tests
-
-`tst_core` covers grids, every coordinate form above, ZIP centroids, click bearing, the 359.9° clamp, the azimuthal projection, country hit-testing, and protocol framing. `tst_driver` connects to the mock over TCP and, on Unix, over a pty, and checks that a second TCP client is refused. `tst_globe` clicks the map and edits the heading.
+`meridian-mock` is a stand-in controller for tests and for trying the window with no hardware. Its `--tcp` option defaults to port 6555. That is the mock's listen port, not a port Meridian fills in for a real rotor. `meridian --mock` starts the mock and points the session at it without rewriting saved settings.
 
 ## Credits
 
-- Click-to-bearing and the Maidenhead conversion are derived from [QLog](https://github.com/foldynl/QLog) `ui/RotatorWidget` and `data/Gridsquare` (GPL-3.0-or-later). Copyright Thomas Gatzweiler 2020 and Ladislav Foldyna 2021–2026. Meridian does not use QLog’s logger, profiles, or database.
+- Written by Andrew Holmes, K5PO.
+- Click-to-bearing and the Maidenhead conversion are derived from [QLog](https://github.com/foldynl/QLog) `ui/RotatorWidget` and `data/Gridsquare` (GPL-3.0-or-later). Copyright Thomas Gatzweiler 2020 and Ladislav Foldyna 2021–2026. Meridian does not use QLog's logger, profiles, or database.
 - Coastlines and country borders are [Natural Earth](https://www.naturalearthdata.com/) 1:110m and 1:50m land and admin-0 countries, public domain.
 - ZIP centroids are the [US Census Bureau 2020 Gazetteer](https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2020_Gazetteer/2020_Gaz_zcta_national.zip) ZCTA file, public domain.
 - Inter is © The Inter Project Authors, SIL Open Font License 1.1. See `third_party/inter/OFL.txt`.
 - RT-21 behavior follows the Green Heron RT-21 manual (Appendix F) and the Version 4 addendum, plus the Hamlib RT-21 backend (`rotators/rotorez/rotorez.c`, model 405) for the tenths goto frame. Green Heron Engineering is not involved with this project.
-
-## Not yet tried on a real RT-21
-
-The driver, mock, and tests agree with each other. They have not been run against a controller on the bench. In particular:
-
-- Point-and-shoot on the serial port needs the CR: `AP1%05.1f\r;` moves, and `AP1xxx.y;` does not. Meridian sends those same bytes on TCP.
-- Whether a real unit’s EEPROM read comes back as a bare integer. If it doesn’t, the field stays read-only and the raw text is shown.
-- The `WD1180;` style write (location, digit `1`, decimal value, semicolon). Apply will not send it until you confirm, and it saves a backup first.
-- Rotors set up for more than 360° of travel. Meridian clamps to 359.9°, the same limit Hamlib publishes for the RT-21.
-- What the controller does if another program already holds the TCP port, beyond the refused connection the mock produces.

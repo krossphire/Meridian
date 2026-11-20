@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(Meridian VERSION 0.1.0 LANGUAGES CXX)
+project(Meridian VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -32,6 +32,9 @@ add_library(meridian-core STATIC
     src/rotor/UserFiles.cpp
 )
 target_include_directories(meridian-core PUBLIC ${CMAKE_SOURCE_DIR}/src)
+# One version string: the CMake project version. Window title, QApplication,
+# and the traffic-log header all read this.
+target_compile_definitions(meridian-core PUBLIC MERIDIAN_VERSION="${PROJECT_VERSION}")
 target_link_libraries(meridian-core PUBLIC Qt6::Widgets Qt6::Network Qt6::SerialPort)
 if(WIN32)
     target_link_libraries(meridian-core PUBLIC setupapi cfgmgr32 winmm)
