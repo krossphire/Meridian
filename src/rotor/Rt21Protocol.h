@@ -61,6 +61,9 @@ public:
     QList<QByteArray> take();
     void clear();
     void setLineMode(bool on) { lineMode = on; }
+    // SOH and NUL bytes seen in the stream. SOH stays in the frame (echo
+    // delimiter and the R21 status flag). NUL and other controls are dropped.
+    int controlBytes() const { return controls; }
 
 private:
     void commit(const QByteArray &body);
@@ -69,6 +72,7 @@ private:
     QList<QByteArray> frames;
     bool lineMode = false;
     bool dropping = false;
+    int controls = 0;
 };
 
 } // namespace Rt21

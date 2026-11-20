@@ -21,6 +21,7 @@
 #include <QTimer>
 
 #include <cmath>
+#include <optional>
 
 #ifdef Q_OS_UNIX
 #include <QSerialPort>
@@ -44,7 +45,7 @@ private slots:
     void serialPty();
     void serialConnectCancelsIpReconnect();
     void findHitConnectsWhileIpReconnectIsArmed();
-    void bridgeEscBeforePollWhenRouteIsSilent();
+    void repeatedFindHandoffWithReconnectArmed();
     void stopOnALiveSerialLink();
 #endif
 };
@@ -98,7 +99,7 @@ void TestDriver::hardwareReplyBytes()
     QObject::connect(&moving, &Rt21Simulator::output, &moving, [&](const QByteArray &bytes) { got = bytes; });
     moving.setHeading(122.6);
     moving.setSpeed(0);
-    moving.feed("AP1100.0\r;");
+    moving.feed("AP1100.0;");
     QVERIFY(moving.moving());
     for (int i = 0; i < 4; ++i) {
         got.clear();
@@ -235,6 +236,8 @@ void TestDriver::serialPty()
     endpoint.transport = RotorEndpoint::Transport::Serial;
     endpoint.serialPort = pty;
     endpoint.baud = 4800;
+    QElapsedTimer clock;
+    clock.start();
     driver.connectEndpoint(endpoint);
     if (driver.link() == Rt21Driver::Link::Failed)
         QSKIP(qPrintable(driver.detail()));
@@ -242,17 +245,17 @@ void TestDriver::serialPty()
     QTRY_VERIFY_WITH_TIMEOUT(driver.link() == Rt21Driver::Link::On || driver.link() == Rt21Driver::Link::Failed, 3000);
     if (driver.link() == Rt21Driver::Link::Failed)
         QSKIP(qPrintable(driver.detail()));
-    QTRY_VERIFY_WITH_TIMEOUT(driver.heading().has_value(), 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(driver.heading().has_value(), 1000);
+    QVERIFY(clock.elapsed() < 1000);
     QVERIFY(std::abs(*driver.heading() - 33.0) < 1.5);
     const QList<QByteArray> trace = server.sim()->trace();
-    const int r11 = trace.indexOf(QByteArray("R11"));
-    const int t11 = trace.indexOf(QByteArray("T11"));
-    const int r01 = trace.indexOf(QByteArray("R01"));
     const int bi = trace.indexOf(QByteArray("BI1"));
-    QVERIFY(r11 >= 0);
-    QCOMPARE(t11, r11 + 1);
-    QCOMPARE(r01, t11 + 1);
-    QVERIFY(bi > r01);
+    const int r11 = trace.indexOf(QByteArray("R11"));
+    QCOMPARE(bi, 0);
+    QVERIFY(r11 > bi);
+    QVERIFY(!trace.contains(QByteArray("T11")));
+    QVERIFY(!trace.contains(QByteArray("R01")));
+    QVERIFY(!trace.contains(QByteArray("AT")));
     driver.goTo(70);
     QTRY_VERIFY_WITH_TIMEOUT(driver.heading() && std::abs(*driver.heading() - 70.0) < 2.0, 4000);
 }
@@ -342,52 +345,67 @@ void TestDriver::findHitConnectsWhileIpReconnectIsArmed()
     QVERIFY(driver.detail().contains(pty));
 
     const QList<QByteArray> trace = server.sim()->trace();
-    const int r11 = trace.indexOf(QByteArray("R11"));
-    const int t11 = trace.indexOf(QByteArray("T11"));
-    const int r01 = trace.indexOf(QByteArray("R01"));
-    QVERIFY(r11 >= 0);
-    QCOMPARE(t11, r11 + 1);
-    QCOMPARE(r01, t11 + 1);
+    QCOMPARE(trace.indexOf(QByteArray("BI1")), 0);
+    QVERIFY(trace.indexOf(QByteArray("R11")) > 0);
+    QVERIFY(!trace.contains(QByteArray("T11")));
 }
 
-void TestDriver::bridgeEscBeforePollWhenRouteIsSilent()
+void TestDriver::repeatedFindHandoffWithReconnectArmed()
 {
     MockRt21Server server;
-    server.sim()->setHeading(18);
-    server.sim()->setMute(QByteArray("R01"));
+    server.sim()->setHeading(41);
     const QString pty = server.listenPty();
     if (pty.isEmpty())
         QSKIP("pty was not available");
     Rt21Driver driver;
-    RotorEndpoint endpoint;
-    endpoint.transport = RotorEndpoint::Transport::Serial;
-    endpoint.serialPort = pty;
-    endpoint.baud = 4800;
-    driver.connectEndpoint(endpoint);
-    QTRY_VERIFY_WITH_TIMEOUT(server.sim()->trace().contains(QByteArray("T11")), 3000);
-    driver.disconnectLink();
-    QTRY_VERIFY_WITH_TIMEOUT(server.sim()->trace().contains(QByteArray("ESC")), 2000);
-    const QList<QByteArray> closed = server.sim()->trace();
-    const int firstT11 = closed.indexOf(QByteArray("T11"));
-    const int esc = closed.indexOf(QByteArray("ESC"));
-    QVERIFY(firstT11 >= 0);
-    QVERIFY(esc > firstT11);
-    for (int i = firstT11 + 1; i < esc; ++i)
-        QVERIFY(closed.at(i) != QByteArray("T11"));
+    for (int pass = 0; pass < 4; ++pass) {
+        server.sim()->clearTrace();
+        RotorEndpoint tcp;
+        tcp.transport = RotorEndpoint::Transport::Tcp;
+        tcp.host = QStringLiteral("192.0.2.1");
+        tcp.tcpPort = 9;
+        driver.connectEndpoint(tcp);
+        QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::Failed, 5000);
+        bool armed = false;
+        for (QTimer *candidate : driver.findChildren<QTimer *>()) {
+            if (candidate->isActive() && candidate->isSingleShot() && candidate->interval() >= 10000)
+                armed = true;
+        }
+        QVERIFY(armed);
+        driver.disconnectLink();
+        QCOMPARE(driver.link(), Rt21Driver::Link::Off);
+        for (QTimer *candidate : driver.findChildren<QTimer *>()) {
+            if (candidate->isActive() && candidate->isSingleShot() && candidate->interval() >= 10000)
+                QFAIL("reconnect timer still armed after Find released the link");
+        }
 
-    server.sim()->setMute(QByteArray());
-    server.sim()->clearTrace();
-    driver.connectEndpoint(endpoint);
-    QTRY_VERIFY_WITH_TIMEOUT(driver.heading().has_value(), 4000);
-    const QList<QByteArray> again = server.sim()->trace();
-    const int t11 = again.indexOf(QByteArray("T11"));
-    const int release = again.indexOf(QByteArray("ESC"));
-    const int bi = again.indexOf(QByteArray("BI1"));
-    QVERIFY(t11 >= 0);
-    QVERIFY(release > t11);
-    QVERIFY(bi > release);
-    for (int i = t11 + 1; i < release; ++i)
-        QVERIFY(again.at(i) != QByteArray("T11"));
+        std::optional<FoundRotor> hit;
+        QThread *thread = QThread::create([&]() {
+            hit = Rt21Finder::probeSerial(pty, QStringLiteral("serial"), 4800, 800);
+        });
+        QEventLoop loop;
+        QObject::connect(thread, &QThread::finished, &loop, &QEventLoop::quit);
+        QTimer::singleShot(5000, &loop, &QEventLoop::quit);
+        thread->start();
+        loop.exec();
+        QVERIFY(thread->isFinished());
+        thread->deleteLater();
+        QCoreApplication::processEvents();
+        QVERIFY(hit.has_value());
+
+        QElapsedTimer clock;
+        clock.start();
+        RotorEndpoint serial;
+        serial.transport = RotorEndpoint::Transport::Serial;
+        serial.serialPort = pty;
+        serial.baud = 4800;
+        driver.connectEndpoint(serial);
+        QTRY_VERIFY_WITH_TIMEOUT(driver.heading().has_value(), 1000);
+        QVERIFY(clock.elapsed() < 1000);
+        QVERIFY(!server.sim()->trace().contains(QByteArray("T11")));
+        QCOMPARE(server.sim()->trace().indexOf(QByteArray("BI1")), 0);
+        driver.disconnectLink();
+    }
 }
 
 void TestDriver::stopOnALiveSerialLink()

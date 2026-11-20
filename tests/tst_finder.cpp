@@ -9,6 +9,7 @@
 #include "rotor/Rt21Finder.h"
 #include "rotor/UserFiles.h"
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QEventLoop>
@@ -43,6 +44,7 @@ private slots:
     void settingsFileBesideExe();
     void settingsRoundTrip();
     void missingIniHasNoEndpoint();
+    void nativeSettingsAreNotImported();
     void windowsZipHasNoIni();
 };
 
@@ -296,6 +298,41 @@ void TestFinder::missingIniHasNoEndpoint()
     QVERIFY(fromDisk.rotors.at(0).host.isEmpty());
     QVERIFY(fromDisk.rotors.at(0).serialPort.isEmpty());
     QCOMPARE(fromDisk.rotors.at(0).tcpPort, 0);
+    QCOMPARE(fromDisk.homeText, QStringLiteral("EM26"));
+    QVERIFY(!QFileInfo::exists(UserFiles::settingsPath()));
+}
+
+void TestFinder::nativeSettingsAreNotImported()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QCoreApplication::setOrganizationName(QStringLiteral("K5PO"));
+    QCoreApplication::setApplicationName(QStringLiteral("Meridian"));
+    QSettings native(QSettings::NativeFormat, QSettings::UserScope, QStringLiteral("K5PO"),
+                     QStringLiteral("Meridian"));
+    native.setValue(QStringLiteral("rotors/1/host"), QStringLiteral("192.168.1.106"));
+    native.setValue(QStringLiteral("rotors/1/tcpPort"), 6555);
+    native.setValue(QStringLiteral("rotors/1/transport"), QStringLiteral("tcp"));
+    native.setValue(QStringLiteral("rotors/1/serialPort"), QStringLiteral("COM4"));
+    native.sync();
+
+    UserFiles::setRoot(dir.path());
+    const AppConfig loaded = UserFiles::load();
+    QVERIFY(loaded.rotors.at(0).host.isEmpty());
+    QVERIFY(loaded.rotors.at(0).serialPort.isEmpty());
+    QCOMPARE(loaded.rotors.at(0).tcpPort, 0);
+    QCOMPARE(loaded.homeText, QStringLiteral("EM26"));
+    QVERIFY(!QFileInfo::exists(UserFiles::settingsPath()));
+    if (QFileInfo::exists(UserFiles::settingsPath())) {
+        QFile ini(UserFiles::settingsPath());
+        QVERIFY(ini.open(QIODevice::ReadOnly));
+        QVERIFY(!QString::fromUtf8(ini.readAll()).contains(QStringLiteral("192.168.1.106")));
+    }
+    native.remove(QStringLiteral("rotors/1/host"));
+    native.remove(QStringLiteral("rotors/1/tcpPort"));
+    native.remove(QStringLiteral("rotors/1/transport"));
+    native.remove(QStringLiteral("rotors/1/serialPort"));
+    native.sync();
 }
 
 void TestFinder::windowsZipHasNoIni()

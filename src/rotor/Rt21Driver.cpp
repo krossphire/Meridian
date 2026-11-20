@@ -503,12 +503,14 @@ Rt21Driver::Rt21Driver(QObject *parent)
             TrafficLog::instance().recordSession("NOTE", QByteArray("brightness watch poll timed out"));
             return;
         }
-        if (note == QLatin1String("post-quiet")) {
-            abortNetworkRead(QStringLiteral("Controller stopped answering. Power-cycle the RT-21."));
-            return;
-        }
-        if (awaitHeadingAfterNetwork && note == QLatin1String("post-network")) {
-            if (!networkHeadingRetried) {
+        if (note == QLatin1String("post-quiet")
+            || (awaitHeadingAfterNetwork && note == QLatin1String("post-network"))) {
+            recordHeadingMiss();
+            if (powerCycleDue()) {
+                abortNetworkRead(QStringLiteral("Controller stopped answering. Power-cycle the RT-21."));
+                return;
+            }
+            if (note == QLatin1String("post-network") && !networkHeadingRetried) {
                 networkHeadingRetried = true;
                 TrafficLog::instance().recordSession("NOTE", QByteArray("one missed reply after network exit, retrying quietly"));
                 QTimer::singleShot(250, this, [this]() {
@@ -516,7 +518,7 @@ Rt21Driver::Rt21Driver(QObject *parent)
                         return;
                     Job again;
                     again.kind = Kind::Heading;
-                    again.bytes = Rt21::queryStatus();
+                    again.bytes = Rt21::queryTenths();
                     again.note = QStringLiteral("post-network");
                     queue.enqueue(again);
                     pump();
@@ -529,6 +531,8 @@ Rt21Driver::Rt21Driver(QObject *parent)
         ++failures;
         if (failures == 1 && !fastPace && !networkMode && !configMode) {
             TrafficLog::instance().recordSession("NOTE", QByteArray("one missed reply, retrying quietly"));
+            if (!heading_)
+                showNote(QStringLiteral("Waiting for a heading from the RT-21…"));
             QTimer::singleShot(250, this, [this]() {
                 if (!inflight && io && !networkMode && !configMode && !awaitHeadingAfterNetwork && !brightnessCapture)
                     sendQuery();
@@ -538,6 +542,16 @@ Rt21Driver::Rt21Driver(QObject *parent)
         TrafficLog::instance().note(QStringLiteral("query timeout consecutive=%1").arg(failures));
         if (!lastQueryWasAi)
             useAiNext = true;
+        // No heading yet: stay on the fast poll and keep asking. Two misses
+        // used to arm the 30 s idle timer and the link went silent.
+        if (!heading_) {
+            showNote(QStringLiteral("Waiting for a heading from the RT-21…"));
+            fastPace = true;
+            if (pollTimer)
+                pollTimer->start(fastPollMs);
+            return;
+        }
+        showNote(QStringLiteral("Waiting for the RT-21…"));
         if (failures >= 3) {
             const QString saverHint = firmwareReport.contains(QStringLiteral("4.14"))
                                           ? QStringLiteral(" RT-21 not answering. If its screen saver is on, power-cycle it.")
@@ -1180,11 +1194,15 @@ void Rt21Driver::ingestReceived(const QByteArray &receivedIn, bool fromSerial)
         TrafficLog::instance().record("RX", received);
     if (networkPhase == NetworkPhase::PreAt) {
         // Bytes that arrived during the quiet must not glue onto <uart2>;.
+        const int before = framer.controlBytes();
         framer.append(received);
+        logControlBytes(before);
         framer.take();
         return;
     }
+    const int before = framer.controlBytes();
     framer.append(received);
+    logControlBytes(before);
     const QList<QByteArray> frames = framer.take();
     for (const QByteArray &frame : frames)
         handleFrame(frame);
@@ -1337,11 +1355,14 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
     if (inflight && (inflight->kind == Kind::Heading || inflight->kind == Kind::Status)) {
         const bool postNetwork = inflight->note == QLatin1String("post-network");
         const bool postQuiet = inflight->note == QLatin1String("post-quiet");
+        const bool connectHeading = inflight->note == QLatin1String("connect-heading");
         if (const auto status = Rt21::parseStatusFrame(frame)) {
             failures = 0;
             noteArrival(status->azimuth, status->haveStatus, status->status);
             finishInflight();
-            if (postNetwork)
+            if (connectHeading)
+                enqueueVersionAfterHeading();
+            else if (postNetwork)
                 resumePollsAfterNetwork();
             else if (postQuiet)
                 afterNetworkHeading(true);
@@ -1351,7 +1372,9 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
             failures = 0;
             noteArrival(*heading, false, -1);
             finishInflight();
-            if (postNetwork)
+            if (connectHeading)
+                enqueueVersionAfterHeading();
+            else if (postNetwork)
                 resumePollsAfterNetwork();
             else if (postQuiet)
                 afterNetworkHeading(true);
@@ -1476,27 +1499,12 @@ void Rt21Driver::handleFrame(const QByteArray &frame)
 
     if (inflight && inflight->kind == Kind::Note && inflight->note == QLatin1String("route-version")) {
         failures = 0;
+        serialRoute = false;
         const QString payload = Rt21::payloadAfterSoh(frame);
         firmwareReport = payload;
         TrafficLog::instance().recordSession("NOTE", QByteArray("serial route R11 ") + payload.toLatin1());
-        replyTimer->stop();
-        inflight.reset();
-        if (endpoint.transport != RotorEndpoint::Transport::Tcp && io && !bridgeLatched) {
-            const QByteArray t11("T11;");
-            serialRouteT11 = true;
-            bridgeLatched = true;
-            TrafficLog::instance().recordSession("NOTE", QByteArray("serial route T11;"));
-            TrafficLog::instance().recordSession("SER-TX", t11);
-            io->write(t11);
-            if (serial)
-                serial->flush();
-        }
-        Job pot;
-        pot.kind = Kind::Note;
-        pot.bytes = Rt21::queryPot();
-        pot.note = QStringLiteral("route-pot");
-        queue.enqueue(pot);
-        pump();
+        finishInflight();
+        startPoll();
         return;
     }
 
@@ -1980,8 +1988,8 @@ void Rt21Driver::primeUtilityLines()
     raiseDtrAndRts(serial);
 #endif
     TrafficLog::instance().recordSession(
-        "NOTE", QByteArray("network open lines: DTR low ") + QByteArray::number(kOpenDtrLowMs)
-                    + " ms, RTS on, 4800 8N1, no flow control");
+        "NOTE", QByteArray("network open DTR pulse: low ") + QByteArray::number(kOpenDtrLowMs)
+                    + " ms (port open, not the post-uart2 pulse), RTS on, 4800 8N1, no flow control");
 }
 
 void Rt21Driver::beginNetworkLeadIn()
@@ -2179,7 +2187,8 @@ void Rt21Driver::raiseLinesAndFinish(const std::function<void(bool)> &done)
     networkDtrRoseProbeMs().store(networkReopenedMs);
     const int lowMs = int(networkReopenedMs - networkDtrLowMs);
     TrafficLog::instance().recordSession(
-        "NOTE", QByteArray("network DTR-low ") + QByteArray::number(lowMs) + " ms variant " + networkVariant);
+        "NOTE", QByteArray("network DTR-low ") + QByteArray::number(lowMs)
+                    + " ms post-uart2 variant " + networkVariant);
     portCycling = false;
     ignoreSerialErrorUntil = QDateTime::currentMSecsSinceEpoch() + 1500;
     done(true);
@@ -2546,14 +2555,34 @@ void Rt21Driver::beginNetworkExit()
     finishNetworkExit();
 }
 
+void Rt21Driver::recordHeadingMiss()
+{
+    headingMissAt.append(QDateTime::currentMSecsSinceEpoch());
+}
+
+bool Rt21Driver::powerCycleDue() const
+{
+    // Three BI1 misses, and the oldest of those three at least 10 s ago.
+    if (headingMissAt.size() < 3)
+        return false;
+    const qint64 oldest = headingMissAt.at(headingMissAt.size() - 3);
+    return QDateTime::currentMSecsSinceEpoch() - oldest >= 10000;
+}
+
+void Rt21Driver::logControlBytes(int before)
+{
+    const int now = framer.controlBytes();
+    if (now <= before)
+        return;
+    TrafficLog::instance().recordSession(
+        "NOTE", QByteArray("control bytes stripped ") + QByteArray::number(now - before) + " running "
+                    + QByteArray::number(now));
+}
+
 void Rt21Driver::beginPassThroughQuiet()
 {
     if (retired || networkPhase == NetworkPhase::Quiet)
         return;
-    if (networkQuiets >= 1) {
-        abortNetworkRead(QStringLiteral("Controller stopped answering. Power-cycle the RT-21."));
-        return;
-    }
     ++networkQuiets;
     networkQuietFromWarmup = networkPhase == NetworkPhase::Warmup;
     TrafficLog::instance().recordSession(
@@ -2584,7 +2613,7 @@ void Rt21Driver::beginPassThroughQuiet()
         }
         Job job;
         job.kind = Kind::Heading;
-        job.bytes = Rt21::queryStatus();
+        job.bytes = Rt21::queryTenths();
         job.note = QStringLiteral("post-quiet");
         queue.enqueue(job);
         pump();
@@ -2982,23 +3011,35 @@ void Rt21Driver::onWarmupMiss()
     });
 }
 
-void Rt21Driver::beginSerialRoute()
+void Rt21Driver::enqueueVersionAfterHeading()
 {
-    if (bridgeLatched || serialRouteT11 || networkT11Watch)
-        releaseBridge();
-    serialRoute = true;
-    serialRouteT11 = false;
-    if (!io || endpoint.transport == RotorEndpoint::Transport::Tcp) {
-        startPoll();
-        return;
-    }
     Job version;
     version.kind = Kind::Note;
     version.bytes = Rt21::queryVersion();
     version.note = QStringLiteral("route-version");
+    queue.enqueue(version);
+    pump();
+}
+
+void Rt21Driver::beginSerialRoute()
+{
+    // A plain serial connect does not enter the bridge. BI1 goes out first
+    // so the heading is on screen before R11 asks for the version.
+    serialRoute = true;
+    serialRouteT11 = false;
+    if (bridgeLatched || networkT11Watch)
+        releaseBridge();
+    if (!io || endpoint.transport == RotorEndpoint::Transport::Tcp) {
+        startPoll();
+        return;
+    }
     queue.clear();
     inflight.reset();
-    queue.enqueue(version);
+    Job heading;
+    heading.kind = Kind::Heading;
+    heading.bytes = Rt21::queryTenths();
+    heading.note = QStringLiteral("connect-heading");
+    queue.enqueue(heading);
     pump();
 }
 
@@ -3141,23 +3182,17 @@ void Rt21Driver::startNetworkPass()
     networkPhase = NetworkPhase::WaitUart;
     networkMode = true;
     configMode = true;
+    // T11 mutes the controller for tens of seconds. The utility never sends
+    // it before AT;. Entry is the answered R21/R01 polls, then a bare AT;.
     if (bridgeLatched || serialRouteT11 || networkT11Watch)
         releaseBridge();
-    if (!bridgeLatched && endpoint.transport != RotorEndpoint::Transport::Tcp && io) {
-        const QByteArray t11("T11;");
-        networkT11Watch = true;
-        bridgeLatched = true;
-        networkVariant = 'F';
-        TrafficLog::instance().recordSession("NOTE", QByteArray("network variant F T11;"));
-        sendNetworkBytes(t11);
-    }
     const QByteArray enter("AT;");
     networkEntered = true;
     networkAtMs = QDateTime::currentMSecsSinceEpoch();
     TrafficLog::instance().recordSession(
         "NOTE", QByteArray("network enter AT; expecting <uart2>; variant ") + networkVariant);
     sendNetworkBytes(enter);
-    armNetworkTimer(500);
+    armNetworkTimer(1000);
 }
 
 void Rt21Driver::readNetwork()
@@ -3399,7 +3434,7 @@ void Rt21Driver::holdPollsForNetworkExit()
     }
     Job job;
     job.kind = Kind::Heading;
-    job.bytes = Rt21::queryStatus();
+    job.bytes = Rt21::queryTenths();
     job.note = QStringLiteral("post-network");
     queue.enqueue(job);
     pump();
@@ -3422,8 +3457,11 @@ void Rt21Driver::afterNetworkHeading(bool headingSeen)
         "NOTE", headingSeen ? QByteArray("heading resumed after network")
                             : QByteArray("no heading after network exit"));
     if (!headingSeen && !networkCancel) {
-        beginPassThroughQuiet();
-        return;
+        if (powerCycleDue()) {
+            abortNetworkRead(QStringLiteral("Controller stopped answering. Power-cycle the RT-21."));
+            return;
+        }
+        // One missed BI1 is not the end of the 12 tries.
     }
     if (networkQuietFromWarmup && !networkCancel && io && networkCycle <= kNetworkTries) {
         networkQuietFromWarmup = false;

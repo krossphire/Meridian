@@ -224,7 +224,10 @@ void TestSetup::mockNetworkRead()
     const QList<QByteArray> trace = server.sim()->trace();
     const int enter = trace.indexOf(QByteArray("AT"));
     QVERIFY(enter > 0);
-    QCOMPARE(trace.at(enter - 1), QByteArray("T11"));
+    QVERIFY(trace.at(enter - 1).startsWith("R2") || trace.at(enter - 1).startsWith("R0")
+            || trace.at(enter - 1).startsWith("BI"));
+    for (int i = 0; i < enter; ++i)
+        QVERIFY(trace.at(i) != QByteArray("T11"));
     QVERIFY(sawEnter);
     QVERIFY(sawEcho);
     QVERIFY(sawEsc);
@@ -234,7 +237,10 @@ void TestSetup::mockNetworkRead()
     const QString log = QString::fromUtf8(logFile.readAll());
     QVERIFY(log.contains(QStringLiteral("network lead-in ESC ESC")));
     QVERIFY(log.contains(QStringLiteral("network lead-in ;")));
-    QVERIFY(log.contains(QStringLiteral("network variant F T11;")));
+    QVERIFY(log.contains(QStringLiteral("network enter AT;")));
+    QVERIFY(log.contains(QStringLiteral("network open DTR pulse")));
+    QVERIFY(log.contains(QStringLiteral("post-uart2")));
+    QVERIFY(!log.contains(QStringLiteral("network variant F T11;")));
     QVERIFY(!log.contains(QStringLiteral("network bridge write")));
     const auto phaseMs = [&](const QString &label, bool *ok) {
         const QString key = QStringLiteral("network ") + label + QStringLiteral(" ");
@@ -389,8 +395,7 @@ void TestSetup::firmwareGate()
     QVERIFY(Rt21::gatewaySubnetNote(QStringLiteral("192.168.1.106"), QStringLiteral("255.255.255.0"),
                                     QStringLiteral("192.168.1.1"))
                 .isEmpty());
-    QCOMPARE(serialProbeBauds().first(), 4800);
-    QVERIFY(serialProbeBauds().contains(19200));
+    QCOMPARE(serialProbeBauds(), QList<int>({4800, 9600}));
 }
 
 void TestSetup::serialPortsStayOnTheSavedName()
@@ -483,16 +488,20 @@ void TestSetup::silentModuleSkipsQueries()
         if (cmd == "AT") {
             ++enters;
             QVERIFY(i > 0);
-            QCOMPARE(trace.at(i - 1), QByteArray("T11"));
+            QVERIFY(trace.at(i - 1) != QByteArray("T11"));
+            QVERIFY(trace.at(i - 1).startsWith("R2") || trace.at(i - 1).startsWith("R0")
+                    || trace.at(i - 1).startsWith("BI"));
+            for (int j = 0; j < i; ++j)
+                QVERIFY(trace.at(j) != QByteArray("T11"));
         }
         QVERIFY(cmd != "T01");
         QVERIFY(!cmd.startsWith("WW"));
         QVERIFY(!cmd.startsWith("W0"));
     }
     QCOMPARE(queries, 0);
-    // The serial route releases T11 with one ESC, then each of the 12 tries
-    // sends two lead-in ESC bytes plus the exit ESC.
-    QCOMPARE(exits, 37);
+    // Each of the 12 tries sends two lead-in ESC bytes plus the exit ESC.
+    // Connect does not send T11, so there is no extra route ESC.
+    QCOMPARE(exits, 36);
     QCOMPARE(enters, 12);
 }
 

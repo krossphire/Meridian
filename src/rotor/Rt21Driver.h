@@ -13,6 +13,7 @@
 #include "Rt21Setup.h"
 
 #include <QHash>
+#include <QList>
 #include <QMap>
 #include <QObject>
 #include <QQueue>
@@ -159,6 +160,7 @@ private:
     void onWarmupAnswer(const QByteArray &command);
     void onWarmupMiss();
     void beginSerialRoute();
+    void enqueueVersionAfterHeading();
     void beginBridgeRearm();
     void sendBridgeCommand(const QByteArray &bytes, const QByteArray &note);
     void onBridgeReply(const QByteArray &frame);
@@ -176,6 +178,9 @@ private:
     void writeEsc();
     void beginPassThroughQuiet();
     void abortNetworkRead(const QString &text);
+    void recordHeadingMiss();
+    bool powerCycleDue() const;
+    void logControlBytes(int before);
     void networkReopenFailed();
     void cycleSerialPort(const std::function<void(bool)> &done);
     void raiseLinesAndFinish(const std::function<void(bool)> &done);
@@ -292,6 +297,7 @@ private:
     bool networkTxQuiet = false;
     bool networkQuietFromWarmup = false;
     int networkQuiets = 0;
+    QList<qint64> headingMissAt;
     bool networkCycleReopen = false;
     char networkVariant = 'A';
     int networkEchoSends = 0;

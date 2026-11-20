@@ -255,10 +255,36 @@ void TestCore::strictSemicolonFrames()
 
 void TestCore::commands()
 {
-    QCOMPARE(Rt21::gotoImmediate(123.4), QByteArray("AP1123.4\r;"));
-    QCOMPARE(Rt21::gotoImmediate(5), QByteArray("AP1005.0\r;"));
-    QCOMPARE(Rt21::gotoImmediate(360), QByteArray("AP1000.0\r;"));
+    QCOMPARE(Rt21::gotoImmediate(123.4), QByteArray("AP1123.4;"));
+    QCOMPARE(Rt21::gotoImmediate(5), QByteArray("AP1005.0;"));
+    QCOMPARE(Rt21::gotoImmediate(360), QByteArray("AP1000.0;"));
     QCOMPARE(Rt21::preset(12), QByteArray("AP1012.0;"));
+    const QList<QByteArray> built = {
+        Rt21::stopCommand(),
+        Rt21::queryTenths(),
+        Rt21::queryInteger(),
+        Rt21::queryStatus(),
+        Rt21::queryVersion(),
+        Rt21::queryPot(),
+        Rt21::queryReset(),
+        Rt21::gotoImmediate(10),
+        Rt21::preset(10),
+        Rt21::executeMove(),
+        Rt21::readEe(QLatin1Char('A')),
+        Rt21::writeEe(QLatin1Char('A'), 1),
+        Rt21::registerWriteCommand(QLatin1Char('O'), 10),
+        Rt21::registerReadCommand(QLatin1Char('O')),
+        Rt21::brightnessWriteCommand(10),
+        Rt21::brightnessReadCommand(),
+        Rt21::calibrateEndpoint(true),
+        Rt21::calibrateEndpoint(false),
+        Rt21::setPulseHeading(1.0),
+    };
+    for (const QByteArray &cmd : built) {
+        QVERIFY(!cmd.contains('\r'));
+        QVERIFY(!cmd.contains('\n'));
+        QVERIFY(cmd.endsWith(';'));
+    }
     QCOMPARE(Rt21::stopCommand(), QByteArray(";"));
     QCOMPARE(Rt21::queryTenths(), QByteArray("BI1;"));
     QCOMPARE(Rt21::queryStatus(), QByteArray("R21;"));
@@ -358,6 +384,30 @@ void TestCore::hardwareRx()
     QVERIFY(moving->haveStatus);
     QCOMPARE(moving->status, 1);
     QVERIFY(std::abs(moving->azimuth - 122.6) < 1e-9);
+
+    Rt21::Framer noisy;
+    QByteArray r21frame;
+    r21frame.append('\x01');
+    r21frame.append('0');
+    r21frame.append('\0');
+    r21frame.append(">50.1;");
+    noisy.append(r21frame);
+    const QList<QByteArray> r21 = noisy.take();
+    QCOMPARE(r21.size(), 1);
+    const auto r21Heading = Rt21::parseHeadingFrame(r21.at(0));
+    QVERIFY(r21Heading);
+    QVERIFY(std::abs(*r21Heading - 50.1) < 1e-9);
+    QCOMPARE(Rt21::payloadAfterSoh(QByteArray("1") + QByteArray(1, '\x01') + QByteArray("RT-21 4.13.2")),
+             QStringLiteral("RT-21 4.13.2"));
+    QByteArray stuffed;
+    const QByteArray plainHeading("35.1;");
+    for (char ch : plainHeading) {
+        stuffed.append(ch);
+        stuffed.append('\0');
+    }
+    noisy.append(stuffed);
+    QCOMPARE(noisy.take().value(0), QByteArray("35.1"));
+    QVERIFY(noisy.controlBytes() > 0);
 }
 
 void TestCore::solarPosition()

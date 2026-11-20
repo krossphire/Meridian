@@ -163,8 +163,7 @@ void Rt21Simulator::feed(const QByteArray &bytes)
                 sawCr = false;
                 continue;
             }
-            // CR inside AP1xxx.y\r; is what makes the turn immediate. The ';'
-            // still terminates the command, so it is not a separate stop.
+            // ';' ends the command. AP1xxx.y; moves; a CR is not required.
             sawCr = true;
             continue;
         }
@@ -228,8 +227,8 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
         const double az = QString::fromLatin1(rest.trimmed()).toDouble(&ok);
         if (ok) {
             preset_ = clampRt21Azimuth(az);
-            if (immediate)
-                startMotion();
+            Q_UNUSED(immediate);
+            startMotion();
         }
         return;
     }

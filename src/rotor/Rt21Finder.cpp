@@ -185,10 +185,13 @@ std::optional<FoundRotor> Rt21Finder::probeSerial(const QString &portName, const
     // Deliver the port's last completion before its notifier is destroyed.
     // Closing and then destroying it as the worker thread exits crashes in
     // ntdll on Windows (overlapped I/O into a freed port).
-    port.disconnect();
+    // Destroy the port on this thread, with no event-loop turn in between.
+    // processEvents after close delivered a freed overlapped read into
+    // ntdll (c0000005 at ntdll+0x69a21) on the Find worker.
+    port.blockSignals(true);
+    port.clear(QSerialPort::AllDirections);
     if (port.isOpen())
         port.close();
-    QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
     if (!heading)
         return std::nullopt;
     FoundRotor found;
@@ -250,7 +253,7 @@ std::optional<FoundRotor> Rt21Finder::probeTcp(const QString &host, int port, in
 
 QList<int> serialProbeBauds()
 {
-    return {4800, 9600, 19200};
+    return {4800, 9600};
 }
 
 bool findReplacesSavedEndpoint(const RotorEndpoint &saved, bool linkUp, const RotorEndpoint &found)

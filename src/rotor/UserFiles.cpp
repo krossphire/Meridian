@@ -36,35 +36,6 @@ bool &readyFlag()
     return ready;
 }
 
-void copyNativeSettings(QSettings &native, QSettings &dest)
-{
-    const QStringList keys = native.allKeys();
-    for (const QString &key : keys) {
-        if (key.contains(QStringLiteral("password"), Qt::CaseInsensitive)
-            || key.contains(QStringLiteral("passphrase"), Qt::CaseInsensitive))
-            continue;
-        dest.setValue(key, native.value(key));
-    }
-}
-
-void migrateNative(const QString &dest)
-{
-    if (QFileInfo::exists(dest))
-        return;
-    QSettings native(QSettings::NativeFormat, QSettings::UserScope, QCoreApplication::organizationName(),
-                     QCoreApplication::applicationName());
-    if (native.allKeys().isEmpty())
-        return;
-    const QString tmp = dest + QStringLiteral(".tmp");
-    {
-        QSettings out(tmp, QSettings::IniFormat);
-        copyNativeSettings(native, out);
-        out.sync();
-    }
-    QFile::remove(dest);
-    QFile::rename(tmp, dest);
-}
-
 void prepare()
 {
     if (readyFlag())
@@ -76,7 +47,6 @@ void prepare()
     QDir().mkpath(rootStorage());
     QDir().mkpath(UserFiles::logDirectory());
     QDir().mkpath(UserFiles::backupDirectory());
-    migrateNative(UserFiles::settingsPath());
 }
 
 } // namespace
@@ -141,11 +111,8 @@ QString UserFiles::backupDirectory()
 AppConfig UserFiles::load()
 {
     prepare();
-    if (!QFileInfo::exists(settingsPath())) {
-        const AppConfig config = AppConfig::defaults();
-        save(config);
-        return config;
-    }
+    if (!QFileInfo::exists(settingsPath()))
+        return AppConfig::defaults();
     QSettings file(settingsPath(), QSettings::IniFormat);
     return AppConfig::load(file);
 }

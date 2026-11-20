@@ -16,10 +16,13 @@
 #include "rotor/UserFiles.h"
 
 #include <QComboBox>
+#include <QLineEdit>
+#include <QSpinBox>
 #include <QCoreApplication>
 #include <QDialogButtonBox>
 #include <QPushButton>
 #include <QSerialPort>
+#include <QSettings>
 #include <QTcpSocket>
 #include <QTemporaryDir>
 #include <QTest>
@@ -32,6 +35,7 @@ private slots:
     void transportFlickKeepsOneConnection();
     void foundBaudIsKeptWhenItIs4800Or9600();
     void readNetworkStaysOffUntilSerialIsUp();
+    void freshStartSendsNothing();
 #ifdef Q_OS_UNIX
     void liveSerialFindStopsAndResumesAfterTheProbe();
 #endif
@@ -172,6 +176,57 @@ void TestSettings::foundBaudIsKeptWhenItIs4800Or9600()
     buttons.last()->click();
     QCOMPARE(dialog.config().rotors.at(0).baud, 9600);
     QVERIFY(dialog.config().rotors.at(0).baud != 19200);
+}
+
+void TestSettings::freshStartSendsNothing()
+{
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+    QSettings native(QSettings::NativeFormat, QSettings::UserScope, QStringLiteral("K5PO"),
+                     QStringLiteral("Meridian"));
+    native.setValue(QStringLiteral("rotors/1/host"), QStringLiteral("192.168.1.106"));
+    native.setValue(QStringLiteral("rotors/1/tcpPort"), 6555);
+    native.setValue(QStringLiteral("rotors/1/transport"), QStringLiteral("tcp"));
+    native.setValue(QStringLiteral("rotors/1/serialPort"), QStringLiteral("COM4"));
+    native.sync();
+
+    const AppConfig config = UserFiles::load();
+    QVERIFY(config.rotors.at(0).host.isEmpty());
+    QCOMPARE(config.rotors.at(0).tcpPort, 0);
+    QVERIFY(config.rotors.at(0).serialPort.isEmpty());
+    QCOMPARE(config.homeText, QStringLiteral("EM26"));
+    MainWindow window(config, nullptr);
+    QCOMPARE(window.driver()->link(), Rt21Driver::Link::Off);
+    QTest::qWait(300);
+    QCOMPARE(window.driver()->link(), Rt21Driver::Link::Off);
+    QCOMPARE(Rt21Driver::transportsOpen(), 0);
+
+    SettingsDialog *dialog = window.settingsDialog();
+    auto *host = dialog->findChild<QLineEdit *>();
+    bool sawHost = false;
+    const auto edits = dialog->findChildren<QLineEdit *>();
+    for (QLineEdit *edit : edits) {
+        if (edit->placeholderText() == QStringLiteral("Host name or IP")) {
+            sawHost = true;
+            QVERIFY(edit->text().isEmpty());
+        }
+    }
+    QVERIFY(sawHost);
+    Q_UNUSED(host);
+    bool sawPort = false;
+    for (QSpinBox *spin : dialog->findChildren<QSpinBox *>()) {
+        if (spin->maximum() == 65535) {
+            sawPort = true;
+            QCOMPARE(spin->value(), 0);
+        }
+    }
+    QVERIFY(sawPort);
+    auto *home = dialog->findChild<QLineEdit *>(QStringLiteral("homeEdit"));
+    QVERIFY(home);
+    QCOMPARE(home->text(), QStringLiteral("EM26"));
+    native.clear();
+    native.sync();
 }
 
 void TestSettings::readNetworkStaysOffUntilSerialIsUp()

@@ -39,7 +39,7 @@ bool isVirtualAdapterName(const QString &name);
 // `extra` is a saved or custom port. Order is stable and duplicates are dropped.
 QList<int> networkCandidatePorts(const QList<int> &extra = {});
 
-// 4800, then 9600, then 19200.
+// RT-21 RS-232 is 4800, then 9600. Nothing else is probed.
 QList<int> serialProbeBauds();
 
 // Saved TCP is down, and Find confirmed a different endpoint. The live TCP

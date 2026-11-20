@@ -859,12 +859,18 @@ void SettingsDialog::startFind(bool networkOnly)
         refreshUsbHints();
         if (driver) {
             const RotorEndpoint live = driver->linkEndpoint();
-            if (live.transport == RotorEndpoint::Transport::Serial && live.configured()
-                && driver->link() != Rt21Driver::Link::Off) {
+            // Stop whatever is up, including a failed TCP link whose reconnect
+            // timer would open a socket while the probe still owns a COM port.
+            if (live.configured() && driver->link() != Rt21Driver::Link::Off) {
                 resumeEndpoint = live;
                 resumeSerial = true;
-                TrafficLog::instance().recordSession("FIND", QByteArray("release ") + live.serialPort.toLatin1());
-                driver->stopMotion();
+                const QByteArray where = live.transport == RotorEndpoint::Transport::Serial
+                                             ? live.serialPort.toLatin1()
+                                             : (live.host.toLatin1() + ":" + QByteArray::number(live.tcpPort));
+                TrafficLog::instance().recordSession("FIND", QByteArray("release ") + where);
+                if (live.transport == RotorEndpoint::Transport::Serial
+                    && (driver->link() == Rt21Driver::Link::On || driver->link() == Rt21Driver::Link::Moving))
+                    driver->stopMotion();
                 driver->disconnectLink();
             }
         }
@@ -922,10 +928,8 @@ void SettingsDialog::startFind(bool networkOnly)
         }
         if (!self)
             return;
-        // Finish the worker's deferred deletes before the thread's dispatcher
-        // goes away. That handoff is where alpha25d died in ntdll.
-        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
-        QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        // The probe port is already destroyed on this thread. Do not run an
+        // event loop here: that was the ntdll overlapped-read crash.
         QMetaObject::invokeMethod(
             self.data(), [self]() {
                 if (self)

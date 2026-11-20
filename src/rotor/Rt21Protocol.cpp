@@ -23,6 +23,17 @@ QByteArray azField(double azimuth)
 
 QByteArray stripNoise(QByteArray frame)
 {
+    // NUL between payload bytes (and any other embedded NUL) is wiring noise.
+    // SOH stays so the echo delimiter and the R21 status flag still parse.
+    if (frame.contains('\0')) {
+        QByteArray cleaned;
+        cleaned.reserve(frame.size());
+        for (char ch : frame) {
+            if (ch != '\0')
+                cleaned.append(ch);
+        }
+        frame = cleaned;
+    }
     if (!frame.isEmpty() && frame.at(0) == char(0x01))
         frame.remove(0, 1);
     frame = frame.trimmed();
@@ -76,10 +87,8 @@ QByteArray queryReset()
 
 QByteArray gotoImmediate(double azimuth)
 {
-    // Hamlib RT-21: "AP1XXX.Y\r;" — the CR makes the controller move now.
-    // Sent on serial and on TCP. Whether TCP requires the CR is unverified
-    // on hardware; the mock accepts both.
-    return QByteArray("AP1") + azField(azimuth) + QByteArray("\r;");
+    // Semicolon only. A CR before the semicolon is not part of the command.
+    return QByteArray("AP1") + azField(azimuth) + QByteArray(";");
 }
 
 QByteArray preset(double azimuth)
@@ -274,6 +283,14 @@ void Framer::append(const QByteArray &bytes)
     // separator, so ";131.9;" is one heading and never a short ghost.
     constexpr int kMaxFrame = 256;
     for (unsigned char c : bytes) {
+        // Drop NUL and other controls. Keep SOH: it delimits an echoed
+        // register reply and it is the binary "rotating" flag in an R21 frame.
+        if (c == 0x00 || (c < 0x20 && c != '\n' && c != '\r' && c != 0x01)) {
+            ++controls;
+            continue;
+        }
+        if (c == 0x01)
+            ++controls;
         if (c == '\n' || c == '\r') {
             if (lineMode && !dropping && !buffer.isEmpty()) {
                 commit(buffer);
