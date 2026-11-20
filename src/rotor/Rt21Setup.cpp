@@ -75,6 +75,59 @@ void addModule(QList<PlannedWrite> *out, const QString &command, const QString &
 
 } // namespace
 
+std::optional<ModuleAssignment> parseModuleLine(const QByteArray &line)
+{
+    QString text = QString::fromLatin1(line).trimmed();
+    if (text.startsWith(QLatin1String("AT"), Qt::CaseInsensitive))
+        text = text.mid(2).trimmed();
+    if (text.startsWith(QLatin1Char('*')))
+        text = text.mid(1);
+    const int eq = text.indexOf(QLatin1Char('='));
+    if (eq <= 0)
+        return std::nullopt;
+    ModuleAssignment parsed;
+    parsed.key = text.left(eq).trimmed();
+    parsed.value = text.mid(eq + 1).trimmed().section(QLatin1Char(' '), 0, 0);
+    if (parsed.key.isEmpty())
+        return std::nullopt;
+    for (const QChar ch : parsed.key) {
+        if (!ch.isLetterOrNumber() && ch != QLatin1Char('_'))
+            return std::nullopt;
+    }
+    return parsed;
+}
+
+QList<ModuleAssignment> ModuleLineBuffer::feed(const QByteArray &chunk)
+{
+    pending.append(chunk);
+    QList<ModuleAssignment> done;
+    while (true) {
+        int cut = -1;
+        for (int i = 0; i < pending.size(); ++i) {
+            const char c = pending.at(i);
+            if (c == '\r' || c == '\n') {
+                cut = i;
+                break;
+            }
+        }
+        if (cut < 0)
+            break;
+        const QByteArray line = pending.left(cut);
+        int next = cut + 1;
+        if (pending.at(cut) == '\r' && next < pending.size() && pending.at(next) == '\n')
+            ++next;
+        pending.remove(0, next);
+        if (const auto parsed = parseModuleLine(line))
+            done.append(*parsed);
+    }
+    return done;
+}
+
+void ModuleLineBuffer::clear()
+{
+    pending.clear();
+}
+
 QList<ModuleQuery> networkReadSequence()
 {
     // Captured from Setup Utility 4.B12 on 4.13.2. Each query is the key plus '?' plus LF.

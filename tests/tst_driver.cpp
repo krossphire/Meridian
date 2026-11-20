@@ -99,8 +99,15 @@ void TestDriver::hardwareReplyBytes()
     QObject::connect(&moving, &Rt21Simulator::output, &moving, [&](const QByteArray &bytes) { got = bytes; });
     moving.setHeading(122.6);
     moving.setSpeed(0);
-    moving.feed("AP1100.0;");
+    Rt21Simulator presetOnly;
+    presetOnly.feed("AP1100.0;");
+    QVERIFY(!presetOnly.moving());
+    presetOnly.feed("AM1;");
+    QVERIFY(presetOnly.moving());
+
+    moving.feed(QByteArray("AP1100.0\r;"));
     QVERIFY(moving.moving());
+    QVERIFY(moving.trace().contains(QByteArray("AP1100.0\r")));
     for (int i = 0; i < 4; ++i) {
         got.clear();
         moving.feed("BI1;");
@@ -143,6 +150,7 @@ void TestDriver::prePollThenOneGoto()
     QVERIFY(query >= 0);
     QVERIFY(go > query);
     QCOMPARE(goCount, 1);
+    QCOMPARE(trace.at(go), QByteArray("AP1080.0\r"));
 }
 
 void TestDriver::dropCommandWithoutReplay()
@@ -256,8 +264,10 @@ void TestDriver::serialPty()
     QVERIFY(!trace.contains(QByteArray("T11")));
     QVERIFY(!trace.contains(QByteArray("R01")));
     QVERIFY(!trace.contains(QByteArray("AT")));
+    server.sim()->clearTrace();
     driver.goTo(70);
     QTRY_VERIFY_WITH_TIMEOUT(driver.heading() && std::abs(*driver.heading() - 70.0) < 2.0, 4000);
+    QCOMPARE(server.sim()->trace().count(QByteArray("AP1070.0\r")), 1);
 }
 
 void TestDriver::serialConnectCancelsIpReconnect()
@@ -315,18 +325,8 @@ void TestDriver::findHitConnectsWhileIpReconnectIsArmed()
     if (pty.isEmpty())
         QSKIP("pty was not available");
 
-    // The GUI must not open the port until this thread has exited. Opening
-    // COM6 while the probe's QSerialPort was still winding down is the crash.
-    QThread *thread = QThread::create([&]() {
-        Rt21Finder::scanSerialPorts(1000, {}, {}, {pty});
-    });
-    QEventLoop loop;
-    QObject::connect(thread, &QThread::finished, &loop, &QEventLoop::quit);
-    QTimer::singleShot(8000, &loop, &QEventLoop::quit);
-    thread->start();
-    loop.exec();
-    QVERIFY(thread->isFinished());
-    thread->deleteLater();
+    // The GUI opens the port only after the probe port has closed.
+    Rt21Finder::scanSerialPorts(1000, {}, {}, {pty});
 
     RotorEndpoint serial;
     serial.transport = RotorEndpoint::Transport::Serial;
@@ -379,18 +379,7 @@ void TestDriver::repeatedFindHandoffWithReconnectArmed()
                 QFAIL("reconnect timer still armed after Find released the link");
         }
 
-        std::optional<FoundRotor> hit;
-        QThread *thread = QThread::create([&]() {
-            hit = Rt21Finder::probeSerial(pty, QStringLiteral("serial"), 4800, 800);
-        });
-        QEventLoop loop;
-        QObject::connect(thread, &QThread::finished, &loop, &QEventLoop::quit);
-        QTimer::singleShot(5000, &loop, &QEventLoop::quit);
-        thread->start();
-        loop.exec();
-        QVERIFY(thread->isFinished());
-        thread->deleteLater();
-        QCoreApplication::processEvents();
+        const std::optional<FoundRotor> hit = Rt21Finder::probeSerial(pty, QStringLiteral("serial"), 4800, 800);
         QVERIFY(hit.has_value());
 
         QElapsedTimer clock;

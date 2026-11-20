@@ -11,7 +11,6 @@
 #include "rotor/Rt21Finder.h"
 #include "rotor/UsbHint.h"
 
-#include <QAtomicInt>
 #include <QDialog>
 #include <QList>
 #include <QMap>
@@ -45,7 +44,7 @@ public:
 
 signals:
     void configSaved(const AppConfig &config);
-    // The probe thread has emitted finished. A live serial link is reopened after this.
+    // The probe has closed its port. A live serial link is reopened after this.
     void findProbeSettled();
 
 private:
@@ -71,6 +70,7 @@ private:
     void renderUsbHints(const QList<UsbHint> &hints);
     void startFind(bool network);
     void finishFind(const QList<FoundRotor> &found, bool network);
+    void onFindSettled();
     void applyFound(const FoundRotor &found);
     void styleFindButton();
     void setStatus(const QString &text);
@@ -119,8 +119,8 @@ private:
     bool usbFactsLocked = false;
     QSet<QString> usbSeen;
     class QVBoxLayout *findResults = nullptr;
-    class QThread *findThread = nullptr;
-    QAtomicInt findCancel = 0;
+    FindScan *findScan = nullptr;
+    bool findStopRequested = false;
     QStringList foundKeys;
     QLabel *versionLabel = nullptr;
     QLabel *displayCallout = nullptr;

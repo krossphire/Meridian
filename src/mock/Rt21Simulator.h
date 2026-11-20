@@ -32,6 +32,10 @@ public:
     void setIgnoreModule(bool ignore);
     void setEe(QChar id, int value);
     void setMuteRegisterW(bool mute);
+    // Bench replies: *HWTYPE and *DHCP, AT*KEY= for the rest, OK on the first echo,
+    // and the current-IP line split into the 1–3 byte reads from the 19 Nov log.
+    void setBenchModuleLines(bool on);
+    void setModuleValue(const QByteArray &key, const QByteArray &value);
     // Record the command and send nothing back. Used when R01 must time out.
     void setMute(const QByteArray &prefix);
     void clearTrace();
@@ -72,6 +76,7 @@ private:
     bool ignoreQueries = false;
     bool ignoreModule = false;
     bool muteRegisterW = false;
+    bool benchLines = false;
     QByteArray mutePrefix;
     QList<QByteArray> trace_;
 };

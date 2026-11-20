@@ -87,8 +87,11 @@ QByteArray queryReset()
 
 QByteArray gotoImmediate(double azimuth)
 {
-    // Semicolon only. A CR before the semicolon is not part of the command.
-    return QByteArray("AP1") + azField(azimuth) + QByteArray(";");
+    // Hamlib RT-21: "AP1%05.1f\r;". The CR is the execute byte. Without it
+    // the controller only stores a target and waits for AM1;. This is the
+    // one command that carries a CR. Every other command ends in ';' only.
+    // The same bytes go out on serial and on TCP.
+    return QByteArray("AP1") + azField(azimuth) + QByteArray("\r;");
 }
 
 QByteArray preset(double azimuth)

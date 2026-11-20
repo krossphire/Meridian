@@ -9,9 +9,12 @@
 
 #pragma once
 
+#include <QByteArray>
 #include <QList>
 #include <QMap>
 #include <QString>
+
+#include <optional>
 
 class QHostAddress;
 
@@ -41,6 +44,25 @@ struct StaticAdvice {
 };
 
 QList<ModuleQuery> networkReadSequence();
+
+// One completed module line: optional "AT", optional "*", then KEY=value.
+struct ModuleAssignment {
+    QString key;
+    QString value;
+};
+
+// Empty when the line is not KEY=value (OK, ERROR, a fragment, a prompt).
+std::optional<ModuleAssignment> parseModuleLine(const QByteArray &line);
+
+// Holds RX until CR or LF, then parses each completed line. A CR LF pair is one break.
+class ModuleLineBuffer {
+public:
+    QList<ModuleAssignment> feed(const QByteArray &chunk);
+    void clear();
+
+private:
+    QByteArray pending;
+};
 
 QString rotorTypeName(int code);
 QString modeName(int code);

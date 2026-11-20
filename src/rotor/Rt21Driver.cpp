@@ -1187,9 +1187,9 @@ void Rt21Driver::ingestReceived(const QByteArray &receivedIn, bool fromSerial)
     if (brightnessCapture)
         TrafficLog::instance().recordSession("WRITE-RX", received);
     if (fromSerial)
-        TrafficLog::instance().recordSession("SER-RX", received);
+        TrafficLog::instance().recordSession("SER-RX", networkMode ? Rt21::redactForLog(received) : received);
     else if (networkMode)
-        TrafficLog::instance().recordSession("NET-RX", received);
+        TrafficLog::instance().recordSession("NET-RX", Rt21::redactForLog(received));
     else
         TrafficLog::instance().record("RX", received);
     if (networkPhase == NetworkPhase::PreAt) {
@@ -2842,25 +2842,22 @@ bool Rt21Driver::handleNetworkFrame(const QByteArray &frame)
         return true;
     }
 
-    auto takeValue = [&](const QString &token) {
-        const int at = line.indexOf(token, 0, Qt::CaseInsensitive);
-        if (at < 0)
-            return QString();
-        return line.mid(at + token.size()).trimmed().section(QLatin1Char(' '), 0, 0);
-    };
-
     if (networkPhase == NetworkPhase::Query) {
         const QList<Rt21::ModuleQuery> rows = Rt21::networkReadSequence();
         if (networkQueryIndex >= rows.size())
             return true;
         const Rt21::ModuleQuery query = rows.at(networkQueryIndex);
-        if (!line.startsWith(query.token, Qt::CaseInsensitive))
+        const auto parsed = Rt21::parseModuleLine(line.toLatin1());
+        QString expectKey = query.token;
+        if (expectKey.endsWith(QLatin1Char('=')))
+            expectKey.chop(1);
+        if (!parsed || parsed->key.compare(expectKey, Qt::CaseInsensitive) != 0)
             return true;
         TrafficLog::instance().recordSession(
-            "NOTE", QByteArray("network query rx ") + line.toLatin1() + " " + frame.toHex(' '));
+            "NOTE", QByteArray("network query rx ") + Rt21::redactForLog(line.toLatin1()));
         if (networkTimer)
             networkTimer->stop();
-        const QString value = takeValue(query.token);
+        const QString value = parsed->value;
         if (!value.isEmpty())
             networkGotField = true;
         emit networkField(query.key, value);
@@ -2884,16 +2881,17 @@ bool Rt21Driver::handleNetworkFrame(const QByteArray &frame)
     }
 
     if (networkPhase == NetworkPhase::WriteRead) {
-        const bool agwLine = line.startsWith(QStringLiteral("AGW="), Qt::CaseInsensitive);
-        const bool gwLine = line.startsWith(QStringLiteral("GW="), Qt::CaseInsensitive);
+        const auto parsedLine = Rt21::parseModuleLine(line.toLatin1());
+        const bool agwLine = parsedLine && parsedLine->key.compare(QLatin1String("AGW"), Qt::CaseInsensitive) == 0;
+        const bool gwLine = parsedLine && parsedLine->key.compare(QLatin1String("GW"), Qt::CaseInsensitive) == 0;
         if (networkWriteReadStep == 0) {
             if (!agwLine)
                 return true;
             TrafficLog::instance().recordSession(
-                "NOTE", QByteArray("network query rx ") + line.toLatin1() + " " + frame.toHex(' '));
+                "NOTE", QByteArray("network query rx ") + Rt21::redactForLog(line.toLatin1()));
             if (networkTimer)
                 networkTimer->stop();
-            const QString value = takeValue(QStringLiteral("AGW="));
+            const QString value = parsedLine->value;
             networkWriteOk = value == networkWriteExpect;
             TrafficLog::instance().recordSession(
                 "NOTE", QByteArray("network read-back ") + value.toLatin1()
@@ -2907,10 +2905,10 @@ bool Rt21Driver::handleNetworkFrame(const QByteArray &frame)
         if (!gwLine)
             return true;
         TrafficLog::instance().recordSession(
-            "NOTE", QByteArray("network query rx ") + line.toLatin1() + " " + frame.toHex(' '));
+            "NOTE", QByteArray("network query rx ") + Rt21::redactForLog(line.toLatin1()));
         if (networkTimer)
             networkTimer->stop();
-        emit networkField(QStringLiteral("gw"), takeValue(QStringLiteral("GW=")));
+        emit networkField(QStringLiteral("gw"), parsedLine->value);
         beginNetworkExit();
         return true;
     }

@@ -255,10 +255,13 @@ void TestCore::strictSemicolonFrames()
 
 void TestCore::commands()
 {
-    QCOMPARE(Rt21::gotoImmediate(123.4), QByteArray("AP1123.4;"));
-    QCOMPARE(Rt21::gotoImmediate(5), QByteArray("AP1005.0;"));
-    QCOMPARE(Rt21::gotoImmediate(360), QByteArray("AP1000.0;"));
+    // Byte-exact point-and-shoot. The CR before ';' is the execute byte.
+    QCOMPARE(Rt21::gotoImmediate(123.4), QByteArray("AP1123.4\r;"));
+    QCOMPARE(Rt21::gotoImmediate(5), QByteArray("AP1005.0\r;"));
+    QCOMPARE(Rt21::gotoImmediate(360), QByteArray("AP1000.0\r;"));
+    QCOMPARE(Rt21::gotoImmediate(10).count('\r'), 1);
     QCOMPARE(Rt21::preset(12), QByteArray("AP1012.0;"));
+    QVERIFY(!Rt21::preset(12).contains('\r'));
     const QList<QByteArray> built = {
         Rt21::stopCommand(),
         Rt21::queryTenths(),
@@ -267,7 +270,6 @@ void TestCore::commands()
         Rt21::queryVersion(),
         Rt21::queryPot(),
         Rt21::queryReset(),
-        Rt21::gotoImmediate(10),
         Rt21::preset(10),
         Rt21::executeMove(),
         Rt21::readEe(QLatin1Char('A')),

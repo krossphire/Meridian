@@ -15,9 +15,12 @@
 #include "rotor/Rt21Driver.h"
 #include "rotor/Rt21Protocol.h"
 #include "rotor/Rt21Finder.h"
+#include "SetupPanel.h"
 #include "rotor/Rt21Setup.h"
 
 #include <QDateTime>
+#include <QLabel>
+#include <QLineEdit>
 #include <QElapsedTimer>
 #include <QSignalSpy>
 #include <QTest>
@@ -33,7 +36,9 @@ private slots:
     void adviceStaysOffTheConnectionFields();
     void secretsStayOutOfTheLog();
     void moduleLinesSplitOnCr();
+    void fragmentedModuleLinesFillEveryField();
     void mockNetworkRead();
+    void benchNetworkReadFillsSetupFields();
     void networkWriteNeedsAReadThenReadsBack();
     void screenSaverIsOnlyInTheDisplayGroup();
     void firmwareGate();
@@ -146,6 +151,55 @@ void TestSetup::moduleLinesSplitOnCr()
     QCOMPARE(frames.size(), 2);
     QCOMPARE(frames.at(0), QByteArray("DHCP=0"));
     QCOMPARE(frames.at(1), QByteArray("KEY=secret"));
+}
+
+void TestSetup::fragmentedModuleLinesFillEveryField()
+{
+    // The 19 Nov bench delivered the current IP as 1–3 byte reads, and the
+    // other keys as either "*KEY=value" or "AT*KEY=value".
+    const QList<QByteArray> ipChunks = {QByteArray("A"), QByteArray("T"), QByteArray("*"), QByteArray("IP="),
+                                        QByteArray("19"), QByteArray("2.1"), QByteArray("68"), QByteArray(".1"),
+                                        QByteArray(".10"), QByteArray("6\r"), QByteArray("\n")};
+    Rt21::ModuleLineBuffer buffer;
+    QList<Rt21::ModuleAssignment> ip;
+    for (const QByteArray &chunk : ipChunks)
+        ip += buffer.feed(chunk);
+    QCOMPARE(ip.size(), 1);
+    QCOMPARE(ip.at(0).key, QStringLiteral("IP"));
+    QCOMPARE(ip.at(0).value, QStringLiteral("192.168.1.106"));
+
+    const QByteArray stream =
+        QByteArray("*HWTYPE=2\r\n") + "*DHCP=0\r\n" + "AT*AIP=192.168.1.106\r\n" + "AT*NMASK=255.255.255.0\r\n"
+        + "AT*GW=192.168.2.1\r\n" + "AT*AGW=192.168.2.1\r\n" + "AT*ID=RT-21\r\n" + "AT*HTTP=801\r\n"
+        + "AT*UDP=23073\r\n" + "AT*TFTP=69\r\n" + "AT*HTTP_USER=\r\n" + "AT*HTTP_PASS=s3cret-not-shown\r\n"
+        + "AT*NVREG16_0=6555\r\n" + "AT*LINK=1\r\n";
+    QList<Rt21::ModuleAssignment> rows;
+    int at = 0;
+    while (at < stream.size()) {
+        const int n = std::min(3, int(stream.size() - at));
+        rows += buffer.feed(stream.mid(at, n));
+        at += n;
+    }
+    QMap<QString, QString> fields;
+    fields.insert(QStringLiteral("IP"), QStringLiteral("192.168.1.106"));
+    for (const Rt21::ModuleAssignment &row : rows)
+        fields.insert(row.key, row.value);
+    QCOMPARE(fields.value(QStringLiteral("HWTYPE")), QStringLiteral("2"));
+    QCOMPARE(fields.value(QStringLiteral("DHCP")), QStringLiteral("0"));
+    QCOMPARE(fields.value(QStringLiteral("IP")), QStringLiteral("192.168.1.106"));
+    QCOMPARE(fields.value(QStringLiteral("AIP")), QStringLiteral("192.168.1.106"));
+    QCOMPARE(fields.value(QStringLiteral("NMASK")), QStringLiteral("255.255.255.0"));
+    QCOMPARE(fields.value(QStringLiteral("GW")), QStringLiteral("192.168.2.1"));
+    QCOMPARE(fields.value(QStringLiteral("AGW")), QStringLiteral("192.168.2.1"));
+    QCOMPARE(fields.value(QStringLiteral("ID")), QStringLiteral("RT-21"));
+    QCOMPARE(fields.value(QStringLiteral("HTTP")), QStringLiteral("801"));
+    QCOMPARE(fields.value(QStringLiteral("UDP")), QStringLiteral("23073"));
+    QCOMPARE(fields.value(QStringLiteral("TFTP")), QStringLiteral("69"));
+    QCOMPARE(fields.value(QStringLiteral("HTTP_USER")), QString());
+    QCOMPARE(fields.value(QStringLiteral("HTTP_PASS")), QStringLiteral("s3cret-not-shown"));
+    QCOMPARE(fields.value(QStringLiteral("NVREG16_0")), QStringLiteral("6555"));
+    QCOMPARE(fields.value(QStringLiteral("LINK")), QStringLiteral("1"));
+    QVERIFY(!Rt21::redactForLog(QByteArray("AT*HTTP_PASS=s3cret-not-shown\r\n")).contains("s3cret"));
 }
 
 void TestSetup::mockNetworkRead()
@@ -267,6 +321,100 @@ void TestSetup::mockNetworkRead()
     QVERIFY(log.contains(QStringLiteral("network echo send 2")));
     QVERIFY(log.contains(QStringLiteral("network query rx AGW=")));
     QVERIFY(preAtQuiet >= 650 && preAtQuiet <= 900);
+}
+
+void TestSetup::benchNetworkReadFillsSetupFields()
+{
+    MockRt21Server server;
+    server.sim()->setBenchModuleLines(true);
+    server.sim()->setModuleValue("HTTP_PASS", "s3cret-not-shown");
+    server.sim()->setHeading(35.1);
+    const QString pty = server.listenPty();
+    if (pty.isEmpty())
+        QSKIP("pty was not available");
+    Rt21Driver driver;
+    RotorEndpoint endpoint;
+    endpoint.transport = RotorEndpoint::Transport::Serial;
+    endpoint.serialPort = pty;
+    endpoint.baud = 4800;
+    driver.connectEndpoint(endpoint);
+    QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::On, 3000);
+
+    SetupPanel panel;
+    panel.setDriver(&driver);
+    QSignalSpy done(&driver, &Rt21Driver::networkFinished);
+    qint64 logMark = 0;
+    {
+        QFile prior(TrafficLog::instance().filePath());
+        if (prior.open(QIODevice::ReadOnly))
+            logMark = prior.size();
+    }
+    driver.readNetwork();
+    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 20000);
+    QCOMPARE(done.at(0).at(0).toBool(), true);
+
+    QWidget *page = panel.networkPage();
+    QVERIFY(page);
+    auto text = [&](const char *name) {
+        auto *edit = page->findChild<QLineEdit *>(QString::fromLatin1(name));
+        return edit ? edit->text() : QStringLiteral("<missing>");
+    };
+    QCOMPARE(text("net-id"), QStringLiteral("RT-21"));
+    QVERIFY(text("net-dhcp").contains(QStringLiteral("DHCP")));
+    QCOMPARE(text("net-ip"), QStringLiteral("192.168.1.106"));
+    QCOMPARE(text("net-aip"), QStringLiteral("192.168.1.106"));
+    QCOMPARE(text("net-nmask"), QStringLiteral("255.255.255.0"));
+    QCOMPARE(text("net-gw"), QStringLiteral("192.168.2.1"));
+    QCOMPARE(text("net-agw"), QStringLiteral("192.168.2.1"));
+    QCOMPARE(text("net-http"), QStringLiteral("801"));
+    QCOMPARE(text("net-udp"), QStringLiteral("23073"));
+    QCOMPARE(text("net-tftp"), QStringLiteral("69"));
+    QCOMPARE(text("net-serialPort"), QStringLiteral("6555"));
+    QCOMPARE(text("net-hwtype"), QStringLiteral("Type 2"));
+    QCOMPARE(text("net-link"), QStringLiteral("Link OK"));
+    QCOMPARE(text("net-user"), QString());
+    auto *pass = page->findChild<QLineEdit *>(QStringLiteral("net-pass"));
+    QVERIFY(pass);
+    QCOMPARE(pass->echoMode(), QLineEdit::Password);
+    QVERIFY(!pass->text().contains(QStringLiteral("s3cret")));
+    QVERIFY(!pass->displayText().contains(QStringLiteral("s3cret")));
+    QVERIFY(pass->text() != QStringLiteral("Not read"));
+    auto *note = page->findChild<QLabel *>(QStringLiteral("gatewayNote"));
+    QVERIFY(note);
+    QVERIFY(note->text().contains(QStringLiteral("not on the same subnet")));
+    QVERIFY(note->styleSheet().contains(statusToneColor(StatusTone::Busy).name()));
+
+    const QList<QByteArray> trace = server.sim()->trace();
+    const int enter = trace.indexOf(QByteArray("AT"));
+    QVERIFY(enter > 0);
+    for (int i = 0; i < enter; ++i)
+        QVERIFY(trace.at(i) != QByteArray("T11"));
+    QVERIFY(trace.at(enter - 1).startsWith("R2") || trace.at(enter - 1).startsWith("R0")
+            || trace.at(enter - 1).startsWith("BI"));
+    QVERIFY(trace.contains(QByteArray("AT*SERIAL_ECHO=0")));
+    QVERIFY(trace.contains(QByteArray("ESC")));
+    QVERIFY(!trace.contains(QByteArray("T11")));
+    QFile logFile(TrafficLog::instance().filePath());
+    QVERIFY(logFile.open(QIODevice::ReadOnly));
+    QVERIFY(logFile.seek(logMark));
+    const QString log = QString::fromUtf8(logFile.readAll());
+    QVERIFY(log.contains(QStringLiteral("network enter AT;")));
+    QVERIFY(log.contains(QStringLiteral("network success variant D")));
+    QVERIFY(log.contains(QStringLiteral("network echo ok")));
+    QVERIFY(!log.contains(QStringLiteral("network echo send 2")));
+    QVERIFY(log.contains(QStringLiteral("network query rx *HWTYPE=2")));
+    QVERIFY(log.contains(QStringLiteral("network query rx AT*IP=192.168.1.106")));
+    QVERIFY(log.contains(QStringLiteral("AT*HTTP_PASS=****")));
+    QVERIFY(!log.contains(QStringLiteral("s3cret")));
+    bool timingOk = true;
+    const QString key = QStringLiteral("network uart2->ECHO ");
+    const int at = log.lastIndexOf(key);
+    QVERIFY(at >= 0);
+    const int uartToEcho = log.mid(at + key.size()).section(QLatin1Char(' '), 0, 0).toInt(&timingOk);
+    QVERIFY(timingOk);
+    QVERIFY(uartToEcho >= 700 && uartToEcho <= 760);
+    QTRY_VERIFY_WITH_TIMEOUT(driver.heading().has_value(), 3000);
+    QCOMPARE(driver.link(), Rt21Driver::Link::On);
 }
 
 void TestSetup::networkWriteNeedsAReadThenReadsBack()

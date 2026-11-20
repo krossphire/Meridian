@@ -23,6 +23,7 @@ QByteArray queryStatus();
 QByteArray queryVersion();
 QByteArray queryPot();
 QByteArray queryReset();
+// Point-and-shoot: AP1 + %05.1f + CR + ';'. The CR is the execute byte.
 QByteArray gotoImmediate(double azimuth);
 QByteArray preset(double azimuth);
 QByteArray executeMove();

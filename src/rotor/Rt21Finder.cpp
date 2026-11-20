@@ -601,3 +601,406 @@ QList<FoundRotor> Rt21Finder::scanHosts(const QStringList &hosts, const QList<in
     }
     return found;
 }
+
+QList<std::pair<QString, QString>> serialFindCandidates()
+{
+    QList<std::pair<QString, QString>> candidates;
+    auto ports = QSerialPortInfo::availablePorts();
+    std::sort(ports.begin(), ports.end(), [](const QSerialPortInfo &a, const QSerialPortInfo &b) {
+        return portLess(a.portName(), b.portName());
+    });
+    for (const QSerialPortInfo &info : ports) {
+        const QString chip = usbChipName(info.manufacturer(), info.description());
+        const QString blob = (info.manufacturer() + info.description() + info.portName()).toLower();
+        const bool usb = info.hasVendorIdentifier() || blob.contains(QStringLiteral("usb"))
+                         || blob.contains(QStringLiteral("ttyusb")) || blob.contains(QStringLiteral("ttyacm"));
+        QString kind = chip;
+        if (kind.isEmpty() && usb)
+            kind = QStringLiteral("USB");
+        else if (kind.isEmpty())
+            kind = QStringLiteral("serial");
+        candidates.append({info.portName(), kind});
+    }
+    return candidates;
+}
+
+struct FindScan::FindNetProbe : QObject {
+    explicit FindNetProbe(QObject *parent = nullptr)
+        : QObject(parent)
+    {
+    }
+    QTcpSocket *socket = nullptr;
+    Rt21::Framer framer;
+    QTimer *readTimer = nullptr;
+    QTimer *connectTimer = nullptr;
+    QString host;
+    int port = 0;
+    bool done = false;
+    bool opened = false;
+    bool wantVersion = false;
+    double heading = 0;
+    QByteArray rx;
+};
+
+FindScan::FindScan(QObject *parent)
+    : QObject(parent)
+{
+    timer = new QTimer(this);
+    timer->setSingleShot(true);
+    connect(timer, &QTimer::timeout, this, &FindScan::onTimeout);
+}
+
+void FindScan::start(const Request &next)
+{
+    if (running_)
+        cancel();
+    request = next;
+    steps.clear();
+    stepIndex = 0;
+    gotHit = false;
+    cancelled_ = false;
+    running_ = true;
+    netActive = false;
+    netIndex = 0;
+    netTargets.clear();
+    destroyPort();
+    destroyProbes();
+    const QList<int> bauds = request.bauds.isEmpty() ? serialProbeBauds() : request.bauds;
+    if (request.doSerial) {
+        for (const auto &candidate : request.serial) {
+            if (candidate.first.trimmed().isEmpty())
+                continue;
+            for (int baud : bauds)
+                steps.append(Step{candidate.first, candidate.second, baud});
+        }
+    }
+    QTimer::singleShot(0, this, &FindScan::openNext);
+}
+
+void FindScan::cancel()
+{
+    if (!running_)
+        return;
+    cancelled_ = true;
+    if (timer)
+        timer->stop();
+    destroyPort();
+    destroyProbes();
+    finish();
+}
+
+bool FindScan::owns(FindNetProbe *probe) const
+{
+    return probe && probes.contains(probe);
+}
+
+void FindScan::destroyPort()
+{
+    if (!port)
+        return;
+    QSerialPort *dying = port;
+    port = nullptr;
+    dying->blockSignals(true);
+    dying->disconnect(this);
+    dying->clear(QSerialPort::AllDirections);
+    if (dying->isOpen())
+        dying->close();
+    dying->deleteLater();
+}
+
+void FindScan::destroyProbes()
+{
+    const QList<FindNetProbe *> dying = probes;
+    probes.clear();
+    for (FindNetProbe *probe : dying) {
+        if (!probe)
+            continue;
+        if (probe->readTimer)
+            probe->readTimer->stop();
+        if (probe->connectTimer)
+            probe->connectTimer->stop();
+        if (probe->socket) {
+            probe->socket->blockSignals(true);
+            probe->socket->abort();
+        }
+        probe->deleteLater();
+    }
+}
+
+void FindScan::finish()
+{
+    if (!running_)
+        return;
+    running_ = false;
+    netActive = false;
+    if (timer)
+        timer->stop();
+    destroyPort();
+    destroyProbes();
+    emit settled();
+}
+
+void FindScan::openNext()
+{
+    if (!running_)
+        return;
+    if (cancelled_ || gotHit || stepIndex >= steps.size()) {
+        if (!cancelled_ && !gotHit && request.doNetwork)
+            beginNetwork();
+        else
+            finish();
+        return;
+    }
+    const Step step = steps.at(stepIndex);
+    port = new QSerialPort(this);
+    port->setPortName(step.name);
+    port->setBaudRate(step.baud);
+    port->setDataBits(QSerialPort::Data8);
+    port->setParity(QSerialPort::NoParity);
+    port->setStopBits(QSerialPort::OneStop);
+    port->setFlowControl(QSerialPort::NoFlowControl);
+    const QByteArray where = step.name.toLatin1() + " " + QByteArray::number(step.baud);
+    TrafficLog::instance().recordSession("FIND", QByteArray("probe ") + where + " " + step.kind.toLatin1());
+    rx.clear();
+    framer.clear();
+    if (!port->open(QIODevice::ReadWrite)) {
+        TrafficLog::instance().recordSession("FIND", QByteArray("open failed ") + where);
+        destroyPort();
+        ++stepIndex;
+        QTimer::singleShot(0, this, &FindScan::openNext);
+        return;
+    }
+    raiseDtrAndRts(port);
+    connect(port, &QSerialPort::readyRead, this, &FindScan::onReady);
+    const QByteArray query = Rt21::queryTenths();
+    TrafficLog::instance().recordSession("FIND-TX", query);
+    port->write(query);
+    port->flush();
+    timer->start(std::max(1, request.serialTimeoutMs));
+}
+
+void FindScan::onReady()
+{
+    if (!running_ || !port || gotHit)
+        return;
+    const QByteArray chunk = port->readAll();
+    rx.append(chunk);
+    framer.append(chunk);
+    for (const QByteArray &frame : framer.take()) {
+        if (const auto heading = Rt21::parseHeadingFrame(frame)) {
+            timer->stop();
+            const Step step = steps.at(stepIndex);
+            const QByteArray where = step.name.toLatin1() + " " + QByteArray::number(step.baud);
+            TrafficLog::instance().recordSession("FIND-RX", rx);
+            TrafficLog::instance().recordSession("FIND", QByteArray("hit ") + where);
+            FoundRotor hit;
+            hit.endpoint.transport = RotorEndpoint::Transport::Serial;
+            hit.endpoint.serialPort = step.name;
+            hit.endpoint.baud = step.baud;
+            hit.heading = *heading;
+            const QString shown = step.kind.isEmpty() ? QStringLiteral("serial") : step.kind;
+            hit.label = foundRotorLabel(step.name, shown, step.baud, *heading);
+            pendingHit = hit;
+            gotHit = true;
+            destroyPort();
+            QTimer::singleShot(0, this, &FindScan::afterPortClosed);
+            return;
+        }
+    }
+}
+
+void FindScan::onTimeout()
+{
+    if (!running_ || gotHit)
+        return;
+    if (stepIndex < steps.size()) {
+        const Step step = steps.at(stepIndex);
+        const QByteArray where = step.name.toLatin1() + " " + QByteArray::number(step.baud);
+        TrafficLog::instance().recordSession("FIND-RX", rx);
+        TrafficLog::instance().recordSession("FIND", QByteArray("no reply ") + where);
+    }
+    ++stepIndex;
+    destroyPort();
+    QTimer::singleShot(0, this, &FindScan::afterPortClosed);
+}
+
+void FindScan::afterPortClosed()
+{
+    if (!running_)
+        return;
+    if (gotHit) {
+        const FoundRotor hit = pendingHit;
+        emit hitFound(hit);
+        finish();
+        return;
+    }
+    openNext();
+}
+
+void FindScan::beginNetwork()
+{
+    if (!running_ || cancelled_) {
+        finish();
+        return;
+    }
+    if (request.doSerial)
+        emit note(QStringLiteral("No USB or COM RT-21 found. Scanning local network..."));
+    netTargets.clear();
+    for (const QString &host : request.hosts) {
+        for (int portNumber : request.ports) {
+            if (portNumber > 0 && portNumber <= 65535)
+                netTargets.append({host, portNumber});
+        }
+    }
+    netIndex = 0;
+    netActive = true;
+    netBudget.start();
+    if (netTargets.isEmpty()) {
+        finish();
+        return;
+    }
+    launchNetBatch();
+}
+
+void FindScan::launchNetBatch()
+{
+    if (!running_ || cancelled_ || gotHit) {
+        if (running_)
+            finish();
+        return;
+    }
+    if (netIndex >= netTargets.size() || netBudget.elapsed() >= 14000) {
+        finish();
+        return;
+    }
+    destroyProbes();
+    const int end = std::min(netIndex + 32, int(netTargets.size()));
+    for (int i = netIndex; i < end; ++i) {
+        auto *probe = new FindNetProbe(this);
+        probe->host = netTargets.at(i).first;
+        probe->port = netTargets.at(i).second;
+        probe->socket = new QTcpSocket(probe);
+        probe->readTimer = new QTimer(probe->socket);
+        probe->readTimer->setSingleShot(true);
+        probe->connectTimer = new QTimer(probe->socket);
+        probe->connectTimer->setSingleShot(true);
+        probes.append(probe);
+        connect(probe->socket, &QTcpSocket::connected, this, [this, probe]() {
+            if (!owns(probe) || probe->done)
+                return;
+            probe->opened = true;
+            probe->socket->write(Rt21::queryTenths());
+            probe->socket->flush();
+            probe->readTimer->start(400);
+        });
+        connect(probe->socket, &QTcpSocket::readyRead, this, [this, probe]() {
+            if (!owns(probe) || probe->done)
+                return;
+            const QByteArray chunk = probe->socket->readAll();
+            probe->rx.append(chunk);
+            probe->framer.append(chunk);
+            for (const QByteArray &frame : probe->framer.take()) {
+                if (!probe->wantVersion) {
+                    if (const auto heading = Rt21::parseHeadingFrame(frame)) {
+                        probe->heading = *heading;
+                        probe->wantVersion = true;
+                        probe->socket->write(Rt21::queryVersion());
+                        probe->socket->flush();
+                        probe->readTimer->start(400);
+                        return;
+                    }
+                    continue;
+                }
+                const QString text = Rt21::payloadAfterSoh(frame);
+                if (!text.contains(QStringLiteral("RT-21")))
+                    continue;
+                FoundRotor hit;
+                hit.endpoint.transport = RotorEndpoint::Transport::Tcp;
+                hit.endpoint.host = probe->host;
+                hit.endpoint.tcpPort = probe->port;
+                hit.heading = probe->heading;
+                hit.label = foundRotorLabel(QStringLiteral("%1:%2").arg(probe->host).arg(probe->port), QString(), 0,
+                                            hit.heading)
+                            + QStringLiteral(", ") + text;
+                settleProbe(probe, QByteArray("hit ") + text.toLatin1());
+                deliver(hit);
+                return;
+            }
+        });
+        connect(probe->socket, &QTcpSocket::errorOccurred, this, [this, probe](QAbstractSocket::SocketError) {
+            if (!owns(probe))
+                return;
+            settleProbe(probe, probe->opened ? QByteArray("closed") : QByteArray("connect failed"));
+        });
+        connect(probe->readTimer, &QTimer::timeout, this, [this, probe]() {
+            if (!owns(probe))
+                return;
+            settleProbe(probe, probe->wantVersion ? QByteArray("no version") : QByteArray("no heading"));
+        });
+        connect(probe->connectTimer, &QTimer::timeout, this, [this, probe]() {
+            if (!owns(probe) || !probe->socket)
+                return;
+            if (probe->socket->state() != QAbstractSocket::ConnectedState)
+                settleProbe(probe, QByteArray("connect failed"));
+        });
+        probe->connectTimer->start(std::max(1, request.connectMs));
+        probe->socket->connectToHost(probe->host, quint16(probe->port));
+    }
+    netIndex = end;
+}
+
+void FindScan::settleProbe(FindNetProbe *probe, const QByteArray &result)
+{
+    if (!owns(probe) || probe->done)
+        return;
+    probe->done = true;
+    if (probe->readTimer)
+        probe->readTimer->stop();
+    if (probe->connectTimer)
+        probe->connectTimer->stop();
+    const QByteArray line = probe->host.toLatin1() + ":" + QByteArray::number(probe->port) + " " + result;
+    TrafficLog::instance().recordSession("FIND-NET", line);
+    if (!probe->rx.isEmpty())
+        TrafficLog::instance().recordSession("FIND-NET", probe->rx);
+    if (probe->socket) {
+        probe->socket->blockSignals(true);
+        probe->socket->abort();
+    }
+    // A hit is delivered by the caller. Queueing the next batch here races
+    // that delivery and can finish the scan before hitFound is emitted.
+    if (result.startsWith("hit ") || gotHit || cancelled_ || !running_)
+        return;
+    for (FindNetProbe *other : probes) {
+        if (other && !other->done)
+            return;
+    }
+    QTimer::singleShot(0, this, &FindScan::netBatchDone);
+}
+
+void FindScan::netBatchDone()
+{
+    if (!running_ || gotHit || cancelled_) {
+        if (running_)
+            finish();
+        return;
+    }
+    if (netBudget.elapsed() >= 14000 || netIndex >= netTargets.size()) {
+        finish();
+        return;
+    }
+    launchNetBatch();
+}
+
+void FindScan::deliver(const FoundRotor &hit)
+{
+    if (!running_ || gotHit)
+        return;
+    gotHit = true;
+    pendingHit = hit;
+    if (timer)
+        timer->stop();
+    const FoundRotor copy = hit;
+    destroyProbes();
+    emit hitFound(copy);
+    finish();
+}

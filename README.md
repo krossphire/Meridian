@@ -101,7 +101,7 @@ The Controller tab reads the documented queries (`R11;`, `R01;`, `R41;`, and `RA
 
 The driver, mock, and tests agree with each other. They have not been run against a controller on the bench. In particular:
 
-- Whether the serial-TCP port needs the CR in `AP1xxx.y\r;`, or accepts the command without it.
+- Point-and-shoot on the serial port needs the CR: `AP1%05.1f\r;` moves, and `AP1xxx.y;` does not. Meridian sends those same bytes on TCP.
 - Whether a real unit’s EEPROM read comes back as a bare integer. If it doesn’t, the field stays read-only and the raw text is shown.
 - The `WD1180;` style write (location, digit `1`, decimal value, semicolon). Apply will not send it until you confirm, and it saves a backup first.
 - Rotors set up for more than 360° of travel. Meridian clamps to 359.9°, the same limit Hamlib publishes for the RT-21.

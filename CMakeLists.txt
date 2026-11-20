@@ -116,6 +116,7 @@ target_sources(tst_settings PRIVATE
     src/AboutDialog.cpp
     src/GlobeWidget.cpp)
 meridian_test(tst_setup)
+target_sources(tst_setup PRIVATE src/SetupPanel.cpp)
 target_link_libraries(tst_settings PRIVATE Qt6::Svg)
 set_tests_properties(tst_usb tst_settings tst_setup PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()

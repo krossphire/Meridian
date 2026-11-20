@@ -23,6 +23,11 @@
 
 #include <cmath>
 
+#ifdef Q_OS_UNIX
+#include <pty.h>
+#include <unistd.h>
+#endif
+
 class TestFinder : public QObject
 {
     Q_OBJECT
@@ -40,7 +45,9 @@ private slots:
     void foundBaudStays4800Or9600();
 #ifdef Q_OS_UNIX
     void serialScanStopsAtFirstHit();
+    void findFiftyTimesHitsTheSixthPort();
 #endif
+    void findScanFindsTcp();
     void settingsFileBesideExe();
     void settingsRoundTrip();
     void missingIniHasNoEndpoint();
@@ -137,24 +144,11 @@ void TestFinder::networkScanStopsAtFirstHit()
     MockRt21Server server;
     server.sim()->setHeading(132);
     QVERIFY(server.listenTcp(0));
-    qint64 elapsed = -1;
-    QList<FoundRotor> found;
-    // The dead host would otherwise hold the batch for the full connect timeout.
-    // alpha25d then destroyed those sockets as the worker thread exited.
-    QThread *thread = QThread::create([&]() {
-        QElapsedTimer timer;
-        timer.start();
-        found = Rt21Finder::scanHosts({QStringLiteral("127.0.0.1"), QStringLiteral("192.0.2.1")},
-                                      {int(server.port()), 9}, 3000);
-        elapsed = timer.elapsed();
-    });
-    QEventLoop loop;
-    QObject::connect(thread, &QThread::finished, &loop, &QEventLoop::quit);
-    QTimer::singleShot(8000, &loop, &QEventLoop::quit);
-    thread->start();
-    loop.exec();
-    QVERIFY(thread->isFinished());
-    delete thread;
+    QElapsedTimer timer;
+    timer.start();
+    const QList<FoundRotor> found = Rt21Finder::scanHosts(
+        {QStringLiteral("127.0.0.1"), QStringLiteral("192.0.2.1")}, {int(server.port()), 9}, 3000);
+    const qint64 elapsed = timer.elapsed();
     QCOMPARE(found.size(), 1);
     QCOMPARE(found.at(0).endpoint.host, QStringLiteral("127.0.0.1"));
     QCOMPARE(found.at(0).endpoint.tcpPort, int(server.port()));
@@ -207,22 +201,98 @@ void TestFinder::serialScanStopsAtFirstHit()
     const QString extra = second.listenPty();
     if (primary.isEmpty() || extra.isEmpty())
         QSKIP("pty was not available");
-    QList<FoundRotor> found;
-    QThread *thread = QThread::create([&]() {
-        found = Rt21Finder::scanSerialPorts(1000, {}, {}, {primary, extra});
-    });
-    QEventLoop loop;
-    QObject::connect(thread, &QThread::finished, &loop, &QEventLoop::quit);
-    QTimer::singleShot(8000, &loop, &QEventLoop::quit);
-    thread->start();
-    loop.exec();
-    QVERIFY(thread->isFinished());
-    delete thread;
+    const QList<FoundRotor> found = Rt21Finder::scanSerialPorts(1000, {}, {}, {primary, extra});
     QCOMPARE(found.size(), 1);
     QCOMPARE(found.at(0).endpoint.serialPort, primary);
     QCOMPARE(second.sim()->trace().size(), 0);
 }
+
+void TestFinder::findFiftyTimesHitsTheSixthPort()
+{
+    MockRt21Server server;
+    server.sim()->setHeading(35.1);
+    const QString live = server.listenPty();
+    if (live.isEmpty())
+        QSKIP("pty was not available");
+    struct Silent {
+        int master = -1;
+        QString name;
+    };
+    QList<Silent> quiet;
+    for (int i = 0; i < 5; ++i) {
+        int master = -1;
+        int slave = -1;
+        char name[256] = {};
+        if (openpty(&master, &slave, name, nullptr, nullptr) != 0) {
+            for (const Silent &held : quiet)
+                ::close(held.master);
+            QSKIP("pty was not available");
+        }
+        ::close(slave);
+        quiet.append(Silent{master, QString::fromLocal8Bit(name)});
+    }
+    QList<std::pair<QString, QString>> ports;
+    for (const Silent &held : quiet)
+        ports.append({held.name, QStringLiteral("serial")});
+    ports.append({live, QStringLiteral("USB")});
+    for (int pass = 0; pass < 50; ++pass) {
+        FindScan scan;
+        QEventLoop loop;
+        int hits = 0;
+        FoundRotor hit;
+        QObject::connect(&scan, &FindScan::hitFound, &loop, [&](const FoundRotor &found) {
+            ++hits;
+            hit = found;
+        });
+        QObject::connect(&scan, &FindScan::settled, &loop, &QEventLoop::quit);
+        QTimer::singleShot(20000, &loop, &QEventLoop::quit);
+        FindScan::Request request;
+        request.serial = ports;
+        request.doSerial = true;
+        request.doNetwork = false;
+        request.bauds = {4800};
+        request.serialTimeoutMs = 120;
+        scan.start(request);
+        loop.exec();
+        QCOMPARE(hits, 1);
+        QCOMPARE(hit.endpoint.serialPort, live);
+        QCOMPARE(hit.endpoint.baud, 4800);
+        QVERIFY(std::abs(hit.heading - 35.1) < 0.2);
+        QVERIFY(!scan.running());
+    }
+    for (const Silent &held : quiet)
+        ::close(held.master);
+}
 #endif
+
+void TestFinder::findScanFindsTcp()
+{
+    MockRt21Server server;
+    server.sim()->setHeading(12);
+    QVERIFY(server.listenTcp(0));
+    FindScan scan;
+    QEventLoop loop;
+    int hits = 0;
+    FoundRotor hit;
+    QObject::connect(&scan, &FindScan::hitFound, &loop, [&](const FoundRotor &found) {
+        ++hits;
+        hit = found;
+    });
+    QObject::connect(&scan, &FindScan::settled, &loop, &QEventLoop::quit);
+    QTimer::singleShot(8000, &loop, &QEventLoop::quit);
+    FindScan::Request request;
+    request.doSerial = false;
+    request.doNetwork = true;
+    request.hosts = {QStringLiteral("127.0.0.1")};
+    request.ports = {int(server.port())};
+    request.connectMs = 1000;
+    scan.start(request);
+    loop.exec();
+    QCOMPARE(hits, 1);
+    QCOMPARE(hit.endpoint.host, QStringLiteral("127.0.0.1"));
+    QCOMPARE(hit.endpoint.tcpPort, int(server.port()));
+    QVERIFY(hit.label.contains(QStringLiteral("4.13.2")));
+}
 
 void TestFinder::settingsFileBesideExe()
 {

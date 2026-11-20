@@ -38,9 +38,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMessageBox>
-#include <QPointer>
 #include <QPushButton>
-#include <QThread>
 #include <QFrame>
 #include <QScrollArea>
 #include <QSerialPortInfo>
@@ -800,9 +798,8 @@ void SettingsDialog::presentFound(const FoundRotor &found)
                          && findReplacesSavedEndpoint(draft.rotors.at(rotorIndex), linkUp, found.endpoint);
     if (replace) {
         findSavedHit = true;
-        findCancel.storeRelaxed(1);
-        // The probe's QSerialPort is still winding down on the finder thread.
-        // Opening COM6 from here is the ntdll crash (c0000005 at 0x69a21).
+        // The probe port is already closed before this runs. Connect after
+        // findProbeSettled so the new open does not overlap that close.
         pendingApply = found;
         havePendingApply = true;
         return;
@@ -813,7 +810,7 @@ void SettingsDialog::presentFound(const FoundRotor &found)
 
 void SettingsDialog::applyFound(const FoundRotor &found)
 {
-    if (findThread && findThread->isRunning()) {
+    if (findScan && findScan->running()) {
         pendingApply = found;
         havePendingApply = true;
         return;
@@ -838,13 +835,14 @@ void SettingsDialog::applyFound(const FoundRotor &found)
 
 void SettingsDialog::startFind(bool networkOnly)
 {
-    if (findThread) {
-        findCancel.storeRelaxed(1);
+    if (findScan && findScan->running()) {
+        findStopRequested = true;
+        findScan->cancel();
         if (findNote)
             findNote->setText(QStringLiteral("Cancelling…"));
         return;
     }
-    findCancel.storeRelaxed(0);
+    findStopRequested = false;
     findSavedHit = false;
     havePendingApply = false;
     findButton->setText(QStringLiteral("Cancel"));
@@ -859,8 +857,7 @@ void SettingsDialog::startFind(bool networkOnly)
         refreshUsbHints();
         if (driver) {
             const RotorEndpoint live = driver->linkEndpoint();
-            // Stop whatever is up, including a failed TCP link whose reconnect
-            // timer would open a socket while the probe still owns a COM port.
+            // Stop whatever is up before the probe opens a port of its own.
             if (live.configured() && driver->link() != Rt21Driver::Link::Off) {
                 resumeEndpoint = live;
                 resumeSerial = true;
@@ -885,76 +882,46 @@ void SettingsDialog::startFind(bool networkOnly)
     bool portOk = false;
     const int customPort = customPortEdit ? customPortEdit->text().trimmed().toInt(&portOk) : 0;
     const QString typedHost = customHostEdit ? customHostEdit->text().trimmed() : QString();
-    QPointer<SettingsDialog> self(this);
-    auto *thread = QThread::create([self, networkOnly, portOk, customPort, typedHost]() {
-        auto post = [self](const FoundRotor &hit) {
-            if (!self)
-                return;
-            QMetaObject::invokeMethod(
-                self.data(), [self, hit]() {
-                    if (self)
-                        self->presentFound(hit);
-                },
-                Qt::QueuedConnection);
-        };
-        auto cancelled = [self]() { return !self || self->findCancel.loadRelaxed() != 0; };
-        int serialHits = 0;
-        if (!networkOnly) {
-            Rt21Finder::scanSerialPorts(650, [&](const FoundRotor &hit) {
-                ++serialHits;
-                post(hit);
-            }, cancelled);
-        }
-        if (!self)
-            return;
-        const bool scanNetwork = networkOnly || serialHits == 0;
-        if (scanNetwork && !cancelled()) {
-            if (!networkOnly) {
-                QMetaObject::invokeMethod(
-                    self.data(), [self]() {
-                        if (self && self->findNote && self->findCancel.loadRelaxed() == 0)
-                            self->findNote->setText(
-                                QStringLiteral("No USB or COM RT-21 found. Scanning local network..."));
-                    },
-                    Qt::QueuedConnection);
-            }
-            QStringList hosts = Rt21Finder::localSubnetHosts();
-            if (!typedHost.isEmpty() && !hosts.contains(typedHost))
-                hosts.prepend(typedHost);
-            QList<int> ports = {6555, 6665};
-            if (networkOnly && portOk && customPort > 0 && !ports.contains(customPort))
-                ports.append(customPort);
-            Rt21Finder::scanHosts(hosts, ports, 300, post, cancelled);
-        }
-        if (!self)
-            return;
-        // The probe port is already destroyed on this thread. Do not run an
-        // event loop here: that was the ntdll overlapped-read crash.
-        QMetaObject::invokeMethod(
-            self.data(), [self]() {
-                if (self)
-                    self->finishFind({}, false);
-            },
-            Qt::QueuedConnection);
-    });
-    findThread = thread;
-    connect(thread, &QThread::finished, this, [this, thread]() {
-        if (findThread == thread)
-            findThread = nullptr;
-        emit findProbeSettled();
-        if (havePendingApply) {
-            resumeSerial = false;
-            const FoundRotor hit = pendingApply;
-            havePendingApply = false;
-            applyFound(hit);
-        } else if (resumeSerial && driver) {
-            const RotorEndpoint again = resumeEndpoint;
-            resumeSerial = false;
-            driver->connectEndpoint(again);
-        }
-        thread->deleteLater();
-    });
-    thread->start();
+    if (!findScan) {
+        findScan = new FindScan(this);
+        connect(findScan, &FindScan::hitFound, this, &SettingsDialog::presentFound);
+        connect(findScan, &FindScan::note, this, [this](const QString &text) {
+            if (findNote && !findStopRequested)
+                findNote->setText(text);
+        });
+        connect(findScan, &FindScan::settled, this, &SettingsDialog::onFindSettled);
+    }
+    FindScan::Request request;
+    request.doSerial = !networkOnly;
+    request.doNetwork = true;
+    request.serialTimeoutMs = 650;
+    request.connectMs = 300;
+    if (!networkOnly)
+        request.serial = serialFindCandidates();
+    QStringList hosts = Rt21Finder::localSubnetHosts();
+    if (!typedHost.isEmpty() && !hosts.contains(typedHost))
+        hosts.prepend(typedHost);
+    request.hosts = hosts;
+    request.ports = {6555, 6665};
+    if (networkOnly && portOk && customPort > 0 && !request.ports.contains(customPort))
+        request.ports.append(customPort);
+    findScan->start(request);
+}
+
+void SettingsDialog::onFindSettled()
+{
+    emit findProbeSettled();
+    finishFind({}, false);
+    if (havePendingApply) {
+        resumeSerial = false;
+        const FoundRotor hit = pendingApply;
+        havePendingApply = false;
+        applyFound(hit);
+    } else if (resumeSerial && driver) {
+        const RotorEndpoint again = resumeEndpoint;
+        resumeSerial = false;
+        driver->connectEndpoint(again);
+    }
 }
 
 void SettingsDialog::finishFind(const QList<FoundRotor> &found, bool network)
@@ -966,13 +933,13 @@ void SettingsDialog::finishFind(const QList<FoundRotor> &found, bool network)
     for (const FoundRotor &hit : found)
         presentFound(hit);
     const bool any = findResults && findResults->count() > 0;
-    if (findCancel.loadRelaxed() != 0 && !any)
+    if (findStopRequested && !any)
         findNote->setText(QStringLiteral("Scan cancelled."));
     else if (!any)
         findNote->setText(QStringLiteral("No RT-21 found."));
     else if (!findSavedHit)
         findNote->setText(QStringLiteral("Pick the RT-21 to use."));
-    findCancel.storeRelaxed(0);
+    findStopRequested = false;
 }
 
 void SettingsDialog::storeRotor(int index)

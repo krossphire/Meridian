@@ -6,6 +6,7 @@
 
 #include "SetupPanel.h"
 
+#include "StatusTone.h"
 #include "rotor/Rt21Driver.h"
 #include "rotor/Rt21Finder.h"
 #include "rotor/Rt21Setup.h"
@@ -177,8 +178,10 @@ void SetupPanel::buildNetwork()
         auto *edit = roField(QStringLiteral("net-") + row.first);
         if (row.first == QLatin1String("key"))
             edit->setEchoMode(QLineEdit::Password);
-        if (row.first == QLatin1String("pass"))
+        if (row.first == QLatin1String("pass")) {
+            edit->setEchoMode(QLineEdit::Password);
             edit->setPlaceholderText(QStringLiteral("not set"));
+        }
         if (row.first == QLatin1String("dns"))
             edit->setPlaceholderText(QStringLiteral("Not in the setup utility"));
         if (row.first == QLatin1String("mode"))
@@ -501,6 +504,7 @@ void SetupPanel::remember(const QString &key, const QString &value)
     rawNetwork.insert(key, stored);
     QLineEdit *edit = values.value(key);
     if (edit) {
+        edit->setPlaceholderText(QString());
         if (key == QLatin1String("dhcp"))
             edit->setText(Rt21::addressModeText(value));
         else if (key == QLatin1String("security")) {
@@ -527,7 +531,11 @@ void SetupPanel::remember(const QString &key, const QString &value)
         const QString ip = rawNetwork.value(QStringLiteral("aip"));
         const QString mask = rawNetwork.value(QStringLiteral("anmask"));
         const QString gate = rawNetwork.value(QStringLiteral("agw"));
-        gatewayNote->setText(Rt21::gatewaySubnetNote(ip, mask.isEmpty() ? rawNetwork.value(QStringLiteral("nmask")) : mask, gate));
+        const QString note = Rt21::gatewaySubnetNote(ip, mask.isEmpty() ? rawNetwork.value(QStringLiteral("nmask")) : mask, gate);
+        gatewayNote->setText(note);
+        gatewayNote->setStyleSheet(note.isEmpty()
+                                       ? QString()
+                                       : QStringLiteral("color: %1;").arg(statusToneColor(StatusTone::Busy).name()));
     }
 }
 

@@ -12,12 +12,16 @@
 #pragma once
 
 #include "AppConfig.h"
+#include "Rt21Protocol.h"
 
+#include <QElapsedTimer>
+#include <QObject>
 #include <QString>
 #include <QStringList>
 
 #include <functional>
 #include <optional>
+#include <utility>
 
 struct FoundRotor {
     RotorEndpoint endpoint;
@@ -73,8 +77,8 @@ public:
     static std::optional<FoundRotor> probeTcp(const QString &host, int port, int timeoutMs);
 
 // Present serial ports, including Edgeport COM1–COM8. Ports that will not open are skipped.
-// Stops at the first port that answers. `onFound` may run on a worker thread.
-// `onlyPorts`, when set, is probed in that order instead of the system list.
+// Stops at the first port that answers. Call on the thread that runs the event loop.
+// Production Find uses FindScan instead. `onlyPorts`, when set, is probed in that order.
 static QList<FoundRotor> scanSerialPorts(int timeoutMs = 650,
                                          const std::function<void(const FoundRotor &)> &onFound = {},
                                          const std::function<bool()> &cancelled = {},
@@ -89,4 +93,77 @@ static QList<FoundRotor> scanSerialPorts(int timeoutMs = 650,
     static QList<FoundRotor> scanHosts(const QStringList &hosts, const QList<int> &ports, int connectMs = 300,
                                        const std::function<void(const FoundRotor &)> &onFound = {},
                                        const std::function<bool()> &cancelled = {});
+};
+
+// Port name and the USB/serial kind shown on the result button.
+// QSerialPortInfo is destroyed before this returns.
+QList<std::pair<QString, QString>> serialFindCandidates();
+
+// The whole Find probe runs on the GUI thread. One QSerialPort at a time:
+// open, write BI1;, readyRead or a timeout, close, then the next port and baud.
+// A network sweep uses QTcpSocket on this same thread. Hits are delivered by
+// value. There is no worker thread and no shared container.
+class FindScan : public QObject
+{
+    Q_OBJECT
+public:
+    struct Request {
+        QList<std::pair<QString, QString>> serial;
+        bool doSerial = true;
+        bool doNetwork = false;
+        QStringList hosts;
+        QList<int> ports;
+        int serialTimeoutMs = 650;
+        int connectMs = 300;
+        QList<int> bauds;
+    };
+
+    explicit FindScan(QObject *parent = nullptr);
+    void start(const Request &request);
+    void cancel();
+    bool running() const { return running_; }
+
+signals:
+    void hitFound(const FoundRotor &found);
+    void note(const QString &text);
+    void settled();
+
+private:
+    struct FindNetProbe;
+
+    void openNext();
+    void onReady();
+    void onTimeout();
+    void afterPortClosed();
+    void beginNetwork();
+    void launchNetBatch();
+    void settleProbe(FindNetProbe *probe, const QByteArray &result);
+    void netBatchDone();
+    void deliver(const FoundRotor &hit);
+    void finish();
+    void destroyPort();
+    void destroyProbes();
+    bool owns(FindNetProbe *probe) const;
+
+    Request request;
+    struct Step {
+        QString name;
+        QString kind;
+        int baud = 4800;
+    };
+    QList<Step> steps;
+    int stepIndex = 0;
+    bool running_ = false;
+    bool cancelled_ = false;
+    bool gotHit = false;
+    FoundRotor pendingHit;
+    class QSerialPort *port = nullptr;
+    class QTimer *timer = nullptr;
+    QByteArray rx;
+    Rt21::Framer framer;
+    QList<FindNetProbe *> probes;
+    QList<std::pair<QString, int>> netTargets;
+    int netIndex = 0;
+    bool netActive = false;
+    QElapsedTimer netBudget;
 };

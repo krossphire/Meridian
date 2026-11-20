@@ -74,6 +74,16 @@ void Rt21Simulator::replyLine(const QByteArray &line)
     emit output(line + QByteArray("\r\n"));
 }
 
+void Rt21Simulator::setBenchModuleLines(bool on)
+{
+    benchLines = on;
+}
+
+void Rt21Simulator::setModuleValue(const QByteArray &key, const QByteArray &value)
+{
+    module.insert(key, value);
+}
+
 void Rt21Simulator::setHeading(double azimuth)
 {
     heading_ = clampRt21Azimuth(azimuth);
@@ -163,7 +173,8 @@ void Rt21Simulator::feed(const QByteArray &bytes)
                 sawCr = false;
                 continue;
             }
-            // ';' ends the command. AP1xxx.y; moves; a CR is not required.
+            // CR inside AP1xxx.y\r; is the execute byte. The ';' still
+            // terminates the command. AP1xxx.y; only stores the target.
             sawCr = true;
             continue;
         }
@@ -227,8 +238,8 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
         const double az = QString::fromLatin1(rest.trimmed()).toDouble(&ok);
         if (ok) {
             preset_ = clampRt21Azimuth(az);
-            Q_UNUSED(immediate);
-            startMotion();
+            if (immediate)
+                startMotion();
         }
         return;
     }
@@ -330,6 +341,10 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
         auto stored = [&](const char *id) { return module.value(QByteArray(id)); };
         if (eq >= 0 && !cmd.endsWith('?')) {
             module.insert(key, cmd.mid(eq + 1));
+            if (key == "SERIAL_ECHO" && benchLines) {
+                replyLine(QByteArray("OK"));
+                return;
+            }
             if (key == "SERIAL_ECHO") {
                 const qint64 now = QDateTime::currentMSecsSinceEpoch();
                 const qint64 sinceUart = now - uart2AtMs;
@@ -361,6 +376,21 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
             prefix = "ASSID";
         else if (key == "WIFI_KEY")
             prefix = "KEY";
+        if (benchLines) {
+            const bool bareStar = key == "HWTYPE" || key == "DHCP";
+            const QByteArray line = (bareStar ? QByteArray("*") : QByteArray("AT*")) + prefix + "=" + value;
+            if (key == "IP") {
+                const QList<QByteArray> chunks = {QByteArray("A"), QByteArray("T"), QByteArray("*"),
+                                                  QByteArray("IP="), QByteArray("19"), QByteArray("2.1"),
+                                                  QByteArray("68"), QByteArray(".1"), QByteArray(".10"),
+                                                  QByteArray("6\r"), QByteArray("\n")};
+                for (const QByteArray &chunk : chunks)
+                    emit output(chunk);
+                return;
+            }
+            replyLine(line);
+            return;
+        }
         replyLine(prefix + "=" + value);
         return;
     }
