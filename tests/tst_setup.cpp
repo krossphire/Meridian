@@ -39,6 +39,7 @@ private slots:
     void fragmentedModuleLinesFillEveryField();
     void mockNetworkRead();
     void benchNetworkReadFillsSetupFields();
+    void coldBootWakeThenRead();
     void networkWriteNeedsAReadThenReadsBack();
     void screenSaverIsOnlyInTheDisplayGroup();
     void firmwareGate();
@@ -415,6 +416,100 @@ void TestSetup::benchNetworkReadFillsSetupFields()
     QVERIFY(uartToEcho >= 700 && uartToEcho <= 760);
     QTRY_VERIFY_WITH_TIMEOUT(driver.heading().has_value(), 3000);
     QCOMPARE(driver.link(), Rt21Driver::Link::On);
+    driver.disconnectLink();
+    QVERIFY(!server.sim()->trace().contains(QByteArray("T01")));
+    QVERIFY(!server.sim()->trace().contains(QByteArray("T11")));
+}
+
+void TestSetup::coldBootWakeThenRead()
+{
+    MockRt21Server server;
+    server.sim()->setBenchModuleLines(true);
+    server.sim()->setColdBootTcp(true);
+    server.sim()->setModuleValue("HTTP_PASS", "s3cret-not-shown");
+    server.sim()->setHeading(35.1);
+    const QString pty = server.listenPty();
+    if (pty.isEmpty())
+        QSKIP("pty was not available");
+    Rt21Driver driver;
+    RotorEndpoint endpoint;
+    endpoint.transport = RotorEndpoint::Transport::Serial;
+    endpoint.serialPort = pty;
+    endpoint.baud = 4800;
+    driver.connectEndpoint(endpoint);
+    QTRY_COMPARE_WITH_TIMEOUT(driver.link(), Rt21Driver::Link::On, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(server.sim()->trace().contains(QByteArray("BI1")), 1000);
+    QVERIFY(!server.sim()->trace().contains(QByteArray("T11")));
+
+    SetupPanel panel;
+    panel.setDriver(&driver);
+    qint64 logMark = 0;
+    {
+        QFile prior(TrafficLog::instance().filePath());
+        if (prior.open(QIODevice::ReadOnly))
+            logMark = prior.size();
+    }
+    QSignalSpy done(&driver, &Rt21Driver::networkFinished);
+    driver.readNetwork();
+    QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 40000);
+    QCOMPARE(done.at(0).at(0).toBool(), true);
+
+    QWidget *page = panel.networkPage();
+    QVERIFY(page);
+    auto text = [&](const char *name) {
+        auto *edit = page->findChild<QLineEdit *>(QString::fromLatin1(name));
+        return edit ? edit->text() : QStringLiteral("<missing>");
+    };
+    QCOMPARE(text("net-ip"), QStringLiteral("192.168.1.106"));
+    QCOMPARE(text("net-gw"), QStringLiteral("192.168.2.1"));
+    QCOMPARE(text("net-agw"), QStringLiteral("192.168.2.1"));
+    QCOMPARE(text("net-id"), QStringLiteral("RT-21"));
+    QCOMPARE(text("net-serialPort"), QStringLiteral("6555"));
+    auto *pass = page->findChild<QLineEdit *>(QStringLiteral("net-pass"));
+    QVERIFY(pass);
+    QCOMPARE(pass->echoMode(), QLineEdit::Password);
+    QVERIFY(!pass->text().contains(QStringLiteral("s3cret")));
+
+    const QList<QByteArray> trace = server.sim()->trace();
+    const int t11 = trace.indexOf(QByteArray("T11"));
+    QVERIFY(t11 > 0);
+    int firstAt = -1;
+    int atAfterWake = -1;
+    for (int i = 0; i < trace.size(); ++i) {
+        if (trace.at(i) != QByteArray("AT"))
+            continue;
+        if (firstAt < 0)
+            firstAt = i;
+        if (i > t11)
+            atAfterWake = i;
+    }
+    QVERIFY(firstAt >= 0 && firstAt < t11);
+    QVERIFY(atAfterWake > t11);
+    QVERIFY(trace.at(atAfterWake - 1) != QByteArray("T11"));
+    bool escAfter = false;
+    bool pollAfter = false;
+    for (int i = t11 + 1; i < atAfterWake; ++i) {
+        if (trace.at(i) == QByteArray("ESC"))
+            escAfter = true;
+        if (trace.at(i).startsWith("R2") || trace.at(i).startsWith("R0"))
+            pollAfter = true;
+    }
+    QVERIFY(escAfter);
+    QVERIFY(pollAfter);
+    QCOMPARE(trace.count(QByteArray("T11")), 1);
+
+    QFile logFile(TrafficLog::instance().filePath());
+    QVERIFY(logFile.open(QIODevice::ReadOnly));
+    QVERIFY(logFile.seek(logMark));
+    const QString log = QString::fromUtf8(logFile.readAll());
+    QVERIFY(log.contains(QStringLiteral("network cold-boot wake: T11; -> ESC ESC -> ;")));
+    QVERIFY(log.contains(QStringLiteral("network echo late bytes none")));
+    QVERIFY(!log.contains(QStringLiteral("network next AT; waits")));
+    QVERIFY(log.contains(QStringLiteral("network success variant D")));
+
+    driver.disconnectLink();
+    QTRY_COMPARE_WITH_TIMEOUT(server.sim()->trace().count(QByteArray("T01")), 1, 1000);
+    QCOMPARE(server.sim()->trace().last(), QByteArray("T01"));
 }
 
 void TestSetup::networkWriteNeedsAReadThenReadsBack()

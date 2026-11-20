@@ -79,6 +79,14 @@ void Rt21Simulator::setBenchModuleLines(bool on)
     benchLines = on;
 }
 
+void Rt21Simulator::setColdBootTcp(bool on)
+{
+    tcpMode = on;
+    t11Mute = false;
+    escPair = false;
+    escStreak = 0;
+}
+
 void Rt21Simulator::setModuleValue(const QByteArray &key, const QByteArray &value)
 {
     module.insert(key, value);
@@ -153,11 +161,25 @@ void Rt21Simulator::feed(const QByteArray &bytes)
     for (unsigned char c : bytes) {
         if (c == 0x1b) {
             atMode = false;
+            ++escStreak;
+            if (escStreak >= 2)
+                escPair = true;
             trace_.append(QByteArray("ESC"));
             buffer.clear();
             sawCr = false;
             continue;
         }
+        if (c == ';' && t11Mute && escPair) {
+            t11Mute = false;
+            escPair = false;
+            escStreak = 0;
+            trace_.append(QByteArray(";"));
+            buffer.clear();
+            sawCr = false;
+            continue;
+        }
+        escStreak = 0;
+        escPair = false;
         if (c == '\n') {
             if (buffer.startsWith("AT")) {
                 handle(buffer, false);
@@ -318,7 +340,24 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
     }
     if (cmd.startsWith("C0") || cmd.startsWith("C1"))
         return;
+    if (t11Mute)
+        return;
     if (cmd == "T11" || cmd == "T01" || cmd == "AT") {
+        if (cmd == "T11") {
+            // Leaves TCP mode and mutes the controller until ESC ESC ;.
+            tcpMode = false;
+            t11Mute = true;
+            escPair = false;
+            escStreak = 0;
+            atMode = false;
+            return;
+        }
+        if (cmd == "T01") {
+            tcpMode = true;
+            t11Mute = false;
+            atMode = false;
+            return;
+        }
         if (cmd == "AT") {
             atMode = true;
             uart2AtMs = QDateTime::currentMSecsSinceEpoch();
@@ -327,12 +366,10 @@ void Rt21Simulator::handle(const QByteArray &command, bool immediate)
             reply(QByteArray("<uart2>"), false);
             return;
         }
-        if (cmd == "T01")
-            atMode = false;
-        replyLine(QByteArray("OK"));
-        return;
     }
     if (cmd.startsWith("AT*")) {
+        if (tcpMode)
+            return;
         const int eq = cmd.indexOf('=');
         const QByteArray name = eq < 0 ? cmd.mid(3) : cmd.mid(3, eq - 3);
         QByteArray key = name;

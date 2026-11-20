@@ -197,6 +197,7 @@ private:
     void enqueueConfiguration();
     void enqueueNetworkQueries();
     void beginNetworkCycle();
+    void beginColdBootWake();
     void dropNetworkQueries();
     QString networkTryText() const;
     void sendNetworkExit();
@@ -278,6 +279,15 @@ private:
     bool networkCancel = false;
     bool networkGotField = false;
     bool networkAnotherCycle = false;
+    // True after this read/write has already sent the one T11 wake-up.
+    bool networkWakeSent = false;
+    // Cycle saw <uart2>; and then silence on AT*SERIAL_ECHO=0.
+    bool networkColdBootPending = false;
+    bool networkEchoSawReply = false;
+    // T11 went out on this serial connection. T01; is sent once, on close.
+    bool sentT11InSession = false;
+    int networkWarmupLimitMs = 15000;
+    int networkWarmupCapActive = 15000;
     bool networkReadOkThisSession = false;
     bool networkEntered = false;
     bool networkExitAfterCycle = false;

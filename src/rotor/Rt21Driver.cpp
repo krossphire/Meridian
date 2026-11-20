@@ -74,6 +74,11 @@ constexpr int kWarmupFirstMs = 3000;
 constexpr int kWarmupRetryMs = 5000;
 constexpr int kWarmupGapMs = 400;
 constexpr int kWarmupCapMs = 15000;
+constexpr int kColdWarmupCapMs = 35000;
+// Green Heron 4.B12, both OK captures: T11;, then ESC ESC 215 ms later.
+constexpr int kColdT11ToEscMs = 215;
+// ';' is 1510 ms after that ESC pair. Polls start 1180 ms after ';'.
+constexpr int kColdSemiToPollMs = 1180;
 constexpr int kPassThroughQuietMs = 35000;
 constexpr int kPreAtQuietMs = 650;
 // Utility open: ESC, ESC 0.7 ms apart, then ';' about 1.5 s later.
@@ -797,6 +802,7 @@ void Rt21Driver::closeIo(const QString &reason)
     networkWriting = false;
     networkWritePending = false;
     networkEntered = false;
+    networkColdBootPending = false;
     awaitHeadingAfterNetwork = false;
     pendingConfigAfterNetwork = false;
     networkWriteName.clear();
@@ -866,6 +872,19 @@ void Rt21Driver::closeIo(const QString &reason)
             io = nullptr;
         port->disconnect(this);
         TrafficLog::instance().note(QStringLiteral("close %1 serial error=%2").arg(reason, port->errorString()));
+        if (port->isOpen() && sentT11InSession) {
+            // Cap2 line 289: T01; goes out immediately before CLOSE, and only
+            // after this session actually sent T11;. Map polls do not send it.
+            const QByteArray restore("T01;");
+            TrafficLog::instance().recordSession("SER-TX", restore);
+            TrafficLog::instance().recordSession("NOTE", QByteArray("network restore TCP mode T01;"));
+            port->write(restore);
+            port->flush();
+            preciseSleepMs(15);
+        }
+        sentT11InSession = false;
+        networkWakeSent = false;
+        networkColdBootPending = false;
         if (port->isOpen())
             port->close();
         port->setParent(nullptr);
@@ -1918,6 +1937,61 @@ QString Rt21Driver::networkTryText() const
     return QStringLiteral("Reading network (try %1 of %2)…").arg(networkCycle).arg(kNetworkTries);
 }
 
+void Rt21Driver::beginColdBootWake()
+{
+    // Power-up leaves the controller in T01, where <uart2>; still arrives and
+    // AT* is ignored. The utility's wake-up is once per entry, and it is not
+    // glued onto AT;: T11;, 215 ms, ESC ESC, 1510 ms, ';', 1180 ms, then the
+    // answered polls. A plain connect never comes through here.
+    networkGotField = false;
+    networkWriteOk = false;
+    networkEntered = false;
+    networkWakeSent = true;
+    sentT11InSession = true;
+    networkMode = true;
+    configMode = true;
+    networkPhase = NetworkPhase::LeadIn;
+    serialRoute = false;
+    serialRouteT11 = false;
+    bridgeLatched = true;
+    if (pollTimer)
+        pollTimer->stop();
+    replyTimer->stop();
+    inflight.reset();
+    queue.clear();
+    TrafficLog::instance().recordSession(
+        "NOTE", QByteArray("network cycle ") + QByteArray::number(networkCycle) + " of " + QByteArray::number(kNetworkTries));
+    emit networkStatus(networkTryText());
+    TrafficLog::instance().recordSession("NOTE", QByteArray("network cold-boot wake: T11; -> ESC ESC -> ;"));
+    sendNetworkBytes(QByteArray("T11;"));
+    QTimer::singleShot(kColdT11ToEscMs, this, [this]() {
+        if (retired || networkCancel || networkPhase != NetworkPhase::LeadIn)
+            return;
+        const QByteArray esc(1, '\x1b');
+        sendNetworkBytes(esc);
+        sendNetworkBytes(esc);
+        if ((serial && serial->isOpen()) || winRaw || (io && io->isOpen())) {
+            bridgeLatched = false;
+            serialRouteT11 = false;
+            networkT11Watch = false;
+            networkEntered = false;
+        }
+        TrafficLog::instance().recordSession("NOTE", QByteArray("network lead-in ESC ESC"));
+        QTimer::singleShot(kLeadInMs, this, [this]() {
+            if (retired || networkCancel || networkPhase != NetworkPhase::LeadIn)
+                return;
+            sendNetworkBytes(QByteArray(1, ';'));
+            TrafficLog::instance().recordSession("NOTE", QByteArray("network lead-in ;"));
+            QTimer::singleShot(kColdSemiToPollMs, this, [this]() {
+                if (retired || networkCancel || networkPhase != NetworkPhase::LeadIn)
+                    return;
+                networkWarmupLimitMs = kColdWarmupCapMs;
+                beginNetworkWarmup(kWarmupRetryMs);
+            });
+        });
+    });
+}
+
 void Rt21Driver::beginNetworkCycle()
 {
     networkGotField = false;
@@ -2666,6 +2740,7 @@ void Rt21Driver::sendEcho()
     framer.setLineMode(true);
     networkLateBytes.clear();
     networkEchoSends = 0;
+    networkEchoSawReply = false;
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
     if (networkReopenedMs > 0) {
         TrafficLog::instance().recordSession(
@@ -2747,6 +2822,10 @@ void Rt21Driver::onNetworkTimeout()
             "NOTE", networkLateBytes.isEmpty()
                         ? QByteArray("network echo late bytes none")
                         : QByteArray("network echo late bytes ") + networkLateBytes.toHex(' '));
+        // <uart2>; with no echo bytes is TCP mode after a power cycle.
+        // ERROR 1 means the module already answered, so this is not that case.
+        if (networkUart2Ms > 0 && !networkEchoSawReply && networkLateBytes.isEmpty() && !networkWakeSent)
+            networkColdBootPending = true;
         beginNetworkExit();
         return;
     }
@@ -2816,6 +2895,7 @@ bool Rt21Driver::handleNetworkFrame(const QByteArray &frame)
     const bool errorLine = line.contains(QStringLiteral("ERROR"), Qt::CaseInsensitive);
     const bool okLine = !errorLine && line.contains(QStringLiteral("OK"), Qt::CaseInsensitive);
     if (networkPhase == NetworkPhase::WaitEcho || networkPhase == NetworkPhase::WaitEchoLate) {
+        networkEchoSawReply = true;
         TrafficLog::instance().recordSession(
             "NOTE", QByteArray("network echo rx ") + line.toLatin1() + " " + frame.toHex(' '));
         if (errorLine && networkPhase == NetworkPhase::WaitEcho) {
@@ -2921,13 +3001,18 @@ void Rt21Driver::beginNetworkWarmup(int ms)
     networkMode = true;
     configMode = true;
     networkWarmupMs = ms;
+    if (networkWarmupLimitMs <= 0)
+        networkWarmupLimitMs = kWarmupCapMs;
+    const int cap = networkWarmupLimitMs;
+    networkWarmupLimitMs = kWarmupCapMs;
+    networkWarmupCapActive = cap;
     networkWarmupHardStartMs = QDateTime::currentMSecsSinceEpoch();
     networkWarmupStartMs = networkWarmupHardStartMs;
     networkWarmupStep = 0;
     networkWarmupSawHeading = false;
     networkWarmupSawR01 = false;
     networkWarmupSawR21 = false;
-    QTimer::singleShot(kWarmupCapMs, this, [this]() {
+    QTimer::singleShot(cap, this, [this]() {
         if (networkPhase == NetworkPhase::Warmup)
             onWarmupMiss();
     });
@@ -2950,8 +3035,9 @@ void Rt21Driver::sendWarmupPoll()
         return;
     }
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
-    if (networkWarmupHardStartMs > 0 && now - networkWarmupHardStartMs >= kWarmupCapMs) {
-        TrafficLog::instance().recordSession("NOTE", QByteArray("network warmup capped at 15 s"));
+    if (networkWarmupHardStartMs > 0 && now - networkWarmupHardStartMs >= networkWarmupCapActive) {
+        TrafficLog::instance().recordSession(
+            "NOTE", QByteArray("network warmup capped at ") + QByteArray::number(networkWarmupCapActive / 1000) + " s");
         beginPassThroughQuiet();
         return;
     }
@@ -2994,8 +3080,9 @@ void Rt21Driver::onWarmupMiss()
     if (networkPhase != NetworkPhase::Warmup || retired)
         return;
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
-    if (networkWarmupHardStartMs > 0 && now - networkWarmupHardStartMs >= kWarmupCapMs) {
-        TrafficLog::instance().recordSession("NOTE", QByteArray("network warmup capped at 15 s"));
+    if (networkWarmupHardStartMs > 0 && now - networkWarmupHardStartMs >= networkWarmupCapActive) {
+        TrafficLog::instance().recordSession(
+            "NOTE", QByteArray("network warmup capped at ") + QByteArray::number(networkWarmupCapActive / 1000) + " s");
         beginPassThroughQuiet();
         return;
     }
@@ -3220,6 +3307,8 @@ void Rt21Driver::readNetwork()
     networkCycle = 1;
     networkGotField = false;
     networkEntered = false;
+    networkWakeSent = false;
+    networkColdBootPending = false;
     networkReadOkThisSession = false;
     loadCycleOrigin();
     beginNetworkCycle();
@@ -3311,6 +3400,8 @@ void Rt21Driver::scheduleBrightnessWrite()
         networkGotField = false;
         networkWriteOk = false;
         networkEntered = false;
+        networkWakeSent = false;
+        networkColdBootPending = false;
         loadCycleOrigin();
         beginNetworkCycle();
         return;
@@ -3468,6 +3559,14 @@ void Rt21Driver::afterNetworkHeading(bool headingSeen)
     }
     if (networkAnotherCycle && !networkCancel && io && networkCycle < kNetworkTries) {
         ++networkCycle;
+        if (networkColdBootPending) {
+            // The controller is in TCP mode. Waiting 35 s does not leave it.
+            // Wake once, then the normal answered polls. Do not put T11 next to AT;.
+            networkColdBootPending = false;
+            networkAnotherCycle = false;
+            beginColdBootWake();
+            return;
+        }
         // The ~31 s pass-through drop only starts once <uart2>; has been
         // seen. A try that never entered (no <uart2>;) can go again at once.
         int delay = 0;

@@ -35,6 +35,9 @@ public:
     // Bench replies: *HWTYPE and *DHCP, AT*KEY= for the rest, OK on the first echo,
     // and the current-IP line split into the 1–3 byte reads from the 19 Nov log.
     void setBenchModuleLines(bool on);
+    // Power-up TCP mode: <uart2>; still arrives, AT* is ignored until T11;,
+    // T11; stays mute until ESC ESC ;, and T01; returns to TCP mode.
+    void setColdBootTcp(bool on);
     void setModuleValue(const QByteArray &key, const QByteArray &value);
     // Record the command and send nothing back. Used when R01 must time out.
     void setMute(const QByteArray &prefix);
@@ -68,6 +71,10 @@ private:
     QHash<QChar, int> ee;
     QHash<QByteArray, QByteArray> module;
     bool atMode = false;
+    bool tcpMode = false;
+    bool t11Mute = false;
+    bool escPair = false;
+    int escStreak = 0;
     qint64 uart2AtMs = 0;
     int echoSends = 0;
     qint64 echoErrorAtMs = 0;
