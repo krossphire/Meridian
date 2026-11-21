@@ -178,7 +178,6 @@ void TestFinder::savedIpIsReplacedOnlyWhenDown()
     QVERIFY(!findReplacesSavedEndpoint(blank, false, serial));
 }
 
-#ifdef Q_OS_UNIX
 void TestFinder::foundBaudStays4800Or9600()
 {
     QCOMPARE(baudKeptAfterFind(4800, 4800), 4800);
@@ -191,6 +190,7 @@ void TestFinder::foundBaudStays4800Or9600()
     QCOMPARE(plainLinkFailure(QStringLiteral("Connection timed out")), QStringLiteral("Connection timed out"));
 }
 
+#ifdef Q_OS_UNIX
 void TestFinder::serialScanStopsAtFirstHit()
 {
     MockRt21Server first;
