@@ -33,6 +33,7 @@ class TestSetup : public QObject
     Q_OBJECT
 private slots:
     void commandsMatchTheUtility();
+    void dhcpZeroIsStaticAcrossChunkedReplies();
     void adviceStaysOffTheConnectionFields();
     void secretsStayOutOfTheLog();
     void moduleLinesSplitOnCr();
@@ -59,8 +60,10 @@ void TestSetup::commandsMatchTheUtility()
     QCOMPARE(Rt21::securityName(1), QStringLiteral("Admin"));
     QCOMPARE(Rt21::wifiSecurityName(6), QStringLiteral("WPA2-PSK"));
     QCOMPARE(Rt21::wifiSecurityName(0), QStringLiteral("None"));
-    QVERIFY(Rt21::addressModeText(QStringLiteral("0")).contains(QStringLiteral("DHCP")));
-    QVERIFY(Rt21::addressModeText(QStringLiteral("1")).contains(QStringLiteral("Static")));
+    QCOMPARE(Rt21::addressModeText(QStringLiteral("0")),
+             QStringLiteral("Static — the saved address is the one below"));
+    QCOMPARE(Rt21::addressModeText(QStringLiteral("1")),
+             QStringLiteral("DHCP — the router assigns the address"));
     QVERIFY(!Rt21::setupWritesCompiledIn());
 
     QList<Rt21::PlannedWrite> plan;
@@ -78,6 +81,11 @@ void TestSetup::commandsMatchTheUtility()
     fields.insert(QStringLiteral("agw"), QStringLiteral("192.168.1.1"));
     QVERIFY(Rt21::planGroup(QStringLiteral("network-address"), fields, &plan).isEmpty());
     QCOMPARE(plan.first().command, QByteArray("AT*DHCP=0\r"));
+    QCOMPARE(plan.first().expectValue, QStringLiteral("0"));
+    fields.insert(QStringLiteral("dhcp"), QStringLiteral("1"));
+    QVERIFY(Rt21::planGroup(QStringLiteral("network-address"), fields, &plan).isEmpty());
+    QCOMPARE(plan.first().command, QByteArray("AT*DHCP=1\r"));
+    QCOMPARE(plan.first().expectValue, QStringLiteral("1"));
     QVERIFY(!Rt21::planGroup(QStringLiteral("factory"), fields, &plan).isEmpty());
     QVERIFY(!Rt21::planGroup(QStringLiteral("tftp"), fields, &plan).isEmpty());
 
@@ -104,6 +112,115 @@ void TestSetup::commandsMatchTheUtility()
         }
     }
     QVERIFY(sawUser);
+}
+
+void TestSetup::dhcpZeroIsStaticAcrossChunkedReplies()
+{
+    // COM6, 2026-11-21. Replies arrive a few bytes at a time, often with a
+    // leading LF and a trailing CR or CR LF. DHCP=0 is static; DHCP=1 is DHCP.
+    auto dhcpFrom = [](const QList<QByteArray> &chunks) {
+        Rt21::Framer framer;
+        framer.setLineMode(true);
+        Rt21::ModuleLineBuffer lines;
+        QString fromFramer;
+        QString fromLines;
+        for (const QByteArray &chunk : chunks) {
+            framer.append(chunk);
+            for (const QByteArray &frame : framer.take()) {
+                const auto parsed = Rt21::parseModuleLine(frame);
+                if (parsed && parsed->key.compare(QLatin1String("DHCP"), Qt::CaseInsensitive) == 0)
+                    fromFramer = parsed->value;
+            }
+            for (const Rt21::ModuleAssignment &row : lines.feed(chunk)) {
+                if (row.key.compare(QLatin1String("DHCP"), Qt::CaseInsensitive) == 0)
+                    fromLines = row.value;
+            }
+        }
+        return qMakePair(fromFramer, fromLines);
+    };
+
+    const QList<QByteArray> staticCr = {QByteArray("\n"), QByteArray("AT*"), QByteArray("DH"),
+                                        QByteArray("CP="), QByteArray("0"), QByteArray("\r")};
+    const auto staticParsed = dhcpFrom(staticCr);
+    QCOMPARE(staticParsed.first, staticParsed.second);
+    QCOMPARE(staticParsed.first, QStringLiteral("0"));
+    QCOMPARE(Rt21::addressModeText(staticParsed.first),
+             QStringLiteral("Static — the saved address is the one below"));
+
+    const QList<QByteArray> staticCrLf = {QByteArray("\nAT*DHCP=0\r\n")};
+    const auto staticLine = dhcpFrom(staticCrLf);
+    QCOMPARE(staticLine.first, staticLine.second);
+    QCOMPARE(staticLine.first, QStringLiteral("0"));
+
+    const QList<QByteArray> dhcpChunks = {QByteArray("\n"), QByteArray("A"), QByteArray("T*D"),
+                                          QByteArray("HCP=1\r"), QByteArray("\n")};
+    const auto dhcpParsed = dhcpFrom(dhcpChunks);
+    QCOMPARE(dhcpParsed.first, dhcpParsed.second);
+    QCOMPARE(dhcpParsed.first, QStringLiteral("1"));
+    QCOMPARE(Rt21::addressModeText(dhcpParsed.first),
+             QStringLiteral("DHCP — the router assigns the address"));
+
+    const QByteArray stream =
+        QByteArray("\nAT*HWTYPE=2\r") + "\nAT*DHCP=0\r\n" + "\nAT*IP=192.168.1.106\r" + "\nAT*AIP=192.168.1.106\r\n"
+        + "\nAT*NMASK=255.255.255.0\r" + "\nAT*GW=192.168.1.1\r\n" + "\nAT*AGW=192.168.1.1\r" + "\nAT*ID=RT-21\r\n"
+        + "\nAT*HTTP=801\r" + "\nAT*UDP=23073\r\n" + "\nAT*TFTP=69\r" + "\nAT*HTTP_USER=\r\n" + "\nAT*HTTP_PASS=\r"
+        + "\nAT*NVREG16_0=6665\r\n" + "\nAT*LINK=1\r";
+    auto readStream = [&](const QByteArray &bytes) {
+        QList<QByteArray> chunks;
+        for (int at = 0; at < bytes.size(); at += 3)
+            chunks.append(bytes.mid(at, std::min(3, int(bytes.size() - at))));
+        Rt21::Framer framer;
+        framer.setLineMode(true);
+        QMap<QString, QString> fields;
+        for (const QByteArray &chunk : chunks) {
+            framer.append(chunk);
+            for (const QByteArray &frame : framer.take()) {
+                if (const auto parsed = Rt21::parseModuleLine(frame))
+                    fields.insert(parsed->key, parsed->value);
+            }
+        }
+        return fields;
+    };
+    const QMap<QString, QString> read = readStream(stream);
+    QCOMPARE(read.value(QStringLiteral("HWTYPE")), QStringLiteral("2"));
+    QCOMPARE(read.value(QStringLiteral("DHCP")), QStringLiteral("0"));
+    QCOMPARE(read.value(QStringLiteral("IP")), QStringLiteral("192.168.1.106"));
+    QCOMPARE(read.value(QStringLiteral("AIP")), QStringLiteral("192.168.1.106"));
+    QCOMPARE(read.value(QStringLiteral("NMASK")), QStringLiteral("255.255.255.0"));
+    QCOMPARE(read.value(QStringLiteral("GW")), QStringLiteral("192.168.1.1"));
+    QCOMPARE(read.value(QStringLiteral("AGW")), QStringLiteral("192.168.1.1"));
+    QCOMPARE(read.value(QStringLiteral("ID")), QStringLiteral("RT-21"));
+    QCOMPARE(read.value(QStringLiteral("HTTP")), QStringLiteral("801"));
+    QCOMPARE(read.value(QStringLiteral("UDP")), QStringLiteral("23073"));
+    QCOMPARE(read.value(QStringLiteral("TFTP")), QStringLiteral("69"));
+    QCOMPARE(read.value(QStringLiteral("HTTP_USER")), QString());
+    QCOMPARE(read.value(QStringLiteral("HTTP_PASS")), QString());
+    QCOMPARE(read.value(QStringLiteral("NVREG16_0")), QStringLiteral("6665"));
+    QCOMPARE(read.value(QStringLiteral("LINK")), QStringLiteral("1"));
+    QCOMPARE(Rt21::addressModeText(read.value(QStringLiteral("DHCP"))),
+             QStringLiteral("Static — the saved address is the one below"));
+
+    QByteArray flipped = stream;
+    QVERIFY(flipped.contains("AT*DHCP=0"));
+    flipped.replace("AT*DHCP=0", "AT*DHCP=1");
+    const QMap<QString, QString> dhcpOn = readStream(flipped);
+    QCOMPARE(dhcpOn.value(QStringLiteral("DHCP")), QStringLiteral("1"));
+    QCOMPARE(Rt21::addressModeText(dhcpOn.value(QStringLiteral("DHCP"))),
+             QStringLiteral("DHCP — the router assigns the address"));
+
+    QList<Rt21::PlannedWrite> plan;
+    QMap<QString, QString> writeFields;
+    writeFields.insert(QStringLiteral("dhcp"), read.value(QStringLiteral("DHCP")));
+    writeFields.insert(QStringLiteral("aip"), read.value(QStringLiteral("AIP")));
+    writeFields.insert(QStringLiteral("anmask"), read.value(QStringLiteral("NMASK")));
+    writeFields.insert(QStringLiteral("agw"), read.value(QStringLiteral("AGW")));
+    QVERIFY(Rt21::planGroup(QStringLiteral("network-address"), writeFields, &plan).isEmpty());
+    QCOMPARE(plan.first().command, QByteArray("AT*DHCP=0\r"));
+    QCOMPARE(plan.first().expectValue, QStringLiteral("0"));
+    writeFields.insert(QStringLiteral("dhcp"), dhcpOn.value(QStringLiteral("DHCP")));
+    QVERIFY(Rt21::planGroup(QStringLiteral("network-address"), writeFields, &plan).isEmpty());
+    QCOMPARE(plan.first().command, QByteArray("AT*DHCP=1\r"));
+    QCOMPARE(plan.first().expectValue, QStringLiteral("1"));
 }
 
 void TestSetup::adviceStaysOffTheConnectionFields()
@@ -361,7 +478,8 @@ void TestSetup::benchNetworkReadFillsSetupFields()
         return edit ? edit->text() : QStringLiteral("<missing>");
     };
     QCOMPARE(text("net-id"), QStringLiteral("RT-21"));
-    QVERIFY(text("net-dhcp").contains(QStringLiteral("DHCP")));
+    QCOMPARE(text("net-dhcp"), QStringLiteral("Static — the saved address is the one below"));
+    QCOMPARE(panel.networkValues().value(QStringLiteral("dhcp")), QStringLiteral("0"));
     QCOMPARE(text("net-ip"), QStringLiteral("192.168.1.106"));
     QCOMPARE(text("net-aip"), QStringLiteral("192.168.1.106"));
     QCOMPARE(text("net-nmask"), QStringLiteral("255.255.255.0"));

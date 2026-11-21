@@ -65,6 +65,7 @@ endif()
 
 add_executable(meridian
     src/main.cpp
+    src/AppIcon.cpp
     src/ScreenshotRun.cpp
     src/GlobeWidget.cpp
     src/MainWindow.cpp
@@ -78,6 +79,16 @@ target_link_libraries(meridian PRIVATE meridian-core meridian-mocklib Qt6::Svg)
 if(WIN32)
     # Desktop app: no extra console window on Windows.
     target_link_options(meridian PRIVATE -mwindows)
+    # Explorer and the taskbar read the exe's icon resource. The .ico is a
+    # raster of paintMeridianMark(); the path is absolute so windres does not
+    # look for it in the build directory. Forward slashes: backslash is an
+    # escape in an .rc file.
+    enable_language(RC)
+    file(TO_CMAKE_PATH "${CMAKE_SOURCE_DIR}/resources/meridian.ico" MERIDIAN_ICO)
+    configure_file(resources/meridian.rc.in "${CMAKE_BINARY_DIR}/meridian.rc" @ONLY)
+    set_source_files_properties("${CMAKE_BINARY_DIR}/meridian.rc" PROPERTIES
+        OBJECT_DEPENDS "${CMAKE_SOURCE_DIR}/resources/meridian.ico")
+    target_sources(meridian PRIVATE "${CMAKE_BINARY_DIR}/meridian.rc")
 endif()
 if(APPLE)
     set_target_properties(meridian PROPERTIES
@@ -93,6 +104,9 @@ endif()
 
 add_executable(meridian-mock src/mock/main.cpp)
 target_link_libraries(meridian-mock PRIVATE meridian-mocklib)
+if(WIN32)
+    target_sources(meridian-mock PRIVATE "${CMAKE_BINARY_DIR}/meridian.rc")
+endif()
 
 if(NOT CMAKE_CROSSCOMPILING)
 enable_testing()
