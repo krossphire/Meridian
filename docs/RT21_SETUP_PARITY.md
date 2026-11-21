@@ -160,7 +160,7 @@ There is no DNS command in the manual or in the utility. There is no AP/client m
 | What you see | Read | Reply token | Write | Risk | Status |
 | --- | --- | --- | --- | --- | --- |
 | Module type | `AT*HWTYPE?` | `HWTYPE=` | none | low | Unverified. The utility accepts only `HWTYPE=2`. |
-| DHCP or static | `AT*DHCP?` | `DHCP=` | `AT*DHCP=0` when the DHCP radio is selected. `AT*DHCP=1` when Static IP is selected. The reset button sends `AT*DHCP=1` together with a static address. | high, drops an IP link | Unverified. The polarity is the opposite of the usual "1 means DHCP". |
+| DHCP or static | `AT*DHCP?` | `DHCP=` | `AT*DHCP=0` is static. `AT*DHCP=1` is DHCP. A write sends that same digit. | high, drops an IP link | Confirmed 2026-11-21 on COM6: a static module answered `AT*DHCP=0`. |
 | Current IP | `AT*IP?` | `IP=` | none (it follows DHCP) | low | Unverified |
 | Static IP | `AT*AIP?` | `AIP=` | `AT*AIP=` + address. The reset writes `192.168.2.100`. | high, drops the link | Unverified |
 | Current mask | `AT*NMASK?` | `NMASK=` | none | low | Unverified |
@@ -220,6 +220,6 @@ The setup utility, on the Edgeport COM port at 4800, showed Yaesu G-2800, Admin,
 | Alt offsets off | R, S = 361 | 361 | 361 is the unused sentinel. Meridian shows off. |
 | 3.58 V at A/D 0440 | pot, not an EEPROM letter | pot was 0334 at another moment | not 440/1023×5 V. The utility derives it. |
 
-A later serial open of the module, after one junk attempt, showed name RT-21, static address 192.168.1.106, mask 255.255.255.0, gateway 192.168.2.1, link 0, HTTP 801, UDP 23073, TFTP 69, serial TCP 6555. `AT*DHCP=1` is Static. The current IP shown beside the DHCP control is `AT*IP`, which was also 192.168.1.106. The gateway is on 192.168.2.0, not 192.168.1.0. Meridian says so and does not offer reset-to-defaults. The web password is reported only as set or not set.
+A later serial open of the module, after one junk attempt, showed name RT-21, static address 192.168.1.106, mask 255.255.255.0, gateway 192.168.2.1, link 0, HTTP 801, UDP 23073, TFTP 69, serial TCP 6555. `AT*DHCP=0` is static. The current IP shown beside the DHCP control is `AT*IP`, which was also 192.168.1.106. The gateway is on 192.168.2.0, not 192.168.1.0. Meridian says so and does not offer reset-to-defaults. The web password is reported only as set or not set.
 
 `docs/RT21_PROTOCOL.md` is the motion-protocol note. This file is the setup map.
