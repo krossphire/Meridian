@@ -7,6 +7,7 @@
 #include "core/Gridsquare.h"
 #include "rotor/AppConfig.h"
 #include "sources/CredentialStore.h"
+#include "sources/N1mmXml.h"
 #include "sources/QrzXml.h"
 #include "sources/WsjtSource.h"
 #include "sources/WsjtStatus.h"
@@ -25,6 +26,7 @@ private slots:
     void qrzXmlUsesLatLonNotBearing();
     void passwordStaysOutOfIni();
     void wsjtStatusFixture();
+    void n1mmFixtures();
 };
 
 void TestSources::qrzXmlUsesLatLonNotBearing()
@@ -120,6 +122,32 @@ void TestSources::wsjtStatusFixture()
     heart.setByteOrder(QDataStream::BigEndian);
     heart << quint32(0xadbccbda) << quint32(3) << quint32(0);
     QVERIFY(!parseWsjtStatus(heartbeat).isStatus);
+}
+
+void TestSources::n1mmFixtures()
+{
+    QCOMPARE(AppConfig::defaults().n1mmPort, 0);
+    const QByteArray lookup = R"(<?xml version="1.0" encoding="utf-8"?>
+<lookupinfo>
+<app>N1MM</app>
+<call>C91RU</call>
+<gridsquare>KG54</gridsquare>
+</lookupinfo>)";
+    const N1mmPacket found = parseN1mmPacket(lookup);
+    QCOMPARE(int(found.kind), int(N1mmPacket::Kind::Lookup));
+    QCOMPARE(found.call, QStringLiteral("C91RU"));
+    QCOMPARE(found.grid, QStringLiteral("KG54"));
+
+    const QByteArray contact = R"(<contactinfo><call>C91RU</call><gridsquare>KG54</gridsquare></contactinfo>)";
+    const N1mmPacket logged = parseN1mmPacket(contact);
+    QCOMPARE(int(logged.kind), int(N1mmPacket::Kind::Contact));
+    QCOMPARE(logged.call, QStringLiteral("C91RU"));
+
+    const N1mmPacket radio = parseN1mmPacket(QByteArray("<RadioInfo><Freq>1400000</Freq></RadioInfo>"));
+    QCOMPARE(int(radio.kind), int(N1mmPacket::Kind::None));
+
+    const N1mmPacket grid4 = parseN1mmPacket(QByteArray("<lookupinfo><call>K1ABC</call><grid4>FN42</grid4></lookupinfo>"));
+    QCOMPARE(grid4.grid, QStringLiteral("FN42"));
 }
 
 QTEST_MAIN(TestSources)

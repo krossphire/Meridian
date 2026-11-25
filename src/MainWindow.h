@@ -18,6 +18,7 @@ class Rt21Driver;
 class SettingsDialog;
 class QrzClient;
 class WsjtSource;
+class N1mmSource;
 class QSettings;
 class QTimer;
 
@@ -51,6 +52,7 @@ private:
                       bool havePoint = false, bool allowLookup = true);
     void refreshQrz();
     void refreshWsjt();
+    void refreshN1mm();
 
     AppConfig config;
     QSettings *settings = nullptr;
@@ -65,5 +67,6 @@ private:
     QTimer *statusTimer = nullptr;
     QrzClient *qrz = nullptr;
     WsjtSource *wsjt = nullptr;
+    N1mmSource *n1mm = nullptr;
     QString pendingCall;
 };
