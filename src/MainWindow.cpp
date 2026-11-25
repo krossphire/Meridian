@@ -11,6 +11,7 @@
 #include "GlobeWidget.h"
 #include "SettingsDialog.h"
 #include "core/Coordinates.h"
+#include "map/Dxcc.h"
 #include "core/Gridsquare.h"
 #include "rotor/Reconnect.h"
 #include "rotor/Rt21Driver.h"
@@ -112,6 +113,10 @@ void MainWindow::loadMaps()
     QFile zipsFile(QStringLiteral(":/data/zcta.bin"));
     mapsOk = read(QStringLiteral(":/data/map110.bin"), low) && read(QStringLiteral(":/data/map50.bin"), high)
              && zipsFile.open(QIODevice::ReadOnly) && zips.load(zipsFile.readAll());
+    QFile dxccFile(QStringLiteral(":/data/dxcc.bin"));
+    QFile dxccNames(QStringLiteral(":/data/dxcc-names.tsv"));
+    if (dxccFile.open(QIODevice::ReadOnly) && dxccNames.open(QIODevice::ReadOnly))
+        loadDxcc(dxccFile.readAll(), dxccNames.readAll());
     if (mapsOk)
         globe->setLayers(&low, &high);
 }

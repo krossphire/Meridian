@@ -131,6 +131,14 @@ void TestFinder::serialProbe()
     QCOMPARE(found->endpoint.baud, 4800);
     QVERIFY(std::abs(found->heading - 132.0) < 0.2);
     QVERIFY(found->label.contains(QStringLiteral("(USB, 4800)")));
+    QVERIFY(found->label.contains(QStringLiteral("RT-21 4.13.2")));
+    QCOMPARE(found->firmware, QStringLiteral("RT-21 4.13.2"));
+    QVERIFY(rt21Firmware(QByteArray("1\x01RT-21 4.13.2")).contains(QStringLiteral("RT-21")));
+    QVERIFY(rt21Firmware(QByteArray("DCU-1")).isEmpty());
+    QCOMPARE(closeNote(QStringLiteral("peer closed"), QStringLiteral("Unknown error")),
+             QStringLiteral("close peer closed"));
+    QCOMPARE(closeNote(QStringLiteral("peer closed"), QStringLiteral("Connection refused")),
+             QStringLiteral("close peer closed error=Connection refused"));
 }
 #endif
 

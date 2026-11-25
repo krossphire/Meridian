@@ -12,6 +12,7 @@
 #include "core/Projection.h"
 #include "core/Solar.h"
 #include "map/DayNight.h"
+#include "map/Dxcc.h"
 
 #include <QAbstractButton>
 #include <QComboBox>
@@ -1034,7 +1035,7 @@ void GlobeWidget::paintScene(QPainter &painter)
                     break;
                 }
             }
-            if (country) {
+            if (country && hoverPrefix.isEmpty()) {
                 painter.save();
                 QPainterPath diskPath;
                 diskPath.addEllipse(globe);
@@ -1047,26 +1048,65 @@ void GlobeWidget::paintScene(QPainter &painter)
                 painter.setBrush(kHover);
                 painter.drawPath(country->path);
                 painter.restore();
+            }
+        }
+    }
 
-                if (!hoverName.isEmpty()) {
-                    QFont font(QStringLiteral("Inter"));
-                    font.setPixelSize(qRound(std::clamp(radius * 0.045, 11.0, 16.0)));
-                    painter.setFont(font);
-                    const QFontMetrics metrics(font);
-                    const int textWidth = metrics.horizontalAdvance(hoverName);
-                    QRectF chip(hoverPos.x() + 14, hoverPos.y() - metrics.height() - 10, textWidth + 16,
-                                metrics.height() + 8);
-                    if (chip.right() > width() - 8)
-                        chip.moveLeft(hoverPos.x() - chip.width() - 14);
-                    if (chip.top() < 8)
-                        chip.moveTop(hoverPos.y() + 16);
-                    painter.setPen(Qt::NoPen);
-                    painter.setBrush(QColor(8, 12, 14, 185));
-                    painter.drawRoundedRect(chip, 7, 7);
-                    painter.setPen(kInk);
-                    painter.drawText(chip, Qt::AlignCenter, hoverName);
+    if (lod >= 1 && !dxccEntities().isEmpty()) {
+        painter.save();
+        painter.setClipPath(discClip);
+        QTransform transform;
+        transform.translate(center.x(), center.y());
+        transform.scale(radius, -radius);
+        painter.setTransform(transform);
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(kBorder, 0));
+        for (const DxccEntity &entity : dxccEntities()) {
+            QPainterPath path;
+            path.setFillRule(Qt::OddEvenFill);
+            for (const GeoRing &ring : entity.rings) {
+                bool started = false;
+                for (const GeoPt &pt : ring.pts) {
+                    const UnitPoint at = projectAzimuthal(homeLat_, homeLon_, pt.lat, pt.lon);
+                    if (at.rho > 1.0) {
+                        started = false;
+                        continue;
+                    }
+                    if (!started)
+                        path.moveTo(at.x, at.y);
+                    else
+                        path.lineTo(at.x, at.y);
+                    started = true;
                 }
             }
+            painter.drawPath(path);
+        }
+        painter.restore();
+    }
+
+    if (!hoverName.isEmpty()) {
+        QFont font(QStringLiteral("Inter"));
+        font.setPixelSize(qRound(std::clamp(radius * 0.04, 11.0, 15.0)));
+        painter.setFont(font);
+        const QFontMetrics metrics(font);
+        const QString line2 = hoverPrefix.isEmpty() ? QString() : QStringLiteral("(%1)").arg(hoverPrefix);
+        const int textWidth = std::max(metrics.horizontalAdvance(hoverName),
+                                        line2.isEmpty() ? 0 : metrics.horizontalAdvance(line2));
+        const int lines = line2.isEmpty() ? 1 : 2;
+        QRectF chip(hoverPos.x() + 14, hoverPos.y() - metrics.height() * lines - 12, textWidth + 16,
+                    metrics.height() * lines + 10);
+        if (chip.right() > width() - 8)
+            chip.moveLeft(hoverPos.x() - chip.width() - 14);
+        if (chip.top() < 8)
+            chip.moveTop(hoverPos.y() + 16);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(8, 12, 14, 185));
+        painter.drawRoundedRect(chip, 7, 7);
+        painter.setPen(kInk);
+        painter.drawText(chip.adjusted(0, 4, 0, 0), Qt::AlignHCenter | Qt::AlignTop, hoverName);
+        if (!line2.isEmpty()) {
+            painter.setPen(QColor(186, 196, 190));
+            painter.drawText(chip.adjusted(0, 0, 0, -4), Qt::AlignHCenter | Qt::AlignBottom, line2);
         }
     }
 
@@ -1227,9 +1267,10 @@ void GlobeWidget::hoverAt(QPointF pos)
 {
     hoverPos = pos;
     if (detailLevel() < 1 || !high) {
-        if (hoverIndex != -1) {
+        if (hoverIndex != -1 || !hoverName.isEmpty()) {
             hoverIndex = -1;
             hoverName.clear();
+            hoverPrefix.clear();
             update();
         }
         return;
@@ -1241,12 +1282,28 @@ void GlobeWidget::hoverAt(QPointF pos)
     double lat = 0;
     double lon = 0;
     int found = -1;
-    if (unprojectAzimuthal(homeLat_, homeLon_, x, y, lat, lon))
-        found = countryAt(*high, lat, lon);
-    if (found == hoverIndex)
+    QString name;
+    QString prefix;
+    if (unprojectAzimuthal(homeLat_, homeLon_, x, y, lat, lon)) {
+        const DxccLabel split = dxccAt(lat, lon);
+        if (!split.name.isEmpty()) {
+            name = split.name;
+            prefix = split.prefix;
+        } else {
+            found = countryAt(*high, lat, lon);
+            if (found >= 0) {
+                const QString raw = high->countries.at(found).name;
+                const DxccLabel labeled = dxccForCountry(raw);
+                name = labeled.name.isEmpty() ? shortCountryName(raw) : labeled.name;
+                prefix = labeled.prefix;
+            }
+        }
+    }
+    if (found == hoverIndex && name == hoverName && prefix == hoverPrefix)
         return;
     hoverIndex = found;
-    hoverName = found >= 0 ? shortCountryName(high->countries.at(found).name) : QString();
+    hoverName = name;
+    hoverPrefix = prefix;
     update();
 }
 
@@ -1283,6 +1340,7 @@ void GlobeWidget::leaveEvent(QEvent *event)
 {
     hoverIndex = -1;
     hoverName.clear();
+    hoverPrefix.clear();
     if (callHover) {
         callHover = false;
         placeCallsign();
