@@ -31,6 +31,7 @@ private slots:
     void subsolarProjectsInside();
     void rimSegmentsStayShort();
     void beamButtonTurns();
+    void manualCallRevealsBeam();
 };
 
 void TestGlobe::clickEastAndEdit()
@@ -60,7 +61,7 @@ void TestGlobe::clickEastAndEdit()
 
     QSignalSpy edited(&globe, &GlobeWidget::headingEdited);
     globe.openHeadingEditor();
-    auto *edit = globe.findChild<QLineEdit *>();
+    auto *edit = globe.findChild<QLineEdit *>(QStringLiteral("headingEdit"));
     QVERIFY(edit);
     edit->setText(QStringLiteral("12.34"));
     QTest::keyClick(edit, Qt::Key_Return);
@@ -259,6 +260,35 @@ void TestGlobe::beamButtonTurns()
     globe.setBeamOffer(QStringLiteral("C91RU"), 92.4);
     globe.setLoggerBeamEnabled(false);
     QVERIFY(!button->isVisible());
+}
+
+void TestGlobe::manualCallRevealsBeam()
+{
+    GlobeWidget globe;
+    globe.resize(900, 900);
+    globe.setHome(36.5, -95.0);
+    globe.show();
+    QObject::connect(&globe, &GlobeWidget::callsignSubmitted, &globe,
+                     [&](const QString &call, const QString &grid) {
+                         double lat = 0;
+                         double lon = 0;
+                         double bearing = 0;
+                         if (Gridsquare::toLatLon(grid, lat, lon)
+                             && Gridsquare::bearingTo(globe.homeLat(), globe.homeLon(), lat, lon, bearing))
+                             globe.setBeamOffer(call, bearing);
+                         else
+                             globe.clearBeamOffer();
+                     });
+    QTest::keyClick(&globe, Qt::Key_C);
+    auto *edit = globe.findChild<QLineEdit *>(QStringLiteral("callsignEdit"));
+    QVERIFY(edit);
+    QVERIFY(edit->isVisible());
+    QCOMPARE(edit->text(), QStringLiteral("C"));
+    edit->setText(QStringLiteral("C91RU KG54"));
+    QTest::keyClick(edit, Qt::Key_Return);
+    QVERIFY(!edit->isVisible());
+    auto *button = globe.findChild<QAbstractButton *>(QStringLiteral("beamButton"));
+    QVERIFY(button && button->isVisible());
 }
 
 QTEST_MAIN(TestGlobe)

@@ -11,6 +11,7 @@
 #include "GlobeWidget.h"
 #include "SettingsDialog.h"
 #include "core/Coordinates.h"
+#include "core/Gridsquare.h"
 #include "rotor/Reconnect.h"
 #include "rotor/Rt21Driver.h"
 #include "rotor/TrafficLog.h"
@@ -50,6 +51,21 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
             link->stopMotion();
     });
     connect(globe, &GlobeWidget::settingsRequested, this, &MainWindow::openSettings);
+    connect(globe, &GlobeWidget::callsignSubmitted, this, [this](const QString &call, const QString &grid) {
+        if (call.isEmpty()) {
+            globe->clearBeamOffer();
+            return;
+        }
+        double lat = 0;
+        double lon = 0;
+        double bearing = 0;
+        if (grid.isEmpty() || !Gridsquare::toLatLon(grid, lat, lon)
+            || !Gridsquare::bearingTo(globe->homeLat(), globe->homeLon(), lat, lon, bearing)) {
+            globe->clearBeamOffer();
+            return;
+        }
+        globe->setBeamOffer(call, bearing);
+    });
     connect(globe, &GlobeWidget::rotorSelected, this, [this](int index) {
         if (index < 0 || index >= config.rotors.size() || index == config.active)
             return;
