@@ -30,7 +30,8 @@ public:
     static void setRoot(const QString &directory);
 
     static AppConfig load();
-    static void save(const AppConfig &config);
+    // False when meridian.ini could not be written. Callers show that; this stays quiet.
+    static bool save(const AppConfig &config);
 
     // True when `directory` accepts a new file.
     static bool directoryWritable(const QString &directory);
