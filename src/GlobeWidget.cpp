@@ -47,6 +47,13 @@ const QColor kHover(62, 96, 98);
 const QColor kCoast(214, 222, 214, 225);
 const QColor kBorder(168, 186, 178, 150);
 const QColor kBeam(255, 191, 0);
+const QColor kOnHeadingInk(10, 28, 20);
+constexpr double kBeamHoldDegrees = 2.0;
+
+double shortGap(double from, double to)
+{
+    return std::abs(std::remainder(from - to, 360.0));
+}
 const QColor kInk(244, 246, 244);
 
 struct Published {
@@ -138,7 +145,7 @@ protected:
         if (lit && moving)
             painter.setPen(QColor(28, 22, 8));
         else if (lit)
-            painter.setPen(QColor(10, 28, 20));
+            painter.setPen(kOnHeadingInk);
         else
             painter.setPen(QColor(142, 160, 153));
         painter.drawText(rect(), Qt::AlignCenter, label);
@@ -166,10 +173,21 @@ public:
     {
         callsign = call.trimmed().toUpper();
         degrees = azimuth;
+        beaming = false;
+        publish();
         updateGeometry();
         update();
     }
 
+    void setBeaming(bool on)
+    {
+        beaming = on;
+        publish();
+        updateGeometry();
+        update();
+    }
+
+    bool isBeaming() const { return beaming; }
     double azimuth() const { return degrees; }
 
     QSize sizeHint() const override
@@ -189,11 +207,11 @@ protected:
         painter.setRenderHint(QPainter::Antialiasing, true);
         painter.setRenderHint(QPainter::TextAntialiasing, true);
         painter.setPen(Qt::NoPen);
-        painter.setBrush(underMouse() ? QColor(255, 204, 48) : QColor(255, 191, 0));
+        painter.setBrush(beaming ? onHeadingGreen() : (underMouse() ? QColor(255, 204, 48) : kBeam));
         painter.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 8, 8);
-        painter.setPen(QColor(28, 22, 8));
+        painter.setPen(beaming ? kOnHeadingInk : QColor(28, 22, 8));
         painter.setFont(labelFont());
-        painter.drawText(rect().adjusted(8, 2, -8, -2), Qt::AlignCenter, labelLines().join(QLatin1Char('\n')));
+        painter.drawText(rect().adjusted(8, 2, -8, -2), Qt::AlignCenter, text());
     }
 
 private:
@@ -208,13 +226,23 @@ private:
     QStringList labelLines() const
     {
         const QString call = callsign.isEmpty() ? QStringLiteral("—") : callsign;
+        if (beaming)
+            return {QStringLiteral("Beaming toward:"), call};
         const QString heading = QString::number(degrees, 'f', 1);
         return {QStringLiteral("Beam toward:"),
                 QStringLiteral("%1 at %2°?").arg(call, heading)};
     }
 
+    void publish()
+    {
+        const QString line = labelLines().join(QLatin1Char('\n'));
+        setText(line);
+        setProperty("fill", beaming ? onHeadingGreen() : kBeam);
+    }
+
     QString callsign;
     double degrees = 0;
+    bool beaming = false;
 };
 
 class CallButton : public QAbstractButton
@@ -501,7 +529,15 @@ GlobeWidget::GlobeWidget(QWidget *parent)
     auto *beamButton = new BeamButton(this);
     beam = beamButton;
     connect(beamButton, &QAbstractButton::clicked, this, [this, beamButton]() {
+        // Green is a status. A second click does not send another goto.
+        if (beamButton->isBeaming())
+            return;
+        beamClick = true;
         emit bearingRequested(clampRt21Azimuth(beamButton->azimuth()));
+        const bool started = beamClick && target && shortGap(*target, beamAzimuth) <= 0.2;
+        beamClick = false;
+        if (started)
+            beginBeaming();
     });
     auto *callMark = new CallButton(this);
     callButton = callMark;
@@ -520,7 +556,10 @@ GlobeWidget::GlobeWidget(QWidget *parent)
         auto *pill = new CompassPill(label, this);
         pill->setObjectName(QStringLiteral("compass") + label);
         const double azimuth = i * 45.0;
-        connect(pill, &QAbstractButton::clicked, this, [this, azimuth]() { emit bearingRequested(azimuth); });
+        connect(pill, &QAbstractButton::clicked, this, [this, azimuth]() {
+            abandonBeam();
+            emit bearingRequested(azimuth);
+        });
         compassPills[i] = pill;
     }
     dot = new StatusDot(this);
@@ -639,6 +678,13 @@ void GlobeWidget::setHome(double lat, double lon)
 void GlobeWidget::setHeading(std::optional<double> azimuth)
 {
     heading = azimuth;
+    if (auto *button = static_cast<BeamButton *>(beam); button && button->isBeaming() && heading) {
+        const double gap = shortGap(*heading, beamAzimuth);
+        if (beamGap >= 0 && gap > beamGap + kBeamHoldDegrees)
+            clearBeamOffer();
+        else
+            beamGap = gap;
+    }
     placeCompass();
     update();
 }
@@ -646,6 +692,11 @@ void GlobeWidget::setHeading(std::optional<double> azimuth)
 void GlobeWidget::setTarget(std::optional<double> azimuth)
 {
     target = azimuth;
+    if (beamClick)
+        return;
+    if (auto *button = static_cast<BeamButton *>(beam); button && button->isBeaming() && target
+        && shortGap(*target, beamAzimuth) > 0.2)
+        clearBeamOffer();
     update();
 }
 
@@ -700,6 +751,7 @@ void GlobeWidget::setLoggerBeamEnabled(bool on)
 
 void GlobeWidget::setBeamOffer(const QString &call, double azimuth)
 {
+    beamGap = -1;
     beamCall = call.trimmed().toUpper();
     beamAzimuth = azimuth;
     if (auto *button = static_cast<BeamButton *>(beam))
@@ -711,6 +763,26 @@ void GlobeWidget::setBeamOffer(const QString &call, double azimuth)
 void GlobeWidget::clearBeamOffer()
 {
     setBeamOffer(QString(), 0);
+}
+
+void GlobeWidget::beginBeaming()
+{
+    auto *button = static_cast<BeamButton *>(beam);
+    if (!button)
+        return;
+    button->setBeaming(true);
+    // No baseline yet. The next heading sample sets it, so the start of the
+    // move is not mistaken for a turn away from the beam.
+    beamGap = heading ? shortGap(*heading, beamAzimuth) : -1;
+    placeBeam();
+}
+
+void GlobeWidget::abandonBeam()
+{
+    auto *button = static_cast<BeamButton *>(beam);
+    if (!button || !button->isBeaming())
+        return;
+    clearBeamOffer();
 }
 
 void GlobeWidget::placeBeam()
@@ -1264,8 +1336,10 @@ void GlobeWidget::mousePressEvent(QMouseEvent *event)
         return;
     }
     const QRectF globe = disk();
-    if (const auto hit = bearingFromClick(event->position(), globe.center(), globe.width() / 2.0))
+    if (const auto hit = bearingFromClick(event->position(), globe.center(), globe.width() / 2.0)) {
+        abandonBeam();
         emit bearingRequested(clampRt21Azimuth(hit->azimuth));
+    }
 }
 
 void GlobeWidget::mouseMoveEvent(QMouseEvent *event)
@@ -1359,6 +1433,7 @@ void GlobeWidget::commitHeading()
     const double value = text.toDouble(&ok);
     if (!ok)
         return;
+    abandonBeam();
     emit headingEdited(clampRt21Azimuth(value));
     update();
 }
