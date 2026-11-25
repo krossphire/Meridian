@@ -460,6 +460,8 @@ bool SettingsDialog::commitDraft(bool interactive)
         draft.trafficLog = trafficBox->isChecked();
     if (sunBox)
         draft.showSun = sunBox->isChecked();
+    if (compassBox)
+        draft.compassButtons = compassBox->isChecked();
     if (idleSpin)
         draft.idlePollSeconds = idleSpin->value();
     emit configSaved(draft);
@@ -475,6 +477,8 @@ void SettingsDialog::setConfig(const AppConfig &config)
         trafficBox->setChecked(draft.trafficLog);
     if (sunBox)
         sunBox->setChecked(draft.showSun);
+    if (compassBox)
+        compassBox->setChecked(draft.compassButtons);
     if (idleSpin)
         idleSpin->setValue(draft.idlePollSeconds);
     if (networkConnectionBox) {
@@ -552,7 +556,11 @@ void SettingsDialog::buildStation()
     idleRow->addWidget(idleLabel);
     idleRow->addWidget(idleSpin);
     idleRow->addStretch();
+    compassBox = new QCheckBox(QStringLiteral("Compass"));
+    compassBox->setChecked(draft.compassButtons);
+    compassBox->setObjectName(QStringLiteral("compassButtons"));
     layout->addSpacing(8);
+    layout->addWidget(compassBox);
     layout->addWidget(sunBox);
     layout->addLayout(idleRow);
     layout->addStretch();

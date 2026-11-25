@@ -5,6 +5,7 @@
  */
 
 #include "core/Bearing.h"
+#include "core/Compass.h"
 #include "core/Coordinates.h"
 #include "core/Gridsquare.h"
 #include "core/Projection.h"
@@ -31,6 +32,7 @@ private slots:
     void coordinates();
     void zipCentroids();
     void bearingDirections();
+    void compassWrap();
     void azimuthClamp();
     void projectionRoundTrip();
     void countryHit();
@@ -154,6 +156,24 @@ void TestCore::bearingDirections()
     QVERIFY(west && std::abs(west->azimuth - 270.0) < 0.01);
     QVERIFY(!bearingFromClick(QPointF(100, 100), center, 80));
     QVERIFY(!bearingFromClick(QPointF(200, 100), center, 80));
+}
+
+void TestCore::compassWrap()
+{
+    QCOMPARE(nearestCompassIndex(0.0), 0);
+    QCOMPARE(QString::fromLatin1(compassLabel(0)), QStringLiteral("N"));
+    QCOMPARE(nearestCompassIndex(359.0), 0);
+    QCOMPARE(nearestCompassIndex(10.0), 0);
+    QCOMPARE(nearestCompassIndex(22.4), 0);
+    QCOMPARE(nearestCompassIndex(22.5), 1);
+    QCOMPARE(QString::fromLatin1(compassLabel(1)), QStringLiteral("NE"));
+    QCOMPARE(nearestCompassIndex(45.0), 1);
+    QCOMPARE(nearestCompassIndex(180.0), 4);
+    QCOMPARE(QString::fromLatin1(compassLabel(4)), QStringLiteral("S"));
+    QCOMPARE(nearestCompassIndex(337.4), 7);
+    QCOMPARE(QString::fromLatin1(compassLabel(7)), QStringLiteral("NW"));
+    QCOMPARE(nearestCompassIndex(337.5), 0);
+    QCOMPARE(nearestCompassIndex(-10.0), 0);
 }
 
 void TestCore::azimuthClamp()

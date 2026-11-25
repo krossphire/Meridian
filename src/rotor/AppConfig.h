@@ -29,6 +29,7 @@ struct AppConfig {
     int active = 0;
     bool trafficLog = true;
     bool showSun = true;
+    bool compassButtons = true;
     int idlePollSeconds = 30;
     // Serial RT-21s with no network board stay No. meridian.ini is the only store.
     bool networkConnection = false;
