@@ -35,6 +35,7 @@ struct AppConfig {
     int wsjtPort = 0;
     QString wsjtMulticast;
     int n1mmPort = 0;
+    bool dxKeeper = false;
     int idlePollSeconds = 30;
     // Serial RT-21s with no network board stay No. meridian.ini is the only store.
     bool networkConnection = false;

@@ -18,6 +18,7 @@
 #include "rotor/UserFiles.h"
 #include "sources/CredentialStore.h"
 #include "sources/QrzClient.h"
+#include "sources/DxKeeperSource.h"
 #include "sources/N1mmSource.h"
 #include "sources/WsjtSource.h"
 
@@ -61,6 +62,7 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
     refreshQrz();
     refreshWsjt();
     refreshN1mm();
+    refreshDxKeeper();
     connect(globe, &GlobeWidget::rotorSelected, this, [this](int index) {
         if (index < 0 || index >= config.rotors.size() || index == config.active)
             return;
@@ -145,6 +147,7 @@ void MainWindow::applyConfig(const AppConfig &saved)
     refreshQrz();
     refreshWsjt();
     refreshN1mm();
+    refreshDxKeeper();
     syncDrivers();
 }
 
@@ -162,6 +165,18 @@ void MainWindow::refreshN1mm()
         });
     }
     n1mm->listen(config.n1mmPort);
+}
+
+void MainWindow::refreshDxKeeper()
+{
+    if (!dxKeeper) {
+        dxKeeper = new DxKeeperSource(this);
+        connect(dxKeeper, &DxKeeperSource::station, this, [this](const QString &call, const QString &grid) {
+            offerStation(call, grid);
+        });
+        connect(dxKeeper, &DxKeeperSource::cleared, this, [this]() { offerStation(QString(), QString()); });
+    }
+    dxKeeper->setEnabled(config.dxKeeper);
 }
 
 void MainWindow::refreshWsjt()

@@ -42,6 +42,7 @@ add_library(meridian-core STATIC
     src/sources/WsjtSource.cpp
     src/sources/N1mmXml.cpp
     src/sources/N1mmSource.cpp
+    src/sources/DxKeeperSource.cpp
 )
 target_include_directories(meridian-core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 # One version string: the CMake project version. Window title, QApplication,

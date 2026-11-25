@@ -7,6 +7,7 @@
 #include "core/Gridsquare.h"
 #include "rotor/AppConfig.h"
 #include "sources/CredentialStore.h"
+#include "sources/DxKeeperSource.h"
 #include "sources/N1mmXml.h"
 #include "sources/QrzXml.h"
 #include "sources/WsjtSource.h"
@@ -27,6 +28,7 @@ private slots:
     void passwordStaysOutOfIni();
     void wsjtStatusFixture();
     void n1mmFixtures();
+    void dxKeeperItems();
 };
 
 void TestSources::qrzXmlUsesLatLonNotBearing()
@@ -148,6 +150,22 @@ void TestSources::n1mmFixtures()
 
     const N1mmPacket grid4 = parseN1mmPacket(QByteArray("<lookupinfo><call>K1ABC</call><grid4>FN42</grid4></lookupinfo>"));
     QCOMPARE(grid4.grid, QStringLiteral("FN42"));
+}
+
+void TestSources::dxKeeperItems()
+{
+    QVERIFY(!AppConfig::defaults().dxKeeper);
+    const DxKeeperReading first = interpretDxKeeper(QString(), QString(), QStringLiteral("c91ru"), QStringLiteral("kg54"));
+    QCOMPARE(int(first.action), int(DxKeeperAction::Offer));
+    QCOMPARE(first.call, QStringLiteral("C91RU"));
+    QCOMPARE(first.grid, QStringLiteral("KG54"));
+    const DxKeeperReading same = interpretDxKeeper(first.call, first.grid, QStringLiteral("C91RU"), QStringLiteral("KG54"));
+    QCOMPARE(int(same.action), int(DxKeeperAction::None));
+    const DxKeeperReading noGrid = interpretDxKeeper(QString(), QString(), QStringLiteral("ZL1ABC"), QString());
+    QCOMPARE(int(noGrid.action), int(DxKeeperAction::Offer));
+    QVERIFY(noGrid.grid.isEmpty());
+    const DxKeeperReading gone = interpretDxKeeper(QStringLiteral("ZL1ABC"), QString(), QString(), QString());
+    QCOMPARE(int(gone.action), int(DxKeeperAction::Clear));
 }
 
 QTEST_MAIN(TestSources)

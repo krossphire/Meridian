@@ -480,6 +480,8 @@ bool SettingsDialog::commitDraft(bool interactive)
         const int port = n1mmPortEdit->text().trimmed().toInt(&ok);
         draft.n1mmPort = ok && port > 0 && port <= 65535 ? port : 0;
     }
+    if (dxKeeperBox)
+        draft.dxKeeper = dxKeeperBox->isChecked();
     if (qrzPassEdit && !qrzPassEdit->text().isEmpty()) {
         if (!CredentialStore::store(draft.qrzUsername, qrzPassEdit->text()))
             setStatus(QStringLiteral("Couldn't save the QRZ password. It was not written to meridian.ini."));
@@ -515,6 +517,8 @@ void SettingsDialog::setConfig(const AppConfig &config)
         wsjtGroupEdit->setText(draft.wsjtMulticast);
     if (n1mmPortEdit)
         n1mmPortEdit->setText(draft.n1mmPort > 0 ? QString::number(draft.n1mmPort) : QString());
+    if (dxKeeperBox)
+        dxKeeperBox->setChecked(draft.dxKeeper);
     if (qrzPassEdit) {
         qrzPassEdit->clear();
         qrzPassStored = !draft.qrzUsername.isEmpty() && !CredentialStore::load(draft.qrzUsername).isEmpty();
@@ -697,6 +701,24 @@ void SettingsDialog::buildSources()
     layout->addSpacing(18);
     layout->addWidget(n1mm);
     layout->addWidget(n1mmPortEdit);
+    auto *keeper = new QLabel(QStringLiteral(
+        "DXKeeper is the log, so Meridian watches DXKeeper rather than DXView. "
+        "DXLabTest links topic DXKeeper|DDEServer, items LookupCallsign and CallbookGrid. "
+        "That source does not link a latitude or longitude for DXKeeper. "
+        "If CallbookGrid is empty, QRZ is used. "
+        "This has not been tried against a running DXKeeper. Windows only."));
+    keeper->setWordWrap(true);
+    keeper->setObjectName(QStringLiteral("hint"));
+    dxKeeperBox = new QCheckBox(QStringLiteral("Watch DXKeeper"));
+    dxKeeperBox->setObjectName(QStringLiteral("dxKeeper"));
+    dxKeeperBox->setChecked(draft.dxKeeper);
+#if !defined(Q_OS_WIN)
+    dxKeeperBox->setEnabled(false);
+    dxKeeperBox->setChecked(false);
+#endif
+    layout->addSpacing(18);
+    layout->addWidget(keeper);
+    layout->addWidget(dxKeeperBox);
     layout->addStretch();
     tabs->addTab(page, QStringLiteral("Sources"));
 }
