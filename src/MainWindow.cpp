@@ -68,6 +68,7 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
     globe->setRotors(names, config.active);
     globe->setShowSun(config.showSun);
     globe->setCompassVisible(config.compassButtons);
+    globe->setLoggerBeamEnabled(config.loggerBeamButton);
     connectActive();
 
     statusTimer = new QTimer(this);
@@ -129,6 +130,7 @@ void MainWindow::applyConfig(const AppConfig &saved)
     globe->setRotors(names, config.active);
     globe->setShowSun(config.showSun);
     globe->setCompassVisible(config.compassButtons);
+    globe->setLoggerBeamEnabled(config.loggerBeamButton);
     syncDrivers();
 }
 

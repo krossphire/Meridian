@@ -33,6 +33,7 @@ private slots:
     void zipCentroids();
     void bearingDirections();
     void compassWrap();
+    void gridBearing();
     void azimuthClamp();
     void projectionRoundTrip();
     void countryHit();
@@ -174,6 +175,17 @@ void TestCore::compassWrap()
     QCOMPARE(QString::fromLatin1(compassLabel(7)), QStringLiteral("NW"));
     QCOMPARE(nearestCompassIndex(337.5), 0);
     QCOMPARE(nearestCompassIndex(-10.0), 0);
+}
+
+void TestCore::gridBearing()
+{
+    double bearing = -1;
+    QVERIFY(Gridsquare::bearingTo(QStringLiteral("EM26"), QStringLiteral("KG54"), bearing));
+    QCOMPARE(QString::number(bearing, 'f', 1), QStringLiteral("92.4"));
+    QVERIFY(!Gridsquare::bearingTo(QStringLiteral("EM26"), QStringLiteral("nope"), bearing));
+    double same = -1;
+    QVERIFY(Gridsquare::bearingTo(36.5, -95.0, 36.5, -95.0, same));
+    QCOMPARE(same, 0.0);
 }
 
 void TestCore::azimuthClamp()

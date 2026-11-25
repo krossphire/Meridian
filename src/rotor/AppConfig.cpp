@@ -27,6 +27,7 @@ AppConfig AppConfig::defaults()
     config.trafficLog = true;
     config.showSun = true;
     config.compassButtons = true;
+    config.loggerBeamButton = true;
     config.idlePollSeconds = 30;
     config.networkConnection = false;
     return config;
@@ -38,6 +39,7 @@ AppConfig AppConfig::load(QSettings &settings)
     const bool traffic = settings.value(QStringLiteral("log/traffic"), true).toBool();
     const bool sun = settings.value(QStringLiteral("view/sun"), true).toBool();
     const bool compass = settings.value(QStringLiteral("ui/compassButtons"), true).toBool();
+    const bool beam = settings.value(QStringLiteral("ui/loggerBeamButton"), true).toBool();
     const int idle = std::clamp(settings.value(QStringLiteral("link/idlePoll"), 30).toInt(), 30, 60);
     const bool network = settings.value(QStringLiteral("link/networkConnection"), false).toBool();
     config.homeText = settings.value(QStringLiteral("home/text"), QStringLiteral("EM26")).toString();
@@ -68,6 +70,7 @@ AppConfig AppConfig::load(QSettings &settings)
         config.trafficLog = traffic;
         config.showSun = sun;
         config.compassButtons = compass;
+        config.loggerBeamButton = beam;
         config.idlePollSeconds = idle;
         config.networkConnection = network;
         return config;
@@ -75,6 +78,7 @@ AppConfig AppConfig::load(QSettings &settings)
     config.trafficLog = traffic;
     config.showSun = sun;
     config.compassButtons = compass;
+    config.loggerBeamButton = beam;
     config.idlePollSeconds = idle;
     config.networkConnection = network;
     config.active = settings.value(QStringLiteral("rotors/active"), 0).toInt();
@@ -108,6 +112,7 @@ void AppConfig::save(QSettings &settings) const
     settings.setValue(QStringLiteral("log/traffic"), trafficLog);
     settings.setValue(QStringLiteral("view/sun"), showSun);
     settings.setValue(QStringLiteral("ui/compassButtons"), compassButtons);
+    settings.setValue(QStringLiteral("ui/loggerBeamButton"), loggerBeamButton);
     settings.setValue(QStringLiteral("link/idlePoll"), idlePollSeconds);
     settings.setValue(QStringLiteral("link/networkConnection"), networkConnection);
 }

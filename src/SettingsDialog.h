@@ -104,6 +104,7 @@ private:
     class QCheckBox *trafficBox = nullptr;
     class QCheckBox *sunBox = nullptr;
     class QCheckBox *compassBox = nullptr;
+    class QCheckBox *beamBox = nullptr;
     class QSpinBox *idleSpin = nullptr;
     QListWidget *rotorList = nullptr;
     QLineEdit *nameEdit = nullptr;

@@ -462,6 +462,8 @@ bool SettingsDialog::commitDraft(bool interactive)
         draft.showSun = sunBox->isChecked();
     if (compassBox)
         draft.compassButtons = compassBox->isChecked();
+    if (beamBox)
+        draft.loggerBeamButton = beamBox->isChecked();
     if (idleSpin)
         draft.idlePollSeconds = idleSpin->value();
     emit configSaved(draft);
@@ -479,6 +481,8 @@ void SettingsDialog::setConfig(const AppConfig &config)
         sunBox->setChecked(draft.showSun);
     if (compassBox)
         compassBox->setChecked(draft.compassButtons);
+    if (beamBox)
+        beamBox->setChecked(draft.loggerBeamButton);
     if (idleSpin)
         idleSpin->setValue(draft.idlePollSeconds);
     if (networkConnectionBox) {
@@ -559,8 +563,12 @@ void SettingsDialog::buildStation()
     compassBox = new QCheckBox(QStringLiteral("Compass"));
     compassBox->setChecked(draft.compassButtons);
     compassBox->setObjectName(QStringLiteral("compassButtons"));
+    beamBox = new QCheckBox(QStringLiteral("Logger beam button"));
+    beamBox->setChecked(draft.loggerBeamButton);
+    beamBox->setObjectName(QStringLiteral("loggerBeamButton"));
     layout->addSpacing(8);
     layout->addWidget(compassBox);
+    layout->addWidget(beamBox);
     layout->addWidget(sunBox);
     layout->addLayout(idleRow);
     layout->addStretch();

@@ -21,6 +21,7 @@
 #include <memory>
 #include <optional>
 
+class QAbstractButton;
 class QLineEdit;
 class QComboBox;
 class QPainter;
@@ -47,6 +48,9 @@ public:
     void setShowSun(bool show);
     void setCompassVisible(bool on);
     bool compassVisible() const { return compassOn; }
+    void setLoggerBeamEnabled(bool on);
+    void setBeamOffer(const QString &call, double azimuth);
+    void clearBeamOffer();
     void setSolarPreview(const QDateTime &utc);
     void setRotors(const QStringList &names, int active);
 
@@ -90,6 +94,7 @@ private:
     void hoverAt(QPointF pos);
     void paintCompass(QPainter &painter);
     int compassInset() const;
+    void placeBeam();
     void commitHeading();
     void cancelHeading();
 
@@ -123,6 +128,10 @@ private:
     QTimer *sunTimer = nullptr;
     bool showSun = true;
     bool compassOn = true;
+    bool loggerBeam = true;
+    QString beamCall;
+    double beamAzimuth = 0;
+    QAbstractButton *beam = nullptr;
     bool headingStale = false;
     bool sunDirty = true;
     QString statusLine;
