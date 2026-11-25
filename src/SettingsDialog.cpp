@@ -726,8 +726,9 @@ void SettingsDialog::buildSources()
     dxKeeperBox->setObjectName(QStringLiteral("dxKeeper"));
     dxKeeperBox->setChecked(draft.dxKeeper);
 #if !defined(Q_OS_WIN)
+    // DDE is Windows-only, so the switch cannot be turned on here. A saved
+    // choice still shows, and Save writes that choice back out.
     dxKeeperBox->setEnabled(false);
-    dxKeeperBox->setChecked(false);
 #endif
     layout->addSpacing(18);
     layout->addWidget(keeper);
