@@ -41,6 +41,8 @@ AppConfig AppConfig::load(QSettings &settings)
     const bool compass = settings.value(QStringLiteral("ui/compassButtons"), true).toBool();
     const bool beam = settings.value(QStringLiteral("ui/loggerBeamButton"), true).toBool();
     const QString qrzUser = settings.value(QStringLiteral("qrz/username")).toString();
+    const int wsjt = settings.value(QStringLiteral("sources/wsjtPort"), 0).toInt();
+    const QString wsjtGroup = settings.value(QStringLiteral("sources/wsjtMulticast")).toString();
     const int idle = std::clamp(settings.value(QStringLiteral("link/idlePoll"), 30).toInt(), 30, 60);
     const bool network = settings.value(QStringLiteral("link/networkConnection"), false).toBool();
     config.homeText = settings.value(QStringLiteral("home/text"), QStringLiteral("EM26")).toString();
@@ -73,6 +75,8 @@ AppConfig AppConfig::load(QSettings &settings)
         config.compassButtons = compass;
         config.loggerBeamButton = beam;
         config.qrzUsername = qrzUser;
+        config.wsjtPort = wsjt > 0 && wsjt <= 65535 ? wsjt : 0;
+        config.wsjtMulticast = wsjtGroup.trimmed();
         config.idlePollSeconds = idle;
         config.networkConnection = network;
         return config;
@@ -82,6 +86,8 @@ AppConfig AppConfig::load(QSettings &settings)
     config.compassButtons = compass;
     config.loggerBeamButton = beam;
     config.qrzUsername = qrzUser;
+    config.wsjtPort = wsjt > 0 && wsjt <= 65535 ? wsjt : 0;
+    config.wsjtMulticast = wsjtGroup.trimmed();
     config.idlePollSeconds = idle;
     config.networkConnection = network;
     config.active = settings.value(QStringLiteral("rotors/active"), 0).toInt();
@@ -117,6 +123,8 @@ void AppConfig::save(QSettings &settings) const
     settings.setValue(QStringLiteral("ui/compassButtons"), compassButtons);
     settings.setValue(QStringLiteral("ui/loggerBeamButton"), loggerBeamButton);
     settings.setValue(QStringLiteral("qrz/username"), qrzUsername.trimmed());
+    settings.setValue(QStringLiteral("sources/wsjtPort"), wsjtPort > 0 ? wsjtPort : 0);
+    settings.setValue(QStringLiteral("sources/wsjtMulticast"), wsjtMulticast.trimmed());
     settings.setValue(QStringLiteral("link/idlePoll"), idlePollSeconds);
     settings.setValue(QStringLiteral("link/networkConnection"), networkConnection);
 }

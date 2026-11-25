@@ -17,6 +17,7 @@ class GlobeWidget;
 class Rt21Driver;
 class SettingsDialog;
 class QrzClient;
+class WsjtSource;
 class QSettings;
 class QTimer;
 
@@ -49,6 +50,7 @@ private:
     void offerStation(const QString &call, const QString &grid, double latitude = 0, double longitude = 0,
                       bool havePoint = false, bool allowLookup = true);
     void refreshQrz();
+    void refreshWsjt();
 
     AppConfig config;
     QSettings *settings = nullptr;
@@ -62,5 +64,6 @@ private:
     SettingsDialog *settingsUi = nullptr;
     QTimer *statusTimer = nullptr;
     QrzClient *qrz = nullptr;
+    WsjtSource *wsjt = nullptr;
     QString pendingCall;
 };
