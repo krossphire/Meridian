@@ -158,7 +158,7 @@ target_sources(tst_settings PRIVATE
 meridian_test(tst_setup)
 target_sources(tst_setup PRIVATE src/SetupPanel.cpp)
 target_link_libraries(tst_settings PRIVATE Qt6::Svg)
-set_tests_properties(tst_usb tst_settings tst_setup PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+set_tests_properties(tst_usb tst_settings tst_setup tst_sources PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
 
 install(TARGETS meridian meridian-mock
