@@ -140,6 +140,14 @@ bool UserFiles::save(const AppConfig &config)
     written.close();
     if (body.isEmpty())
         return false;
+    // Keep the previous ini as meridian.ini.bak. Copy it; do not rename it
+    // out of the way. On Windows a rename cannot replace the file that is
+    // already there, and that used to drop the new settings.
+    if (QFileInfo::exists(dest)) {
+        const QString bak = dest + QStringLiteral(".bak");
+        QFile::remove(bak);
+        QFile::copy(dest, bak);
+    }
     QSaveFile headed(dest);
     if (!headed.open(QIODevice::WriteOnly))
         return false;
