@@ -51,6 +51,7 @@ public:
     void setLoggerBeamEnabled(bool on);
     void setBeamOffer(const QString &call, double azimuth);
     void clearBeamOffer();
+    void revealCallsign(const QString &seed = QString());
     void setSolarPreview(const QDateTime &utc);
     void setRotors(const QStringList &names, int active);
 
@@ -68,6 +69,7 @@ signals:
     void stopRequested();
     void settingsRequested();
     void rotorSelected(int index);
+    void callsignSubmitted(const QString &call, const QString &grid);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -95,6 +97,8 @@ private:
     void paintCompass(QPainter &painter);
     int compassInset() const;
     void placeBeam();
+    void placeCallsign();
+    void submitCallsign();
     void commitHeading();
     void cancelHeading();
 
@@ -132,6 +136,9 @@ private:
     QString beamCall;
     double beamAzimuth = 0;
     QAbstractButton *beam = nullptr;
+    QAbstractButton *callButton = nullptr;
+    QLineEdit *callEdit = nullptr;
+    bool callHover = false;
     bool headingStale = false;
     bool sunDirty = true;
     QString statusLine;

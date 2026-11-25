@@ -8,6 +8,7 @@
 
 #include "core/Bearing.h"
 #include "core/Compass.h"
+#include "core/Gridsquare.h"
 #include "core/Projection.h"
 #include "core/Solar.h"
 #include "map/DayNight.h"
@@ -19,6 +20,7 @@
 #include <QFontMetrics>
 #include <QKeyEvent>
 #include <QLineEdit>
+#include <QRegularExpression>
 #include <QMouseEvent>
 #include <QDateTime>
 #include <QPainter>
@@ -162,6 +164,34 @@ private:
 
     QString callsign;
     double degrees = 0;
+};
+
+class CallButton : public QAbstractButton
+{
+public:
+    explicit CallButton(QWidget *parent)
+        : QAbstractButton(parent)
+    {
+        setObjectName(QStringLiteral("callsignButton"));
+        setCursor(Qt::PointingHandCursor);
+        setFocusPolicy(Qt::NoFocus);
+        setToolTip(QStringLiteral("Callsign"));
+        setFixedSize(22, 22);
+    }
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(underMouse() ? QColor(255, 255, 255, 36) : QColor(255, 255, 255, 18));
+        painter.drawRoundedRect(rect().adjusted(1, 1, -1, -1), 7, 7);
+        painter.setPen(QPen(QColor(186, 196, 190, underMouse() ? 230 : 150), 1.3, Qt::SolidLine, Qt::RoundCap));
+        painter.drawLine(QPointF(6, 11), QPointF(16, 11));
+        painter.drawLine(QPointF(6, 11), QPointF(6, 7));
+        painter.drawLine(QPointF(16, 11), QPointF(16, 15));
+    }
 };
 
 class StatusDot : public QWidget
@@ -422,6 +452,18 @@ GlobeWidget::GlobeWidget(QWidget *parent)
     connect(beamButton, &QAbstractButton::clicked, this, [this, beamButton]() {
         emit bearingRequested(clampRt21Azimuth(beamButton->azimuth()));
     });
+    auto *callMark = new CallButton(this);
+    callButton = callMark;
+    connect(callMark, &QAbstractButton::clicked, this, [this]() { revealCallsign(); });
+    callEdit = new QLineEdit(this);
+    callEdit->setObjectName(QStringLiteral("callsignEdit"));
+    callEdit->setPlaceholderText(QStringLiteral("Call"));
+    callEdit->setMaxLength(20);
+    callEdit->hide();
+    callEdit->setStyleSheet(QStringLiteral(
+        "QLineEdit#callsignEdit { background: rgba(18,23,28,230); color: #f4f6f4;"
+        " border: 1px solid rgba(255,191,0,120); border-radius: 8px; padding: 1px 8px; font-size: 12px; }"));
+    connect(callEdit, &QLineEdit::returnPressed, this, [this]() { submitCallsign(); });
     dot = new StatusDot(this);
     rotors = new QComboBox(this);
     rotors->setObjectName(QStringLiteral("rotorPick"));
@@ -646,6 +688,83 @@ void GlobeWidget::placeBeam()
     button->raise();
 }
 
+void GlobeWidget::revealCallsign(const QString &seed)
+{
+    if (!callEdit)
+        return;
+    if (!seed.isEmpty())
+        callEdit->setText(seed);
+    callEdit->show();
+    placeCallsign();
+    callEdit->setFocus(Qt::OtherFocusReason);
+    if (seed.isEmpty())
+        callEdit->selectAll();
+    else
+        callEdit->setCursorPosition(callEdit->text().size());
+}
+
+void GlobeWidget::placeCallsign()
+{
+    if (!callButton)
+        return;
+    const bool room = std::min(width(), height()) >= 280;
+    const bool editing = callEdit && callEdit->isVisible();
+    const bool near = callHover;
+    callButton->setVisible(room && (editing || near));
+    if (!room) {
+        if (callEdit)
+            callEdit->hide();
+        return;
+    }
+    const QRectF globe = disk();
+    const QPointF center = globe.center();
+    const double radius = globe.width() / 2.0;
+    int x = 10;
+    int y = 10;
+    auto overlaps = [&](int left, int top, int w, int h) {
+        const double px = std::clamp(center.x(), double(left), double(left + w));
+        const double py = std::clamp(center.y(), double(top), double(top + h));
+        return std::hypot(px - center.x(), py - center.y()) < radius + 1.0;
+    };
+    for (int guard = 0; overlaps(x, y, 22, 22) && guard < 16; ++guard)
+        y -= 2;
+    if (overlaps(x, y, 22, 22))
+        callButton->hide();
+    else
+        callButton->setGeometry(x, y, 22, 22);
+    if (!callEdit || !callEdit->isVisible())
+        return;
+    const int editW = 148;
+    int editX = callButton->x() + 26;
+    int editY = callButton->y();
+    if (overlaps(editX, editY, editW, 24))
+        editY = std::max(6, callButton->y() - 2);
+    callEdit->setGeometry(editX, editY, editW, 24);
+    callEdit->raise();
+}
+
+void GlobeWidget::submitCallsign()
+{
+    if (!callEdit)
+        return;
+    const QString text = callEdit->text().trimmed().toUpper();
+    callEdit->hide();
+    callEdit->clear();
+    if (text.isEmpty()) {
+        emit callsignSubmitted(QString(), QString());
+        return;
+    }
+    const QStringList parts = text.split(QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
+    QString call = parts.value(0);
+    call.remove(QRegularExpression(QStringLiteral("[^A-Z0-9/]")));
+    QString grid;
+    if (parts.size() >= 2)
+        grid = Gridsquare::normalize(parts.at(1));
+    if (call.isEmpty())
+        return;
+    emit callsignSubmitted(call, grid);
+}
+
 void GlobeWidget::setSolarPreview(const QDateTime &utc)
 {
     solarPreview = utc;
@@ -835,6 +954,7 @@ void GlobeWidget::placeChrome()
         editor->setGeometry(headingBounds().toAlignedRect().adjusted(-8, -2, 8, 2));
     }
     placeBeam();
+    placeCallsign();
 }
 
 void GlobeWidget::ensureSun()
@@ -1095,6 +1215,11 @@ void GlobeWidget::mousePressEvent(QMouseEvent *event)
 
 void GlobeWidget::mouseMoveEvent(QMouseEvent *event)
 {
+    const bool near = event->position().x() < 90 && event->position().y() < 48;
+    if (near != callHover) {
+        callHover = near;
+        placeCallsign();
+    }
     hoverAt(event->position());
 }
 
@@ -1127,9 +1252,23 @@ void GlobeWidget::hoverAt(QPointF pos)
 
 void GlobeWidget::keyPressEvent(QKeyEvent *event)
 {
+    if (callEdit && callEdit->isVisible() && event->key() == Qt::Key_Escape) {
+        callEdit->hide();
+        callEdit->clear();
+        return;
+    }
     if (!editor->isVisible() && (event->key() == Qt::Key_Escape || event->key() == Qt::Key_Space)) {
         emit stopRequested();
         return;
+    }
+    const bool plain = event->modifiers() == Qt::NoModifier || event->modifiers() == Qt::ShiftModifier;
+    const QString typed = event->text();
+    if (plain && !editor->isVisible() && !(callEdit && callEdit->hasFocus()) && typed.size() == 1) {
+        const QChar ch = typed.at(0).toUpper();
+        if (ch.isLetterOrNumber() || ch == QLatin1Char('/')) {
+            revealCallsign(QString(ch));
+            return;
+        }
     }
     QWidget::keyPressEvent(event);
 }
@@ -1144,6 +1283,10 @@ void GlobeWidget::leaveEvent(QEvent *event)
 {
     hoverIndex = -1;
     hoverName.clear();
+    if (callHover) {
+        callHover = false;
+        placeCallsign();
+    }
     placeChrome();
     update();
     QWidget::leaveEvent(event);
