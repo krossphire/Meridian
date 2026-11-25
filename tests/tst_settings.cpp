@@ -16,6 +16,7 @@
 #include "rotor/UserFiles.h"
 
 #include "GlobeWidget.h"
+#include "StatusTone.h"
 
 #include <QAbstractButton>
 #include <QComboBox>
@@ -44,6 +45,7 @@ private slots:
     void readNetworkStaysOffUntilSerialIsUp();
     void freshStartSendsNothing();
     void compassRowSendsFixedBearings();
+    void beamButtonShowsBeamingThenYields();
     void tcpConfigTurnsNetworkConnectionOn();
     void tcpConnectTurnsNetworkConnectionOn();
 #ifdef Q_OS_UNIX
@@ -565,6 +567,101 @@ void TestSettings::compassRowSendsFixedBearings()
         QTRY_COMPARE_WITH_TIMEOUT(window.driver()->target(), std::optional<double>(bearings[i]), 1000);
         QTRY_VERIFY_WITH_TIMEOUT(traceHasGoto(server, bearings[i]), 4000);
     }
+}
+
+void TestSettings::beamButtonShowsBeamingThenYields()
+{
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+
+    MockRt21Server server;
+    QVERIFY(server.listenTcp(0));
+    server.sim()->setHeading(0);
+    server.sim()->setSpeed(15);
+
+    AppConfig config = AppConfig::defaults();
+    config.compassButtons = true;
+    config.loggerBeamButton = true;
+    config.rotors[0].transport = RotorEndpoint::Transport::Tcp;
+    config.rotors[0].host = QStringLiteral("127.0.0.1");
+    config.rotors[0].tcpPort = int(server.port());
+
+    MainWindow window(config, nullptr);
+    window.resize(900, 900);
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QTRY_VERIFY_WITH_TIMEOUT(server.hasClient(), 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(window.driver()->link(), Rt21Driver::Link::On, 3000);
+
+    auto *globe = window.findChild<GlobeWidget *>();
+    QVERIFY(globe);
+    globe->setBeamOffer(QStringLiteral("C91RU"), 92.4);
+    auto *button = globe->findChild<QAbstractButton *>(QStringLiteral("beamButton"));
+    QVERIFY(button);
+    QVERIFY(button->isVisible());
+    QCOMPARE(button->text(), QStringLiteral("Beam toward:\nC91RU at 92.4°?"));
+
+    QTest::mouseClick(button, Qt::LeftButton);
+    QTRY_VERIFY_WITH_TIMEOUT(traceHasGoto(server, 92.4), 4000);
+    QCOMPARE(button->text(), QStringLiteral("Beaming toward:\nC91RU"));
+    QCOMPARE(button->property("fill").value<QColor>(), onHeadingGreen());
+    QVERIFY(button->isVisible());
+
+    // The mock is turning toward 92°. Those reports are Meridian's own move.
+    QTRY_VERIFY_WITH_TIMEOUT(window.driver()->heading() && *window.driver()->heading() > 2.0
+                                 && *window.driver()->heading() < 80.0,
+                             4000);
+    QVERIFY(button->isVisible());
+    QCOMPARE(button->text(), QStringLiteral("Beaming toward:\nC91RU"));
+    server.sim()->setFrozen(true);
+    server.sim()->setHeading(40);
+
+    // A heading that keeps closing on the beam stays. A couple of degrees of
+    // jitter stays. Leaving the beam by more than that hides the status.
+    globe->setHeading(92.4);
+    QVERIFY(button->isVisible());
+    globe->setHeading(93.9);
+    QVERIFY(button->isVisible());
+    globe->setHeading(110.0);
+    QVERIFY(!button->isVisible());
+    QTRY_VERIFY_WITH_TIMEOUT(window.driver()->heading() && std::abs(*window.driver()->heading() - 40.0) < 1.0, 3000);
+
+    globe->setBeamOffer(QStringLiteral("K5PO"), 45.0);
+    QVERIFY(button->isVisible());
+    QCOMPARE(button->text(), QStringLiteral("Beam toward:\nK5PO at 45.0°?"));
+    QTest::mouseClick(button, Qt::LeftButton);
+    QTRY_VERIFY_WITH_TIMEOUT(traceHasGoto(server, 45.0), 4000);
+    QCOMPARE(button->text(), QStringLiteral("Beaming toward:\nK5PO"));
+
+    QSignalSpy extra(globe, &GlobeWidget::bearingRequested);
+    QTest::mouseClick(button, Qt::LeftButton);
+    QCOMPARE(extra.size(), 0);
+    QCOMPARE(button->text(), QStringLiteral("Beaming toward:\nK5PO"));
+
+    auto *east = globe->findChild<QAbstractButton *>(QStringLiteral("compassE"));
+    QVERIFY(east);
+    QTest::mouseClick(east, Qt::LeftButton);
+    QVERIFY(!button->isVisible());
+    QTRY_VERIFY_WITH_TIMEOUT(traceHasGoto(server, 90.0), 4000);
+
+    globe->setBeamOffer(QStringLiteral("C91RU"), 92.4);
+    QTest::mouseClick(button, Qt::LeftButton);
+    QTRY_COMPARE_WITH_TIMEOUT(button->text(), QStringLiteral("Beaming toward:\nC91RU"), 4000);
+    globe->openHeadingEditor();
+    auto *edit = globe->findChild<QLineEdit *>(QStringLiteral("headingEdit"));
+    QVERIFY(edit);
+    edit->setText(QStringLiteral("10"));
+    QTest::keyClick(edit, Qt::Key_Return);
+    QVERIFY(!button->isVisible());
+    QTRY_VERIFY_WITH_TIMEOUT(traceHasGoto(server, 10.0), 4000);
+
+    globe->setBeamOffer(QStringLiteral("C91RU"), 92.4);
+    QTest::mouseClick(button, Qt::LeftButton);
+    QTRY_COMPARE_WITH_TIMEOUT(button->text(), QStringLiteral("Beaming toward:\nC91RU"), 4000);
+    const QPoint eastOnDisc = globe->rect().center() + QPoint(120, 0);
+    QTest::mouseClick(globe, Qt::LeftButton, Qt::NoModifier, eastOnDisc);
+    QVERIFY(!button->isVisible());
 }
 
 QTEST_MAIN(TestSettings)
