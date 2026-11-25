@@ -113,6 +113,7 @@ private:
     QLineEdit *wsjtGroupEdit = nullptr;
     QLineEdit *n1mmPortEdit = nullptr;
     class QCheckBox *dxKeeperBox = nullptr;
+    QLineEdit *qlogPortEdit = nullptr;
     class QSpinBox *idleSpin = nullptr;
     QListWidget *rotorList = nullptr;
     QLineEdit *nameEdit = nullptr;

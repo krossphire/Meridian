@@ -8,6 +8,7 @@
 #include "rotor/AppConfig.h"
 #include "sources/CredentialStore.h"
 #include "sources/DxKeeperSource.h"
+#include "sources/QlogNotice.h"
 #include "sources/N1mmXml.h"
 #include "sources/QrzXml.h"
 #include "sources/WsjtSource.h"
@@ -29,6 +30,7 @@ private slots:
     void wsjtStatusFixture();
     void n1mmFixtures();
     void dxKeeperItems();
+    void qlogCurrentContact();
 };
 
 void TestSources::qrzXmlUsesLatLonNotBearing()
@@ -166,6 +168,22 @@ void TestSources::dxKeeperItems()
     QVERIFY(noGrid.grid.isEmpty());
     const DxKeeperReading gone = interpretDxKeeper(QStringLiteral("ZL1ABC"), QString(), QString(), QString());
     QCOMPARE(int(gone.action), int(DxKeeperAction::Clear));
+}
+
+void TestSources::qlogCurrentContact()
+{
+    QCOMPARE(AppConfig::defaults().qlogPort, 0);
+    const QByteArray packet = R"({"appid":"QLog","msgtype":"currentcontact","time":1,"data":{"callsign":"C91RU","grid":"KG54","azimuth":92.4}})";
+    const QlogContact contact = parseQlogNotice(packet);
+    QVERIFY(contact.isCurrentContact);
+    QCOMPARE(contact.call, QStringLiteral("C91RU"));
+    QCOMPARE(contact.grid, QStringLiteral("KG54"));
+    QVERIFY(contact.haveAzimuth);
+    QCOMPARE(QString::number(contact.azimuth, 'f', 1), QStringLiteral("92.4"));
+    QVERIFY(!parseQlogNotice(QByteArray(R"({"msgtype":"qso","data":{}})")).isCurrentContact);
+    const QlogContact cleared = parseQlogNotice(QByteArray(R"({"msgtype":"currentcontact","data":{"callsign":""}})"));
+    QVERIFY(cleared.isCurrentContact);
+    QVERIFY(cleared.call.isEmpty());
 }
 
 QTEST_MAIN(TestSources)

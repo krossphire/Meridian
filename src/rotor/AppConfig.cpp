@@ -45,6 +45,7 @@ AppConfig AppConfig::load(QSettings &settings)
     const QString wsjtGroup = settings.value(QStringLiteral("sources/wsjtMulticast")).toString();
     const int n1mm = settings.value(QStringLiteral("sources/n1mmPort"), 0).toInt();
     const bool keeper = settings.value(QStringLiteral("sources/dxKeeper"), false).toBool();
+    const int qlog = settings.value(QStringLiteral("sources/qlogPort"), 0).toInt();
     const int idle = std::clamp(settings.value(QStringLiteral("link/idlePoll"), 30).toInt(), 30, 60);
     const bool network = settings.value(QStringLiteral("link/networkConnection"), false).toBool();
     config.homeText = settings.value(QStringLiteral("home/text"), QStringLiteral("EM26")).toString();
@@ -81,6 +82,7 @@ AppConfig AppConfig::load(QSettings &settings)
         config.wsjtMulticast = wsjtGroup.trimmed();
         config.n1mmPort = n1mm > 0 && n1mm <= 65535 ? n1mm : 0;
         config.dxKeeper = keeper;
+        config.qlogPort = qlog > 0 && qlog <= 65535 ? qlog : 0;
         config.idlePollSeconds = idle;
         config.networkConnection = network;
         return config;
@@ -94,6 +96,7 @@ AppConfig AppConfig::load(QSettings &settings)
     config.wsjtMulticast = wsjtGroup.trimmed();
     config.n1mmPort = n1mm > 0 && n1mm <= 65535 ? n1mm : 0;
     config.dxKeeper = keeper;
+    config.qlogPort = qlog > 0 && qlog <= 65535 ? qlog : 0;
     config.idlePollSeconds = idle;
     config.networkConnection = network;
     config.active = settings.value(QStringLiteral("rotors/active"), 0).toInt();
@@ -133,6 +136,7 @@ void AppConfig::save(QSettings &settings) const
     settings.setValue(QStringLiteral("sources/wsjtMulticast"), wsjtMulticast.trimmed());
     settings.setValue(QStringLiteral("sources/n1mmPort"), n1mmPort > 0 ? n1mmPort : 0);
     settings.setValue(QStringLiteral("sources/dxKeeper"), dxKeeper);
+    settings.setValue(QStringLiteral("sources/qlogPort"), qlogPort > 0 ? qlogPort : 0);
     settings.setValue(QStringLiteral("link/idlePoll"), idlePollSeconds);
     settings.setValue(QStringLiteral("link/networkConnection"), networkConnection);
 }
