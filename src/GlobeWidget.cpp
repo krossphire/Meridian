@@ -7,6 +7,7 @@
 #include "GlobeWidget.h"
 
 #include "core/Bearing.h"
+#include "core/Compass.h"
 #include "core/Projection.h"
 #include "core/Solar.h"
 #include "map/DayNight.h"
@@ -505,6 +506,14 @@ void GlobeWidget::setShowSun(bool show)
     update();
 }
 
+void GlobeWidget::setCompassVisible(bool on)
+{
+    if (compassOn == on)
+        return;
+    compassOn = on;
+    update();
+}
+
 void GlobeWidget::setSolarPreview(const QDateTime &utc)
 {
     solarPreview = utc;
@@ -609,6 +618,13 @@ qreal GlobeWidget::beamWidth() const
     if (side < 520)
         return 2.5;
     return 2.1;
+}
+
+int GlobeWidget::compassInset() const
+{
+    if (!compassOn || width() < 360)
+        return 0;
+    return 28;
 }
 
 QRectF GlobeWidget::disk() const
@@ -871,6 +887,49 @@ void GlobeWidget::paintScene(QPainter &painter)
         painter.drawEllipse(QPointF(box.left() + 3, box.center().y()), 2.5, 2.5);
         painter.setPen(toneColor);
         painter.drawText(box.adjusted(12, 0, 0, 0), Qt::AlignLeft | Qt::AlignVCenter, line);
+    }
+    paintCompass(painter);
+}
+
+void GlobeWidget::paintCompass(QPainter &painter)
+{
+    if (compassInset() <= 0)
+        return;
+    const int active = heading ? nearestCompassIndex(*heading) : -1;
+    const bool moving = link == Link::Moving;
+    QFont font(QStringLiteral("Inter"));
+    font.setPixelSize(11);
+    font.setWeight(QFont::Medium);
+    painter.setFont(font);
+    const QFontMetrics metrics(font);
+    const int gap = 6;
+    int total = 0;
+    int widths[kCompassCount];
+    for (int i = 0; i < kCompassCount; ++i) {
+        widths[i] = metrics.horizontalAdvance(QString::fromLatin1(compassLabel(i))) + 14;
+        total += widths[i];
+    }
+    total += gap * (kCompassCount - 1);
+    int x = int(std::round((width() - total) / 2.0));
+    const int y = height() - 28;
+    for (int i = 0; i < kCompassCount; ++i) {
+        const QRectF pill(x, y, widths[i], 20);
+        const bool on = i == active;
+        painter.setPen(Qt::NoPen);
+        if (on) {
+            painter.setBrush(moving ? QColor(224, 177, 92) : QColor(125, 206, 160, 210));
+        } else {
+            painter.setBrush(QColor(255, 255, 255, 16));
+        }
+        painter.drawRoundedRect(pill, 10, 10);
+        if (on && moving)
+            painter.setPen(QColor(28, 22, 8));
+        else if (on)
+            painter.setPen(QColor(10, 28, 20));
+        else
+            painter.setPen(QColor(142, 160, 153));
+        painter.drawText(pill, Qt::AlignCenter, QString::fromLatin1(compassLabel(i)));
+        x += widths[i] + gap;
     }
 }
 

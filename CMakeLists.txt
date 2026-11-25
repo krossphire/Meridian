@@ -16,6 +16,7 @@ endif()
 add_library(meridian-core STATIC
     src/core/Gridsquare.cpp
     src/core/Bearing.cpp
+    src/core/Compass.cpp
     src/core/Projection.cpp
     src/core/ZipCodes.cpp
     src/core/Coordinates.cpp

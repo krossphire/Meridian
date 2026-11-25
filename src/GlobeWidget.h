@@ -23,6 +23,7 @@
 
 class QLineEdit;
 class QComboBox;
+class QPainter;
 class QThread;
 class QTimer;
 
@@ -44,6 +45,8 @@ public:
     void setStatusLine(const QString &text, StatusTone tone);
     void setHeadingStale(bool stale);
     void setShowSun(bool show);
+    void setCompassVisible(bool on);
+    bool compassVisible() const { return compassOn; }
     void setSolarPreview(const QDateTime &utc);
     void setRotors(const QStringList &names, int active);
 
@@ -85,6 +88,8 @@ private:
     void paintScene(QPainter &painter);
     void ensureSun();
     void hoverAt(QPointF pos);
+    void paintCompass(QPainter &painter);
+    int compassInset() const;
     void commitHeading();
     void cancelHeading();
 
@@ -117,6 +122,7 @@ private:
     QTimer *debounce = nullptr;
     QTimer *sunTimer = nullptr;
     bool showSun = true;
+    bool compassOn = true;
     bool headingStale = false;
     bool sunDirty = true;
     QString statusLine;

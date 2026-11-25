@@ -67,6 +67,7 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
         names.append(rotor.name);
     globe->setRotors(names, config.active);
     globe->setShowSun(config.showSun);
+    globe->setCompassVisible(config.compassButtons);
     connectActive();
 
     statusTimer = new QTimer(this);
@@ -127,6 +128,7 @@ void MainWindow::applyConfig(const AppConfig &saved)
         names.append(rotor.name);
     globe->setRotors(names, config.active);
     globe->setShowSun(config.showSun);
+    globe->setCompassVisible(config.compassButtons);
     syncDrivers();
 }
 

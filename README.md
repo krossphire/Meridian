@@ -67,6 +67,7 @@ The command bytes are in [docs/RT21_PROTOCOL.md](docs/RT21_PROTOCOL.md). How the
 - The gear opens settings. On a very small window it stays hidden until the pointer is over the map. Ctrl+, opens settings too.
 - A rotor menu appears only when more than one rotor is saved.
 - The dot is the link: green connected, amber moving or connecting, red failed. The tooltip has the reason.
+- N, NE, E, SE, S, SW, W, and NW sit along the bottom. The pill nearest the heading is green, and amber while the rotor is moving. Settings can hide the row.
 - **Show sun & day/night** is on by default. The sun and the day/night tint are not clickable.
 
 Idle polls go out every 30 seconds. Settings can set that from 30 to 60 seconds. A TCP connect waits at most 3 seconds. If the link drops, Meridian tries again on its own. A click, a typed heading, opening the program, or leaving settings tries immediately. A goto is not sent again on a later reconnect.

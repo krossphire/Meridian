@@ -103,6 +103,7 @@ private:
     QLabel *detail = nullptr;
     class QCheckBox *trafficBox = nullptr;
     class QCheckBox *sunBox = nullptr;
+    class QCheckBox *compassBox = nullptr;
     class QSpinBox *idleSpin = nullptr;
     QListWidget *rotorList = nullptr;
     QLineEdit *nameEdit = nullptr;
