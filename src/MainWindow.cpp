@@ -61,7 +61,7 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
         if (index < 0 || index >= config.rotors.size() || index == config.active)
             return;
         config.active = index;
-        UserFiles::save(config);
+        persistConfig();
         connectActive();
     });
 
@@ -125,11 +125,18 @@ void MainWindow::connectActive()
     syncDrivers();
 }
 
+void MainWindow::persistConfig()
+{
+    const bool wrote = UserFiles::save(config);
+    if (settingsUi)
+        settingsUi->noteSettingsWrite(wrote);
+}
+
 void MainWindow::applyConfig(const AppConfig &saved)
 {
     config = saved;
     TrafficLog::instance().setEnabled(config.trafficLog);
-    UserFiles::save(config);
+    persistConfig();
     applyHome();
     QStringList names;
     for (const RotorEndpoint &rotor : config.rotors)
@@ -287,7 +294,7 @@ void MainWindow::adopt(Rt21Driver *driver)
         if (!ok || config.networkConnection)
             return;
         config.networkConnection = true;
-        UserFiles::save(config);
+        persistConfig();
         if (settingsUi)
             settingsUi->setNetworkConnection(true);
     });
@@ -320,7 +327,7 @@ void MainWindow::syncDrivers()
         if (isActive && rotor.transport == RotorEndpoint::Transport::Tcp && rotor.configured()
             && !config.networkConnection) {
             config.networkConnection = true;
-            UserFiles::save(config);
+            persistConfig();
             if (settingsUi)
                 settingsUi->setNetworkConnection(true);
         }

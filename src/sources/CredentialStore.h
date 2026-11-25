@@ -18,6 +18,10 @@ public:
     static QString load(const QString &username);
     static bool forget(const QString &username);
 
+    // Windows Credential Manager shows this exact target name. One entry.
+    static QString serviceName();
+
     // Tests keep the secret in process memory and do not touch the OS store.
     static void useMemoryForTests(bool on);
+    static void failStoresForTests(bool on);
 };

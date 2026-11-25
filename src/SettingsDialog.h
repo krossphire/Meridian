@@ -38,6 +38,7 @@ public:
     void setConfig(const AppConfig &config);
     void setDriver(Rt21Driver *driver);
     void setNetworkConnection(bool on);
+    void noteSettingsWrite(bool ok);
     AppConfig config() const { return draft; }
     void showPage(int index);
     void presentFound(const FoundRotor &found);
@@ -78,6 +79,7 @@ private:
     void applyFound(const FoundRotor &found);
     void styleFindButton();
     void setStatus(const QString &text);
+    void setStatus(const QString &text, StatusTone tone);
     void exportSetup();
     void refreshDisplayCallout();
     QString backupConfig(const QString &path) const;

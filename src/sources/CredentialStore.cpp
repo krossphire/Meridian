@@ -28,9 +28,8 @@
 namespace {
 
 bool memoryOnly = false;
+bool failStores = false;
 QHash<QString, QString> memory;
-
-const QString kService = QStringLiteral("Meridian QRZ");
 
 #if defined(MERIDIAN_HAVE_LIBSECRET)
 const SecretSchema *qrzSchema()
@@ -45,11 +44,23 @@ const SecretSchema *qrzSchema()
 
 } // namespace
 
+QString CredentialStore::serviceName()
+{
+    return QStringLiteral("Meridian QRZ");
+}
+
 void CredentialStore::useMemoryForTests(bool on)
 {
     memoryOnly = on;
-    if (!on)
+    if (!on) {
         memory.clear();
+        failStores = false;
+    }
+}
+
+void CredentialStore::failStoresForTests(bool on)
+{
+    failStores = on;
 }
 
 bool CredentialStore::store(const QString &username, const QString &password)
@@ -57,12 +68,14 @@ bool CredentialStore::store(const QString &username, const QString &password)
     const QString user = username.trimmed();
     if (user.isEmpty() || password.isEmpty())
         return false;
+    if (failStores)
+        return false;
     if (memoryOnly) {
         memory.insert(user, password);
         return true;
     }
 #if defined(Q_OS_WIN)
-    const std::wstring target = (kService + QLatin1Char('/') + user).toStdWString();
+    const std::wstring target = serviceName().toStdWString();
     const QByteArray blob = password.toUtf8();
     const std::wstring account = user.toStdWString();
     CREDENTIALW cred{};
@@ -74,7 +87,7 @@ bool CredentialStore::store(const QString &username, const QString &password)
     cred.UserName = const_cast<LPWSTR>(account.c_str());
     return CredWriteW(&cred, 0) == TRUE;
 #elif defined(Q_OS_MACOS)
-    const QByteArray service = kService.toUtf8();
+    const QByteArray service = serviceName().toUtf8();
     const QByteArray account = user.toUtf8();
     const QByteArray secret = password.toUtf8();
     UInt32 length = 0;
@@ -118,16 +131,21 @@ QString CredentialStore::load(const QString &username)
     if (memoryOnly)
         return memory.value(user);
 #if defined(Q_OS_WIN)
-    const std::wstring target = (kService + QLatin1Char('/') + user).toStdWString();
+    const std::wstring target = serviceName().toStdWString();
     PCREDENTIALW cred = nullptr;
     if (!CredReadW(target.c_str(), CRED_TYPE_GENERIC, 0, &cred) || !cred || !cred->CredentialBlob)
         return {};
+    const QString account = cred->UserName ? QString::fromWCharArray(cred->UserName) : QString();
+    if (account.compare(user, Qt::CaseInsensitive) != 0) {
+        CredFree(cred);
+        return {};
+    }
     const QString secret = QString::fromUtf8(reinterpret_cast<const char *>(cred->CredentialBlob),
                                              int(cred->CredentialBlobSize));
     CredFree(cred);
     return secret;
 #elif defined(Q_OS_MACOS)
-    const QByteArray service = kService.toUtf8();
+    const QByteArray service = serviceName().toUtf8();
     const QByteArray account = user.toUtf8();
     UInt32 length = 0;
     void *data = nullptr;
@@ -165,10 +183,17 @@ bool CredentialStore::forget(const QString &username)
         return true;
     }
 #if defined(Q_OS_WIN)
-    const std::wstring target = (kService + QLatin1Char('/') + user).toStdWString();
+    const std::wstring target = serviceName().toStdWString();
+    PCREDENTIALW cred = nullptr;
+    if (!CredReadW(target.c_str(), CRED_TYPE_GENERIC, 0, &cred) || !cred)
+        return false;
+    const QString account = cred->UserName ? QString::fromWCharArray(cred->UserName) : QString();
+    CredFree(cred);
+    if (account.compare(user, Qt::CaseInsensitive) != 0)
+        return false;
     return CredDeleteW(target.c_str(), CRED_TYPE_GENERIC, 0) == TRUE;
 #elif defined(Q_OS_MACOS)
-    const QByteArray service = kService.toUtf8();
+    const QByteArray service = serviceName().toUtf8();
     const QByteArray account = user.toUtf8();
     SecKeychainItemRef item = nullptr;
     const OSStatus found = SecKeychainFindGenericPassword(nullptr, UInt32(service.size()), service.constData(),
