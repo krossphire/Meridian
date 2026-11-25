@@ -475,6 +475,11 @@ bool SettingsDialog::commitDraft(bool interactive)
     }
     if (wsjtGroupEdit)
         draft.wsjtMulticast = wsjtGroupEdit->text().trimmed();
+    if (n1mmPortEdit) {
+        bool ok = false;
+        const int port = n1mmPortEdit->text().trimmed().toInt(&ok);
+        draft.n1mmPort = ok && port > 0 && port <= 65535 ? port : 0;
+    }
     if (qrzPassEdit && !qrzPassEdit->text().isEmpty()) {
         if (!CredentialStore::store(draft.qrzUsername, qrzPassEdit->text()))
             setStatus(QStringLiteral("Couldn't save the QRZ password. It was not written to meridian.ini."));
@@ -508,6 +513,8 @@ void SettingsDialog::setConfig(const AppConfig &config)
         wsjtPortEdit->setText(draft.wsjtPort > 0 ? QString::number(draft.wsjtPort) : QString());
     if (wsjtGroupEdit)
         wsjtGroupEdit->setText(draft.wsjtMulticast);
+    if (n1mmPortEdit)
+        n1mmPortEdit->setText(draft.n1mmPort > 0 ? QString::number(draft.n1mmPort) : QString());
     if (qrzPassEdit) {
         qrzPassEdit->clear();
         qrzPassStored = !draft.qrzUsername.isEmpty() && !CredentialStore::load(draft.qrzUsername).isEmpty();
@@ -677,6 +684,19 @@ void SettingsDialog::buildSources()
     layout->addWidget(wsjt);
     layout->addWidget(wsjtPortEdit);
     layout->addWidget(wsjtGroupEdit);
+    auto *n1mm = new QLabel(QStringLiteral(
+        "N1MM Logger+ sends LookupInfo when a call is entered, and ContactInfo after the contact is logged. "
+        "In Configurer, Broadcast Data, enable External Callsign Lookup. The suggested port is 12060. "
+        "Type it here if that is the port you chose. Meridian binds with SO_REUSEADDR so another program can listen too. "
+        "A logged contact hides the beam button. An empty port listens to nothing. The grid is used when N1MM sends one, otherwise QRZ."));
+    n1mm->setWordWrap(true);
+    n1mm->setObjectName(QStringLiteral("hint"));
+    n1mmPortEdit = new QLineEdit(draft.n1mmPort > 0 ? QString::number(draft.n1mmPort) : QString());
+    n1mmPortEdit->setObjectName(QStringLiteral("n1mmPort"));
+    n1mmPortEdit->setPlaceholderText(QStringLiteral("12060"));
+    layout->addSpacing(18);
+    layout->addWidget(n1mm);
+    layout->addWidget(n1mmPortEdit);
     layout->addStretch();
     tabs->addTab(page, QStringLiteral("Sources"));
 }

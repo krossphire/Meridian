@@ -18,6 +18,7 @@
 #include "rotor/UserFiles.h"
 #include "sources/CredentialStore.h"
 #include "sources/QrzClient.h"
+#include "sources/N1mmSource.h"
 #include "sources/WsjtSource.h"
 
 #include <QDateTime>
@@ -59,6 +60,7 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
     });
     refreshQrz();
     refreshWsjt();
+    refreshN1mm();
     connect(globe, &GlobeWidget::rotorSelected, this, [this](int index) {
         if (index < 0 || index >= config.rotors.size() || index == config.active)
             return;
@@ -142,7 +144,24 @@ void MainWindow::applyConfig(const AppConfig &saved)
     globe->setLoggerBeamEnabled(config.loggerBeamButton);
     refreshQrz();
     refreshWsjt();
+    refreshN1mm();
     syncDrivers();
+}
+
+void MainWindow::refreshN1mm()
+{
+    if (!n1mm) {
+        n1mm = new N1mmSource(this);
+        connect(n1mm, &N1mmSource::lookup, this, [this](const QString &call, const QString &grid) {
+            offerStation(call, grid);
+        });
+        connect(n1mm, &N1mmSource::contactLogged, this, [this]() { offerStation(QString(), QString()); });
+        connect(n1mm, &N1mmSource::note, this, [this](const QString &text) {
+            if (globe)
+                globe->setStatusLine(text, StatusTone::Neutral);
+        });
+    }
+    n1mm->listen(config.n1mmPort);
 }
 
 void MainWindow::refreshWsjt()
