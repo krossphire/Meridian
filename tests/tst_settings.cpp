@@ -21,6 +21,7 @@
 #include "StatusTone.h"
 
 #include <QAbstractButton>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QElapsedTimer>
 #include <QFile>
@@ -714,6 +715,18 @@ void TestSettings::sourcesAndQrzRoundTrip()
     QVERIFY(user && pass);
     user->setText(QStringLiteral("K5PO"));
     pass->setText(QStringLiteral("s3cret-not-for-ini"));
+    auto *wsjtPort = dialog.findChild<QLineEdit *>(QStringLiteral("wsjtPort"));
+    auto *wsjtGroup = dialog.findChild<QLineEdit *>(QStringLiteral("wsjtMulticast"));
+    auto *n1mmPort = dialog.findChild<QLineEdit *>(QStringLiteral("n1mmPort"));
+    auto *dxKeeper = dialog.findChild<QCheckBox *>(QStringLiteral("dxKeeper"));
+    auto *qlogPort = dialog.findChild<QLineEdit *>(QStringLiteral("qlogPort"));
+    QVERIFY(wsjtPort && wsjtGroup && n1mmPort && dxKeeper && qlogPort);
+    wsjtPort->setText(QStringLiteral("2238"));
+    wsjtGroup->setText(QStringLiteral("239.255.0.1"));
+    n1mmPort->setText(QStringLiteral("12060"));
+    dxKeeper->setChecked(true);
+    QVERIFY(dxKeeper->isChecked());
+    qlogPort->setText(QStringLiteral("2333"));
     bool wrote = false;
     QObject::connect(&dialog, &SettingsDialog::configSaved, &dialog, [&](const AppConfig &saved) {
         wrote = UserFiles::save(saved);
@@ -728,18 +741,29 @@ void TestSettings::sourcesAndQrzRoundTrip()
     const QString body = QString::fromUtf8(file.readAll());
     file.close();
     QVERIFY(body.contains(QStringLiteral("K5PO")));
+    QVERIFY(body.contains(QStringLiteral("2238")));
+    QVERIFY(body.contains(QStringLiteral("239.255.0.1")));
+    QVERIFY(body.contains(QStringLiteral("12060")));
+    QVERIFY(body.contains(QStringLiteral("2333")));
     QVERIFY(!body.contains(QStringLiteral("s3cret-not-for-ini")));
     QVERIFY(!body.contains(QStringLiteral("password="), Qt::CaseInsensitive));
     QCOMPARE(CredentialStore::serviceName(), QStringLiteral("Meridian QRZ"));
     QCOMPARE(CredentialStore::load(QStringLiteral("K5PO")), QStringLiteral("s3cret-not-for-ini"));
 
-    SettingsDialog reopened(UserFiles::load(), nullptr, nullptr);
+    const AppConfig loaded = UserFiles::load();
+    QCOMPARE(loaded.dxKeeper, true);
+    SettingsDialog reopened(loaded, nullptr, nullptr);
     auto *userAgain = reopened.findChild<QLineEdit *>(QStringLiteral("qrzUsername"));
     auto *passAgain = reopened.findChild<QLineEdit *>(QStringLiteral("qrzPassword"));
     QVERIFY(userAgain && passAgain);
     QCOMPARE(userAgain->text(), QStringLiteral("K5PO"));
     QCOMPARE(passAgain->text(), QString());
     QCOMPARE(passAgain->placeholderText(), QStringLiteral("••••• saved"));
+    QCOMPARE(reopened.findChild<QLineEdit *>(QStringLiteral("wsjtPort"))->text(), QStringLiteral("2238"));
+    QCOMPARE(reopened.findChild<QLineEdit *>(QStringLiteral("wsjtMulticast"))->text(), QStringLiteral("239.255.0.1"));
+    QCOMPARE(reopened.findChild<QLineEdit *>(QStringLiteral("n1mmPort"))->text(), QStringLiteral("12060"));
+    QCOMPARE(reopened.findChild<QCheckBox *>(QStringLiteral("dxKeeper"))->isChecked(), true);
+    QCOMPARE(reopened.findChild<QLineEdit *>(QStringLiteral("qlogPort"))->text(), QStringLiteral("2333"));
 
     CredentialStore::failStoresForTests(true);
     user->setText(QStringLiteral("NOCALL"));
