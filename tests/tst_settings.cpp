@@ -14,6 +14,7 @@
 #include "rotor/AppConfig.h"
 #include "rotor/Rt21Driver.h"
 #include "rotor/UserFiles.h"
+#include "sources/CredentialStore.h"
 
 #include <QComboBox>
 #include <QElapsedTimer>
@@ -42,6 +43,7 @@ private slots:
     void freshStartSendsNothing();
     void tcpConfigTurnsNetworkConnectionOn();
     void tcpConnectTurnsNetworkConnectionOn();
+    void qrzPasswordIsNotWrittenToIni();
 #ifdef Q_OS_UNIX
     void liveSerialFindStopsAndResumesAfterTheProbe();
     void networkConnectionDefaultsOffAndBlocksTheModule();
@@ -513,6 +515,37 @@ void TestSettings::scanNetworkRestoresTcpBeforeTheProbe()
     QVERIFY(serial.sim()->trace().contains(QByteArray("T11")));
 }
 #endif
+
+void TestSettings::qrzPasswordIsNotWrittenToIni()
+{
+    CredentialStore::useMemoryForTests(true);
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    UserFiles::setRoot(dir.path());
+    AppConfig config = AppConfig::defaults();
+    QSettings settings(dir.filePath(QStringLiteral("shot.ini")), QSettings::IniFormat);
+    SettingsDialog dialog(config, nullptr, nullptr);
+    auto *user = dialog.findChild<QLineEdit *>(QStringLiteral("qrzUsername"));
+    auto *pass = dialog.findChild<QLineEdit *>(QStringLiteral("qrzPassword"));
+    QVERIFY(user && pass);
+    QCOMPARE(pass->echoMode(), QLineEdit::Password);
+    user->setText(QStringLiteral("K5PO"));
+    pass->setText(QStringLiteral("s3cret-not-for-ini"));
+    QObject::connect(&dialog, &SettingsDialog::configSaved, &dialog, [](const AppConfig &saved) {
+        UserFiles::save(saved);
+    });
+    auto *box = dialog.findChild<QDialogButtonBox *>();
+    QVERIFY(box);
+    box->button(QDialogButtonBox::Save)->click();
+    QFile file(UserFiles::settingsPath());
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QString body = QString::fromUtf8(file.readAll());
+    QVERIFY(body.contains(QStringLiteral("K5PO")));
+    QVERIFY(!body.contains(QStringLiteral("s3cret-not-for-ini")));
+    QVERIFY(!body.contains(QStringLiteral("password="), Qt::CaseInsensitive));
+    QCOMPARE(CredentialStore::load(QStringLiteral("K5PO")), QStringLiteral("s3cret-not-for-ini"));
+    CredentialStore::useMemoryForTests(false);
+}
 
 QTEST_MAIN(TestSettings)
 #include "tst_settings.moc"

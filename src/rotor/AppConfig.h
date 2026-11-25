@@ -31,6 +31,7 @@ struct AppConfig {
     bool showSun = true;
     bool compassButtons = true;
     bool loggerBeamButton = true;
+    QString qrzUsername;
     int idlePollSeconds = 30;
     // Serial RT-21s with no network board stay No. meridian.ini is the only store.
     bool networkConnection = false;

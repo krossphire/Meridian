@@ -16,6 +16,7 @@
 #include "rotor/Rt21Setup.h"
 #include "rotor/TrafficLog.h"
 #include "rotor/UserFiles.h"
+#include "sources/CredentialStore.h"
 
 #include <QCheckBox>
 #include <QDateTime>
@@ -119,6 +120,7 @@ SettingsDialog::SettingsDialog(const AppConfig &config, const ZipDatabase *zipDb
     setupTabs->setDocumentMode(true);
     layout->addWidget(tabs, 1);
     buildStation();
+    buildSources();
     buildRotors();
     buildController();
     setupPanel = new SetupPanel(this);
@@ -464,6 +466,16 @@ bool SettingsDialog::commitDraft(bool interactive)
         draft.compassButtons = compassBox->isChecked();
     if (beamBox)
         draft.loggerBeamButton = beamBox->isChecked();
+    if (qrzUserEdit)
+        draft.qrzUsername = qrzUserEdit->text().trimmed();
+    if (qrzPassEdit && !qrzPassEdit->text().isEmpty()) {
+        if (!CredentialStore::store(draft.qrzUsername, qrzPassEdit->text()))
+            setStatus(QStringLiteral("Couldn't save the QRZ password. It was not written to meridian.ini."));
+        qrzPassEdit->clear();
+        qrzPassStored = !draft.qrzUsername.isEmpty();
+        qrzPassEdit->setPlaceholderText(qrzPassStored ? QStringLiteral("Saved in the keychain")
+                                                      : QStringLiteral("Password"));
+    }
     if (idleSpin)
         draft.idlePollSeconds = idleSpin->value();
     emit configSaved(draft);
@@ -483,6 +495,14 @@ void SettingsDialog::setConfig(const AppConfig &config)
         compassBox->setChecked(draft.compassButtons);
     if (beamBox)
         beamBox->setChecked(draft.loggerBeamButton);
+    if (qrzUserEdit)
+        qrzUserEdit->setText(draft.qrzUsername);
+    if (qrzPassEdit) {
+        qrzPassEdit->clear();
+        qrzPassStored = !draft.qrzUsername.isEmpty() && !CredentialStore::load(draft.qrzUsername).isEmpty();
+        qrzPassEdit->setPlaceholderText(qrzPassStored ? QStringLiteral("Saved in the keychain")
+                                                      : QStringLiteral("Password"));
+    }
     if (idleSpin)
         idleSpin->setValue(draft.idlePollSeconds);
     if (networkConnectionBox) {
@@ -589,6 +609,47 @@ void SettingsDialog::refreshLocation()
         detail->clear();
         summary->setStyleSheet(QStringLiteral("color: #e09a86;"));
     }
+}
+
+void SettingsDialog::buildSources()
+{
+    auto *page = new QWidget;
+    auto *layout = new QVBoxLayout(page);
+    auto *intro = new QLabel(QStringLiteral(
+        "QRZ XML is optional. It uses your QRZ username and an XML data subscription. "
+        "The password is stored in the system keychain, not in meridian.ini and not in the log. "
+        "The session key stays in memory. QRZ does not return a bearing to your station. "
+        "Meridian computes the short path from your home to the latitude and longitude, or to the grid if that is all that comes back. "
+        "A logger that sends a call with no grid uses the same lookup."));
+    intro->setWordWrap(true);
+    intro->setObjectName(QStringLiteral("hint"));
+    qrzUserEdit = new QLineEdit(draft.qrzUsername);
+    qrzUserEdit->setObjectName(QStringLiteral("qrzUsername"));
+    qrzUserEdit->setPlaceholderText(QStringLiteral("QRZ username"));
+    qrzPassEdit = new QLineEdit;
+    qrzPassEdit->setObjectName(QStringLiteral("qrzPassword"));
+    qrzPassEdit->setEchoMode(QLineEdit::Password);
+    qrzPassStored = !draft.qrzUsername.isEmpty() && !CredentialStore::load(draft.qrzUsername).isEmpty();
+    qrzPassEdit->setPlaceholderText(qrzPassStored ? QStringLiteral("Saved in the keychain")
+                                                  : QStringLiteral("Password"));
+    auto *clear = new QPushButton(QStringLiteral("Clear password"));
+    clear->setFlat(true);
+    connect(clear, &QPushButton::clicked, this, [this]() {
+        if (qrzUserEdit)
+            CredentialStore::forget(qrzUserEdit->text());
+        if (qrzPassEdit) {
+            qrzPassEdit->clear();
+            qrzPassStored = false;
+            qrzPassEdit->setPlaceholderText(QStringLiteral("Password"));
+        }
+        setStatus(QStringLiteral("QRZ password cleared from the keychain."));
+    });
+    layout->addWidget(intro);
+    layout->addWidget(qrzUserEdit);
+    layout->addWidget(qrzPassEdit);
+    layout->addWidget(clear, 0, Qt::AlignLeft);
+    layout->addStretch();
+    tabs->addTab(page, QStringLiteral("Sources"));
 }
 
 void SettingsDialog::buildRotors()

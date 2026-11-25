@@ -16,6 +16,8 @@
 #include "rotor/Rt21Driver.h"
 #include "rotor/TrafficLog.h"
 #include "rotor/UserFiles.h"
+#include "sources/CredentialStore.h"
+#include "sources/QrzClient.h"
 
 #include <QDateTime>
 #include <QFile>
@@ -52,20 +54,9 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
     });
     connect(globe, &GlobeWidget::settingsRequested, this, &MainWindow::openSettings);
     connect(globe, &GlobeWidget::callsignSubmitted, this, [this](const QString &call, const QString &grid) {
-        if (call.isEmpty()) {
-            globe->clearBeamOffer();
-            return;
-        }
-        double lat = 0;
-        double lon = 0;
-        double bearing = 0;
-        if (grid.isEmpty() || !Gridsquare::toLatLon(grid, lat, lon)
-            || !Gridsquare::bearingTo(globe->homeLat(), globe->homeLon(), lat, lon, bearing)) {
-            globe->clearBeamOffer();
-            return;
-        }
-        globe->setBeamOffer(call, bearing);
+        offerStation(call, grid);
     });
+    refreshQrz();
     connect(globe, &GlobeWidget::rotorSelected, this, [this](int index) {
         if (index < 0 || index >= config.rotors.size() || index == config.active)
             return;
@@ -147,7 +138,57 @@ void MainWindow::applyConfig(const AppConfig &saved)
     globe->setShowSun(config.showSun);
     globe->setCompassVisible(config.compassButtons);
     globe->setLoggerBeamEnabled(config.loggerBeamButton);
+    refreshQrz();
     syncDrivers();
+}
+
+void MainWindow::refreshQrz()
+{
+    if (!qrz) {
+        qrz = new QrzClient(this);
+        connect(qrz, &QrzClient::located, this,
+                [this](const QString &call, const QString &grid, double latitude, double longitude, bool havePoint) {
+                    if (!pendingCall.isEmpty() && !call.isEmpty()
+                        && call.compare(pendingCall, Qt::CaseInsensitive) != 0)
+                        return;
+                    offerStation(call.isEmpty() ? pendingCall : call, grid, latitude, longitude, havePoint, false);
+                });
+        connect(qrz, &QrzClient::note, this, [this](const QString &text) {
+            if (globe)
+                globe->setStatusLine(text, StatusTone::Neutral);
+        });
+    }
+    qrz->setUsername(config.qrzUsername);
+}
+
+void MainWindow::offerStation(const QString &call, const QString &grid, double latitude, double longitude,
+                             bool havePoint, bool allowLookup)
+{
+    if (!globe)
+        return;
+    if (call.trimmed().isEmpty()) {
+        pendingCall.clear();
+        globe->clearBeamOffer();
+        return;
+    }
+    pendingCall = call.trimmed().toUpper();
+    double lat = latitude;
+    double lon = longitude;
+    if (!havePoint) {
+        if (grid.isEmpty() || !Gridsquare::toLatLon(grid, lat, lon)) {
+            globe->clearBeamOffer();
+            if (allowLookup && grid.isEmpty() && qrz && qrz->configured())
+                qrz->lookup(pendingCall);
+            return;
+        }
+        havePoint = true;
+    }
+    double bearing = 0;
+    if (!Gridsquare::bearingTo(globe->homeLat(), globe->homeLon(), lat, lon, bearing)) {
+        globe->clearBeamOffer();
+        return;
+    }
+    globe->setBeamOffer(pendingCall, bearing);
 }
 
 void MainWindow::refreshStatus()
