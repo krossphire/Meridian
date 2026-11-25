@@ -92,7 +92,7 @@ private:
     void paintScene(QPainter &painter);
     void ensureSun();
     void hoverAt(QPointF pos);
-    void paintCompass(QPainter &painter);
+    void placeCompass();
     int compassInset() const;
     void placeBeam();
     void commitHeading();
@@ -143,6 +143,7 @@ private:
     SolarPosition sunNow;
 
     QWidget *gear = nullptr;
+    QAbstractButton *compassPills[8] = {};
     QWidget *dot = nullptr;
     QLineEdit *editor = nullptr;
     QComboBox *rotors = nullptr;

@@ -15,6 +15,9 @@
 #include "rotor/Rt21Driver.h"
 #include "rotor/UserFiles.h"
 
+#include "GlobeWidget.h"
+
+#include <QAbstractButton>
 #include <QComboBox>
 #include <QElapsedTimer>
 #include <QFile>
@@ -40,6 +43,7 @@ private slots:
     void foundBaudIsKeptWhenItIs4800Or9600();
     void readNetworkStaysOffUntilSerialIsUp();
     void freshStartSendsNothing();
+    void compassRowSendsFixedBearings();
     void tcpConfigTurnsNetworkConnectionOn();
     void tcpConnectTurnsNetworkConnectionOn();
 #ifdef Q_OS_UNIX
@@ -513,6 +517,55 @@ void TestSettings::scanNetworkRestoresTcpBeforeTheProbe()
     QVERIFY(serial.sim()->trace().contains(QByteArray("T11")));
 }
 #endif
+
+namespace {
+
+bool traceHasGoto(MockRt21Server &server, double azimuth)
+{
+    const QByteArray want = QByteArray("AP1") + QString::asprintf("%05.1f", azimuth).toLatin1() + QByteArray("\r");
+    return server.sim()->trace().contains(want);
+}
+
+} // namespace
+
+void TestSettings::compassRowSendsFixedBearings()
+{
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+
+    MockRt21Server server;
+    QVERIFY(server.listenTcp(0));
+
+    AppConfig config = AppConfig::defaults();
+    config.compassButtons = true;
+    config.rotors[0].transport = RotorEndpoint::Transport::Tcp;
+    config.rotors[0].host = QStringLiteral("127.0.0.1");
+    config.rotors[0].tcpPort = int(server.port());
+
+    MainWindow window(config, nullptr);
+    window.resize(900, 900);
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QTRY_VERIFY_WITH_TIMEOUT(server.hasClient(), 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(window.driver()->link(), Rt21Driver::Link::On, 3000);
+
+    auto *globe = window.findChild<GlobeWidget *>();
+    QVERIFY(globe);
+    const char *names[] = {"compassN", "compassNE", "compassE", "compassSE",
+                           "compassS", "compassSW", "compassW", "compassNW"};
+    const double bearings[] = {0, 45, 90, 135, 180, 225, 270, 315};
+    for (int i = 0; i < 8; ++i) {
+        auto *button = globe->findChild<QAbstractButton *>(QString::fromLatin1(names[i]));
+        QVERIFY2(button, names[i]);
+        QVERIFY2(button->isVisible(), names[i]);
+        const QPoint center = button->rect().center();
+        QCOMPARE(globe->childAt(button->mapTo(globe, center)), static_cast<QWidget *>(button));
+        QTest::mouseClick(button, Qt::LeftButton);
+        QTRY_COMPARE_WITH_TIMEOUT(window.driver()->target(), std::optional<double>(bearings[i]), 1000);
+        QTRY_VERIFY_WITH_TIMEOUT(traceHasGoto(server, bearings[i]), 4000);
+    }
+}
 
 QTEST_MAIN(TestSettings)
 #include "tst_settings.moc"
