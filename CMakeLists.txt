@@ -9,6 +9,10 @@ set(CMAKE_AUTORCC ON)
 option(MERIDIAN_ALPHA_READONLY "Disable EEPROM and calibration writes" ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Network SerialPort Svg)
+if(UNIX AND NOT APPLE)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(LIBSECRET REQUIRED libsecret-1)
+endif()
 if(NOT CMAKE_CROSSCOMPILING)
     find_package(Qt6 REQUIRED COMPONENTS Test)
 endif()
@@ -31,6 +35,9 @@ add_library(meridian-core STATIC
     src/rotor/UsbHint.cpp
     src/rotor/Rt21Setup.cpp
     src/rotor/UserFiles.cpp
+    src/sources/QrzXml.cpp
+    src/sources/CredentialStore.cpp
+    src/sources/QrzClient.cpp
 )
 target_include_directories(meridian-core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 # One version string: the CMake project version. Window title, QApplication,
@@ -38,7 +45,17 @@ target_include_directories(meridian-core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 target_compile_definitions(meridian-core PUBLIC MERIDIAN_VERSION="${PROJECT_VERSION}")
 target_link_libraries(meridian-core PUBLIC Qt6::Widgets Qt6::Network Qt6::SerialPort)
 if(WIN32)
-    target_link_libraries(meridian-core PUBLIC setupapi cfgmgr32 winmm)
+    target_link_libraries(meridian-core PUBLIC setupapi cfgmgr32 winmm advapi32)
+endif()
+if(UNIX AND NOT APPLE)
+    target_include_directories(meridian-core PUBLIC ${LIBSECRET_INCLUDE_DIRS})
+    target_link_libraries(meridian-core PUBLIC ${LIBSECRET_LIBRARIES})
+    target_compile_definitions(meridian-core PUBLIC MERIDIAN_HAVE_LIBSECRET=1)
+endif()
+if(APPLE)
+    target_link_libraries(meridian-core PUBLIC "-framework Security")
+endif()
+if(WIN32)
     # Private header so a close does not SetCommState the saved DCB back
     # (that re-raises DTR/RTS). Qt6_DIR is .../lib/cmake/Qt6.
     target_include_directories(meridian-core PRIVATE
@@ -118,6 +135,7 @@ function(meridian_test name)
     add_test(NAME ${name} COMMAND ${name})
 endfunction()
 meridian_test(tst_core)
+meridian_test(tst_sources)
 meridian_test(tst_finder)
 meridian_test(tst_usb)
 meridian_test(tst_driver)
@@ -136,7 +154,7 @@ target_sources(tst_settings PRIVATE
 meridian_test(tst_setup)
 target_sources(tst_setup PRIVATE src/SetupPanel.cpp)
 target_link_libraries(tst_settings PRIVATE Qt6::Svg)
-set_tests_properties(tst_usb tst_settings tst_setup PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+set_tests_properties(tst_usb tst_settings tst_setup tst_sources PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
 
 install(TARGETS meridian meridian-mock

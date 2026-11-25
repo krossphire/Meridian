@@ -59,6 +59,7 @@ private:
     };
 
     void buildStation();
+    void buildSources();
     void buildRotors();
     void buildController();
     bool commitDraft(bool interactive);
@@ -105,6 +106,9 @@ private:
     class QCheckBox *sunBox = nullptr;
     class QCheckBox *compassBox = nullptr;
     class QCheckBox *beamBox = nullptr;
+    QLineEdit *qrzUserEdit = nullptr;
+    QLineEdit *qrzPassEdit = nullptr;
+    bool qrzPassStored = false;
     class QSpinBox *idleSpin = nullptr;
     QListWidget *rotorList = nullptr;
     QLineEdit *nameEdit = nullptr;
