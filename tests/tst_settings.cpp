@@ -18,12 +18,14 @@
 
 #include "GlobeWidget.h"
 #include "StatusTone.h"
+#include "StatusTone.h"
 
 #include <QAbstractButton>
 #include <QComboBox>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
+#include <QLabel>
 #include <QLineEdit>
 #include <QSpinBox>
 #include <QCoreApplication>
@@ -50,6 +52,7 @@ private slots:
     void tcpConfigTurnsNetworkConnectionOn();
     void tcpConnectTurnsNetworkConnectionOn();
     void qrzPasswordIsNotWrittenToIni();
+    void sourcesAndQrzRoundTrip();
 #ifdef Q_OS_UNIX
     void liveSerialFindStopsAndResumesAfterTheProbe();
     void networkConnectionDefaultsOffAndBlocksTheModule();
@@ -695,6 +698,74 @@ void TestSettings::beamButtonShowsBeamingThenYields()
     const QPoint eastOnDisc = globe->rect().center() + QPoint(120, 0);
     QTest::mouseClick(globe, Qt::LeftButton, Qt::NoModifier, eastOnDisc);
     QVERIFY(!button->isVisible());
+}
+
+void TestSettings::sourcesAndQrzRoundTrip()
+{
+    CredentialStore::useMemoryForTests(true);
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    UserFiles::setRoot(dir.path());
+
+    AppConfig config = AppConfig::defaults();
+    SettingsDialog dialog(config, nullptr, nullptr);
+    auto *user = dialog.findChild<QLineEdit *>(QStringLiteral("qrzUsername"));
+    auto *pass = dialog.findChild<QLineEdit *>(QStringLiteral("qrzPassword"));
+    QVERIFY(user && pass);
+    user->setText(QStringLiteral("K5PO"));
+    pass->setText(QStringLiteral("s3cret-not-for-ini"));
+    bool wrote = false;
+    QObject::connect(&dialog, &SettingsDialog::configSaved, &dialog, [&](const AppConfig &saved) {
+        wrote = UserFiles::save(saved);
+    });
+    auto *box = dialog.findChild<QDialogButtonBox *>();
+    QVERIFY(box);
+    box->button(QDialogButtonBox::Save)->click();
+    QVERIFY(wrote);
+
+    QFile file(UserFiles::settingsPath());
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QString body = QString::fromUtf8(file.readAll());
+    file.close();
+    QVERIFY(body.contains(QStringLiteral("K5PO")));
+    QVERIFY(!body.contains(QStringLiteral("s3cret-not-for-ini")));
+    QVERIFY(!body.contains(QStringLiteral("password="), Qt::CaseInsensitive));
+    QCOMPARE(CredentialStore::serviceName(), QStringLiteral("Meridian QRZ"));
+    QCOMPARE(CredentialStore::load(QStringLiteral("K5PO")), QStringLiteral("s3cret-not-for-ini"));
+
+    SettingsDialog reopened(UserFiles::load(), nullptr, nullptr);
+    auto *userAgain = reopened.findChild<QLineEdit *>(QStringLiteral("qrzUsername"));
+    auto *passAgain = reopened.findChild<QLineEdit *>(QStringLiteral("qrzPassword"));
+    QVERIFY(userAgain && passAgain);
+    QCOMPARE(userAgain->text(), QStringLiteral("K5PO"));
+    QCOMPARE(passAgain->text(), QString());
+    QCOMPARE(passAgain->placeholderText(), QStringLiteral("••••• saved"));
+
+    CredentialStore::failStoresForTests(true);
+    user->setText(QStringLiteral("NOCALL"));
+    pass->setText(QStringLiteral("nope"));
+    box->button(QDialogButtonBox::Save)->click();
+    auto *status = dialog.findChild<QLabel *>(QStringLiteral("setupStatus"));
+    QVERIFY(status);
+    QVERIFY(status->text().contains(QStringLiteral("Couldn't save the QRZ password")));
+    QVERIFY(status->styleSheet().contains(statusToneColor(StatusTone::Busy).name()));
+    QCOMPARE(pass->placeholderText(), QStringLiteral("Password"));
+    QVERIFY(CredentialStore::load(QStringLiteral("NOCALL")).isEmpty());
+    CredentialStore::failStoresForTests(false);
+
+    QVERIFY(QFile::setPermissions(dir.path(), QFileDevice::ReadOwner | QFileDevice::ExeOwner));
+    MainWindow window(AppConfig::defaults(), nullptr);
+    SettingsDialog *settings = window.settingsDialog();
+    auto *save = settings->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Save);
+    QVERIFY(save);
+    save->click();
+    auto *windowStatus = settings->findChild<QLabel *>(QStringLiteral("setupStatus"));
+    QVERIFY(windowStatus);
+    QVERIFY(windowStatus->text().contains(QStringLiteral("Couldn't write meridian.ini.")));
+    QVERIFY(windowStatus->styleSheet().contains(statusToneColor(StatusTone::Busy).name()));
+    QFile::setPermissions(dir.path(), QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+
+    CredentialStore::useMemoryForTests(false);
 }
 
 QTEST_MAIN(TestSettings)
