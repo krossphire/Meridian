@@ -11,6 +11,7 @@
 #include "map/DayNight.h"
 #include "map/GeoMap.h"
 
+#include <QAbstractButton>
 #include <QDateTime>
 #include <QFile>
 #include <QImage>
@@ -29,6 +30,7 @@ private slots:
     void terminatorIsCurved();
     void subsolarProjectsInside();
     void rimSegmentsStayShort();
+    void beamButtonTurns();
 };
 
 void TestGlobe::clickEastAndEdit()
@@ -235,6 +237,28 @@ void TestGlobe::rimSegmentsStayShort()
         }
     }
     QVERIFY(checked > 100);
+}
+
+void TestGlobe::beamButtonTurns()
+{
+    GlobeWidget globe;
+    globe.resize(900, 900);
+    globe.show();
+    auto *button = globe.findChild<QAbstractButton *>(QStringLiteral("beamButton"));
+    QVERIFY(button);
+    QVERIFY(!button->isVisible());
+    globe.setBeamOffer(QStringLiteral("c91ru"), 92.4);
+    QVERIFY(button->isVisible());
+    QVERIFY(button->toolTip().isEmpty());
+    QSignalSpy turns(&globe, &GlobeWidget::bearingRequested);
+    QTest::mouseClick(button, Qt::LeftButton);
+    QCOMPARE(turns.size(), 1);
+    QCOMPARE(turns.at(0).at(0).toDouble(), 92.4);
+    globe.clearBeamOffer();
+    QVERIFY(!button->isVisible());
+    globe.setBeamOffer(QStringLiteral("C91RU"), 92.4);
+    globe.setLoggerBeamEnabled(false);
+    QVERIFY(!button->isVisible());
 }
 
 QTEST_MAIN(TestGlobe)

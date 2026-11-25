@@ -18,6 +18,7 @@
 #include <QtMath>
 
 #include <algorithm>
+#include <cmath>
 
 namespace {
 
@@ -115,4 +116,39 @@ QString Gridsquare::fromLatLon(double lat, double lon)
 
     return QString(letters.at(i1)) + letters.at(i2) + QString::number(i3) + QString::number(i4)
            + letters.at(i5) + letters.at(i6);
+}
+
+bool Gridsquare::bearingTo(double fromLat, double fromLon, double toLat, double toLon, double &bearing)
+{
+    if (!qIsFinite(fromLat) || !qIsFinite(fromLon) || !qIsFinite(toLat) || !qIsFinite(toLon)
+        || qAbs(fromLat) > 90.0 || qAbs(toLat) > 90.0 || qAbs(fromLon) > 180.0 || qAbs(toLon) > 180.0) {
+        bearing = 0.0;
+        return false;
+    }
+    if (fromLat == toLat && fromLon == toLon) {
+        bearing = 0.0;
+        return true;
+    }
+    constexpr double kDegToRad = 0.017453292519943295;
+    constexpr double kRadToDeg = 57.29577951308232;
+    const double dLon = (toLon - fromLon) * kDegToRad;
+    const double lat1 = fromLat * kDegToRad;
+    const double lat2 = toLat * kDegToRad;
+    const double y = std::sin(dLon) * std::cos(lat2);
+    const double x = std::cos(lat1) * std::sin(lat2) - std::sin(lat1) * std::cos(lat2) * std::cos(dLon);
+    bearing = std::fmod((std::atan2(y, x) * kRadToDeg + 360.0), 360.0);
+    return true;
+}
+
+bool Gridsquare::bearingTo(const QString &fromGrid, const QString &toGrid, double &bearing)
+{
+    double fromLat = 0;
+    double fromLon = 0;
+    double toLat = 0;
+    double toLon = 0;
+    if (!toLatLon(fromGrid, fromLat, fromLon) || !toLatLon(toGrid, toLat, toLon)) {
+        bearing = 0.0;
+        return false;
+    }
+    return bearingTo(fromLat, fromLon, toLat, toLon, bearing);
 }

@@ -97,6 +97,73 @@ private:
     QSvgRenderer renderer;
 };
 
+class BeamButton : public QAbstractButton
+{
+public:
+    explicit BeamButton(QWidget *parent)
+        : QAbstractButton(parent)
+    {
+        setObjectName(QStringLiteral("beamButton"));
+        setCursor(Qt::PointingHandCursor);
+        setFocusPolicy(Qt::NoFocus);
+        hide();
+    }
+
+    void setOffer(const QString &call, double azimuth)
+    {
+        callsign = call.trimmed().toUpper();
+        degrees = azimuth;
+        updateGeometry();
+        update();
+    }
+
+    double azimuth() const { return degrees; }
+
+    QSize sizeHint() const override
+    {
+        const QFontMetrics metrics(labelFont());
+        const QStringList lines = labelLines();
+        int width = 0;
+        for (const QString &line : lines)
+            width = std::max(width, metrics.horizontalAdvance(line));
+        return QSize(width + 18, metrics.height() * lines.size() + 10);
+    }
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setRenderHint(QPainter::TextAntialiasing, true);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(underMouse() ? QColor(255, 204, 48) : QColor(255, 191, 0));
+        painter.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 8, 8);
+        painter.setPen(QColor(28, 22, 8));
+        painter.setFont(labelFont());
+        painter.drawText(rect().adjusted(8, 2, -8, -2), Qt::AlignCenter, labelLines().join(QLatin1Char('\n')));
+    }
+
+private:
+    QFont labelFont() const
+    {
+        QFont font(QStringLiteral("Inter"));
+        font.setPixelSize(11);
+        font.setWeight(QFont::Medium);
+        return font;
+    }
+
+    QStringList labelLines() const
+    {
+        const QString call = callsign.isEmpty() ? QStringLiteral("—") : callsign;
+        const QString heading = QString::number(degrees, 'f', 1);
+        return {QStringLiteral("Beam toward:"),
+                QStringLiteral("%1 at %2°?").arg(call, heading)};
+    }
+
+    QString callsign;
+    double degrees = 0;
+};
+
 class StatusDot : public QWidget
 {
 public:
@@ -350,6 +417,11 @@ GlobeWidget::GlobeWidget(QWidget *parent)
     auto *gearButton = new GearButton(this);
     gear = gearButton;
     connect(gearButton, &QAbstractButton::clicked, this, [this]() { emit settingsRequested(); });
+    auto *beamButton = new BeamButton(this);
+    beam = beamButton;
+    connect(beamButton, &QAbstractButton::clicked, this, [this, beamButton]() {
+        emit bearingRequested(clampRt21Azimuth(beamButton->azimuth()));
+    });
     dot = new StatusDot(this);
     rotors = new QComboBox(this);
     rotors->setObjectName(QStringLiteral("rotorPick"));
@@ -512,6 +584,66 @@ void GlobeWidget::setCompassVisible(bool on)
         return;
     compassOn = on;
     update();
+}
+
+void GlobeWidget::setLoggerBeamEnabled(bool on)
+{
+    if (loggerBeam == on)
+        return;
+    loggerBeam = on;
+    placeBeam();
+    update();
+}
+
+void GlobeWidget::setBeamOffer(const QString &call, double azimuth)
+{
+    beamCall = call.trimmed().toUpper();
+    beamAzimuth = azimuth;
+    if (auto *button = static_cast<BeamButton *>(beam))
+        button->setOffer(beamCall, beamAzimuth);
+    placeBeam();
+    update();
+}
+
+void GlobeWidget::clearBeamOffer()
+{
+    setBeamOffer(QString(), 0);
+}
+
+void GlobeWidget::placeBeam()
+{
+    if (!beam)
+        return;
+    auto *button = static_cast<BeamButton *>(beam);
+    const bool show = loggerBeam && !beamCall.isEmpty() && width() >= 420;
+    if (!show) {
+        button->hide();
+        return;
+    }
+    const QSize hint = button->sizeHint();
+    const QRectF globe = disk();
+    const QPointF center = globe.center();
+    const double radius = globe.width() / 2.0;
+    int x = width() - hint.width() - 10;
+    int y = 10;
+    auto overlaps = [&](int left, int top) {
+        const double px = std::clamp(center.x(), double(left), double(left + hint.width()));
+        const double py = std::clamp(center.y(), double(top), double(top + hint.height()));
+        return std::hypot(px - center.x(), py - center.y()) < radius + 2.0;
+    };
+    for (int guard = 0; overlaps(x, y) && guard < 24; ++guard) {
+        if (x + hint.width() < width() - 4)
+            x += 6;
+        else
+            y -= 4;
+    }
+    if (overlaps(x, y) || x < 8 || y < 4) {
+        button->hide();
+        return;
+    }
+    button->setGeometry(x, y, hint.width(), hint.height());
+    button->show();
+    button->raise();
 }
 
 void GlobeWidget::setSolarPreview(const QDateTime &utc)
@@ -702,6 +834,7 @@ void GlobeWidget::placeChrome()
         editor->setFont(headingFont());
         editor->setGeometry(headingBounds().toAlignedRect().adjusted(-8, -2, 8, 2));
     }
+    placeBeam();
 }
 
 void GlobeWidget::ensureSun()
