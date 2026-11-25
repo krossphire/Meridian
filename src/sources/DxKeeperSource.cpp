@@ -90,10 +90,12 @@ QString DxKeeperSource::requestItem(const wchar_t *name)
     if (!data)
         return {};
     DWORD size = 0;
-    const char *text = static_cast<const char *>(DdeAccessData(data, &size));
+    // MinGW declares DdeAccessData as returning LPBYTE. That is unsigned char*,
+    // which does not static_cast to char*.
+    const auto *bytes = DdeAccessData(data, &size);
     QString value;
-    if (text)
-        value = QString::fromLocal8Bit(text, int(size ? size - 1 : 0)).trimmed();
+    if (bytes)
+        value = QString::fromLocal8Bit(reinterpret_cast<const char *>(bytes), int(size ? size - 1 : 0)).trimmed();
     DdeUnaccessData(data);
     DdeFreeDataHandle(data);
     return value;
