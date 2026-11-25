@@ -19,6 +19,7 @@ class SettingsDialog;
 class QrzClient;
 class WsjtSource;
 class N1mmSource;
+class DxKeeperSource;
 class QSettings;
 class QTimer;
 
@@ -53,6 +54,7 @@ private:
     void refreshQrz();
     void refreshWsjt();
     void refreshN1mm();
+    void refreshDxKeeper();
 
     AppConfig config;
     QSettings *settings = nullptr;
@@ -68,5 +70,6 @@ private:
     QrzClient *qrz = nullptr;
     WsjtSource *wsjt = nullptr;
     N1mmSource *n1mm = nullptr;
+    DxKeeperSource *dxKeeper = nullptr;
     QString pendingCall;
 };
