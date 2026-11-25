@@ -367,8 +367,19 @@ void SettingsDialog::setDriver(Rt21Driver *next)
 
 void SettingsDialog::setStatus(const QString &text)
 {
+    setStatus(text, statusTone(text));
+}
+
+void SettingsDialog::noteSettingsWrite(bool ok)
+{
+    if (!ok)
+        setStatus(QStringLiteral("Couldn't write meridian.ini."), StatusTone::Busy);
+}
+
+void SettingsDialog::setStatus(const QString &text, StatusTone tone)
+{
     statusPlain = text;
-    statusToneNow = statusTone(text);
+    statusToneNow = tone;
     if (!statusFadeTimer) {
         statusFadeTimer = new QTimer(this);
         statusFadeTimer->setSingleShot(true);
@@ -482,10 +493,12 @@ bool SettingsDialog::commitDraft(bool interactive)
     }
     if (qrzPassEdit && !qrzPassEdit->text().isEmpty()) {
         if (!CredentialStore::store(draft.qrzUsername, qrzPassEdit->text()))
-            setStatus(QStringLiteral("Couldn't save the QRZ password. It was not written to meridian.ini."));
-        qrzPassEdit->clear();
-        qrzPassStored = !draft.qrzUsername.isEmpty();
-        qrzPassEdit->setPlaceholderText(qrzPassStored ? QStringLiteral("Saved in the keychain")
+            setStatus(QStringLiteral("Couldn't save the QRZ password. It was not written to meridian.ini."),
+                      StatusTone::Busy);
+        else
+            qrzPassEdit->clear();
+        qrzPassStored = !draft.qrzUsername.isEmpty() && !CredentialStore::load(draft.qrzUsername).isEmpty();
+        qrzPassEdit->setPlaceholderText(qrzPassStored ? QStringLiteral("••••• saved")
                                                       : QStringLiteral("Password"));
     }
     if (idleSpin)
@@ -518,7 +531,7 @@ void SettingsDialog::setConfig(const AppConfig &config)
     if (qrzPassEdit) {
         qrzPassEdit->clear();
         qrzPassStored = !draft.qrzUsername.isEmpty() && !CredentialStore::load(draft.qrzUsername).isEmpty();
-        qrzPassEdit->setPlaceholderText(qrzPassStored ? QStringLiteral("Saved in the keychain")
+        qrzPassEdit->setPlaceholderText(qrzPassStored ? QStringLiteral("••••• saved")
                                                       : QStringLiteral("Password"));
     }
     if (idleSpin)
@@ -648,7 +661,7 @@ void SettingsDialog::buildSources()
     qrzPassEdit->setObjectName(QStringLiteral("qrzPassword"));
     qrzPassEdit->setEchoMode(QLineEdit::Password);
     qrzPassStored = !draft.qrzUsername.isEmpty() && !CredentialStore::load(draft.qrzUsername).isEmpty();
-    qrzPassEdit->setPlaceholderText(qrzPassStored ? QStringLiteral("Saved in the keychain")
+    qrzPassEdit->setPlaceholderText(qrzPassStored ? QStringLiteral("••••• saved")
                                                   : QStringLiteral("Password"));
     auto *clear = new QPushButton(QStringLiteral("Clear password"));
     clear->setFlat(true);

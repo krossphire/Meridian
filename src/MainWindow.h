@@ -44,6 +44,7 @@ private:
     void connectActive();
     void openSettings();
     void applyConfig(const AppConfig &saved);
+    void persistConfig();
     void syncDrivers();
     void retireDriver(const QString &id);
     void adopt(Rt21Driver *driver);
