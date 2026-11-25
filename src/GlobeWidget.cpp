@@ -97,6 +97,57 @@ private:
     QSvgRenderer renderer;
 };
 
+class CompassPill : public QAbstractButton
+{
+public:
+    explicit CompassPill(const QString &label, QWidget *parent)
+        : QAbstractButton(parent)
+        , label(label)
+    {
+        setCursor(Qt::PointingHandCursor);
+        setFocusPolicy(Qt::NoFocus);
+        setText(label);
+    }
+
+    void setLit(bool on, bool turning)
+    {
+        if (lit == on && moving == turning)
+            return;
+        lit = on;
+        moving = turning;
+        update();
+    }
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setPen(Qt::NoPen);
+        if (lit)
+            painter.setBrush(moving ? QColor(224, 177, 92) : onHeadingGreen());
+        else
+            painter.setBrush(QColor(255, 255, 255, 16));
+        painter.drawRoundedRect(rect(), 10, 10);
+        QFont font(QStringLiteral("Inter"));
+        font.setPixelSize(11);
+        font.setWeight(QFont::Medium);
+        painter.setFont(font);
+        if (lit && moving)
+            painter.setPen(QColor(28, 22, 8));
+        else if (lit)
+            painter.setPen(QColor(10, 28, 20));
+        else
+            painter.setPen(QColor(142, 160, 153));
+        painter.drawText(rect(), Qt::AlignCenter, label);
+    }
+
+private:
+    QString label;
+    bool lit = false;
+    bool moving = false;
+};
+
 class StatusDot : public QWidget
 {
 public:
@@ -350,6 +401,14 @@ GlobeWidget::GlobeWidget(QWidget *parent)
     auto *gearButton = new GearButton(this);
     gear = gearButton;
     connect(gearButton, &QAbstractButton::clicked, this, [this]() { emit settingsRequested(); });
+    for (int i = 0; i < kCompassCount; ++i) {
+        const QString label = QString::fromLatin1(compassLabel(i));
+        auto *pill = new CompassPill(label, this);
+        pill->setObjectName(QStringLiteral("compass") + label);
+        const double azimuth = i * 45.0;
+        connect(pill, &QAbstractButton::clicked, this, [this, azimuth]() { emit bearingRequested(azimuth); });
+        compassPills[i] = pill;
+    }
     dot = new StatusDot(this);
     rotors = new QComboBox(this);
     rotors->setObjectName(QStringLiteral("rotorPick"));
@@ -466,6 +525,7 @@ void GlobeWidget::setHome(double lat, double lon)
 void GlobeWidget::setHeading(std::optional<double> azimuth)
 {
     heading = azimuth;
+    placeCompass();
     update();
 }
 
@@ -511,6 +571,7 @@ void GlobeWidget::setCompassVisible(bool on)
     if (compassOn == on)
         return;
     compassOn = on;
+    placeCompass();
     update();
 }
 
@@ -702,6 +763,7 @@ void GlobeWidget::placeChrome()
         editor->setFont(headingFont());
         editor->setGeometry(headingBounds().toAlignedRect().adjusted(-8, -2, 8, 2));
     }
+    placeCompass();
 }
 
 void GlobeWidget::ensureSun()
@@ -888,19 +950,17 @@ void GlobeWidget::paintScene(QPainter &painter)
         painter.setPen(toneColor);
         painter.drawText(box.adjusted(12, 0, 0, 0), Qt::AlignLeft | Qt::AlignVCenter, line);
     }
-    paintCompass(painter);
 }
 
-void GlobeWidget::paintCompass(QPainter &painter)
+void GlobeWidget::placeCompass()
 {
-    if (compassInset() <= 0)
-        return;
+    static_assert(kCompassCount == 8, "compassPills is one button per compass point");
+    const bool show = compassInset() > 0;
     const int active = heading ? nearestCompassIndex(*heading) : -1;
     const bool moving = link == Link::Moving;
     QFont font(QStringLiteral("Inter"));
     font.setPixelSize(11);
     font.setWeight(QFont::Medium);
-    painter.setFont(font);
     const QFontMetrics metrics(font);
     const int gap = 6;
     int total = 0;
@@ -913,22 +973,17 @@ void GlobeWidget::paintCompass(QPainter &painter)
     int x = int(std::round((width() - total) / 2.0));
     const int y = height() - 28;
     for (int i = 0; i < kCompassCount; ++i) {
-        const QRectF pill(x, y, widths[i], 20);
-        const bool on = i == active;
-        painter.setPen(Qt::NoPen);
-        if (on) {
-            painter.setBrush(moving ? QColor(224, 177, 92) : QColor(125, 206, 160, 210));
-        } else {
-            painter.setBrush(QColor(255, 255, 255, 16));
+        auto *pill = static_cast<CompassPill *>(compassPills[i]);
+        if (!pill)
+            continue;
+        pill->setLit(show && i == active, moving);
+        if (!show) {
+            pill->hide();
+            continue;
         }
-        painter.drawRoundedRect(pill, 10, 10);
-        if (on && moving)
-            painter.setPen(QColor(28, 22, 8));
-        else if (on)
-            painter.setPen(QColor(10, 28, 20));
-        else
-            painter.setPen(QColor(142, 160, 153));
-        painter.drawText(pill, Qt::AlignCenter, QString::fromLatin1(compassLabel(i)));
+        pill->setGeometry(x, y, widths[i], 20);
+        pill->show();
+        pill->raise();
         x += widths[i] + gap;
     }
 }
