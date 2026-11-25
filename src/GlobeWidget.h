@@ -113,6 +113,7 @@ private:
     QString linkDetail;
     int hoverIndex = -1;
     QString hoverName;
+    QString hoverPrefix;
     QPointF hoverPos;
     qreal forcedDpr = 0;
 

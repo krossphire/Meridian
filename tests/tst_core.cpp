@@ -10,6 +10,7 @@
 #include "core/Gridsquare.h"
 #include "core/Projection.h"
 #include "core/ZipCodes.h"
+#include "map/Dxcc.h"
 #include "map/GeoMap.h"
 #include "core/Solar.h"
 #include "rotor/Reconnect.h"
@@ -37,6 +38,7 @@ private slots:
     void azimuthClamp();
     void projectionRoundTrip();
     void countryHit();
+    void dxccHover();
     void framing();
     void strictSemicolonFrames();
     void commands();
@@ -238,6 +240,28 @@ void TestCore::countryHit()
     QVERIFY(paris >= 0);
     QCOMPARE(layer.countries.at(paris).name, QStringLiteral("France"));
     QCOMPARE(shortCountryName(QStringLiteral("United States of America")), QStringLiteral("United States"));
+}
+
+void TestCore::dxccHover()
+{
+    QFile outlines(QStringLiteral(MERIDIAN_DATA_DIR) + QStringLiteral("/dxcc.bin"));
+    QFile names(QStringLiteral(MERIDIAN_DATA_DIR) + QStringLiteral("/dxcc-names.tsv"));
+    QVERIFY(outlines.open(QIODevice::ReadOnly));
+    QVERIFY(names.open(QIODevice::ReadOnly));
+    QVERIFY(loadDxcc(outlines.readAll(), names.readAll()));
+    const DxccLabel zealand = dxccForCountry(QStringLiteral("New Zealand"));
+    QCOMPARE(zealand.name, QStringLiteral("New Zealand"));
+    QCOMPARE(zealand.prefix, QStringLiteral("ZL"));
+    const DxccLabel alaska = dxccAt(64.0, -153.0);
+    QCOMPARE(alaska.name, QStringLiteral("Alaska"));
+    QCOMPARE(alaska.prefix, QStringLiteral("KL7"));
+    const DxccLabel hawaii = dxccAt(21.3, -157.8);
+    QCOMPARE(hawaii.prefix, QStringLiteral("KH6"));
+    const DxccLabel azores = dxccAt(37.8, -25.5);
+    QCOMPARE(azores.prefix, QStringLiteral("CU"));
+    const DxccLabel sardinia = dxccAt(40.1, 9.0);
+    QCOMPARE(sardinia.prefix, QStringLiteral("IS0"));
+    QVERIFY(!dxccEntities().isEmpty());
 }
 
 void TestCore::framing()

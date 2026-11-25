@@ -79,8 +79,9 @@ std::optional<QString> readVersion(QIODevice *device, int timeoutMs, QByteArray 
         framer.append(chunk);
         for (const QByteArray &frame : framer.take()) {
             const QString text = Rt21::payloadAfterSoh(frame);
-            if (text.contains(QStringLiteral("RT-21"))) {
-                version = text;
+            const QString firmware = rt21Firmware(frame);
+            if (!firmware.isEmpty()) {
+                version = firmware;
                 return true;
             }
         }
@@ -181,26 +182,39 @@ std::optional<FoundRotor> Rt21Finder::probeSerial(const QString &portName, const
     const auto heading = readHeading(&port, timeoutMs, &rx);
     TrafficLog::instance().recordSession("FIND-RX", rx);
     TrafficLog::instance().recordSession(
-        "FIND", heading ? QByteArray("hit ") + where : QByteArray("no reply ") + where);
-    // Deliver the port's last completion before its notifier is destroyed.
-    // Closing and then destroying it as the worker thread exits crashes in
-    // ntdll on Windows (overlapped I/O into a freed port).
-    // Destroy the port on this thread, with no event-loop turn in between.
-    // processEvents after close delivered a freed overlapped read into
-    // ntdll (c0000005 at ntdll+0x69a21) on the Find worker.
+        "FIND", heading ? QByteArray("heading ") + where : QByteArray("no reply ") + where);
+    std::optional<QString> version;
+    if (heading) {
+        // A DCU-1 can answer a heading. R11 has to name an RT-21 or the port loses.
+        TrafficLog::instance().recordSession("FIND-TX", Rt21::queryVersion());
+        port.write(Rt21::queryVersion());
+        port.flush();
+        version = readVersion(&port, timeoutMs, &rx);
+        TrafficLog::instance().recordSession("FIND-RX", rx);
+    }
+    // Close on this thread, with no event-loop turn after close. processEvents
+    // after close delivered a freed overlapped read into ntdll on Windows.
     port.blockSignals(true);
     port.clear(QSerialPort::AllDirections);
     if (port.isOpen())
         port.close();
-    if (!heading)
+    if (!heading || !version) {
+        if (heading)
+            TrafficLog::instance().recordSession("FIND", QByteArray("no firmware ") + where);
         return std::nullopt;
+    }
+    if (!version) {
+        TrafficLog::instance().recordSession("FIND", QByteArray("no firmware ") + where);
+        return std::nullopt;
+    }
     FoundRotor found;
     found.endpoint.transport = RotorEndpoint::Transport::Serial;
     found.endpoint.serialPort = portName;
     found.endpoint.baud = baud;
     found.heading = *heading;
+    found.firmware = *version;
     const QString shown = kind.isEmpty() ? QStringLiteral("serial") : kind;
-    found.label = foundRotorLabel(portName, shown, baud, *heading);
+    found.label = foundRotorLabel(portName, shown, baud, *heading) + QStringLiteral(", ") + *version;
     return found;
 }
 
@@ -285,6 +299,22 @@ QString plainLinkFailure(const QString &message)
     if (trimmed.isEmpty() || trimmed.compare(QStringLiteral("Unknown error"), Qt::CaseInsensitive) == 0)
         return QStringLiteral("The rotor closed the connection.");
     return trimmed;
+}
+
+QString closeNote(const QString &reason, const QString &errorString)
+{
+    const QString trimmed = errorString.trimmed();
+    if (trimmed.isEmpty() || trimmed.compare(QStringLiteral("Unknown error"), Qt::CaseInsensitive) == 0)
+        return QStringLiteral("close %1").arg(reason);
+    return QStringLiteral("close %1 error=%2").arg(reason, trimmed);
+}
+
+QString rt21Firmware(const QByteArray &frame)
+{
+    const QString text = Rt21::payloadAfterSoh(frame).trimmed();
+    if (!text.contains(QStringLiteral("RT-21")))
+        return {};
+    return text;
 }
 
 namespace {
@@ -763,6 +793,7 @@ void FindScan::openNext()
     TrafficLog::instance().recordSession("FIND", QByteArray("probe ") + where + " " + step.kind.toLatin1());
     rx.clear();
     framer.clear();
+    awaitingFirmware = false;
     if (!port->open(QIODevice::ReadWrite)) {
         TrafficLog::instance().recordSession("FIND", QByteArray("open failed ") + where);
         destroyPort();
@@ -787,23 +818,41 @@ void FindScan::onReady()
     rx.append(chunk);
     framer.append(chunk);
     for (const QByteArray &frame : framer.take()) {
-        if (const auto heading = Rt21::parseHeadingFrame(frame)) {
+        if (!awaitingFirmware) {
+            if (const auto heading = Rt21::parseHeadingFrame(frame)) {
+                const Step step = steps.at(stepIndex);
+                const QByteArray where = step.name.toLatin1() + " " + QByteArray::number(step.baud);
+                TrafficLog::instance().recordSession("FIND-RX", rx);
+                TrafficLog::instance().recordSession("FIND", QByteArray("heading ") + where);
+                FoundRotor hit;
+                hit.endpoint.transport = RotorEndpoint::Transport::Serial;
+                hit.endpoint.serialPort = step.name;
+                hit.endpoint.baud = step.baud;
+                hit.heading = *heading;
+                const QString shown = step.kind.isEmpty() ? QStringLiteral("serial") : step.kind;
+                hit.label = foundRotorLabel(step.name, shown, step.baud, *heading);
+                pendingHit = hit;
+                awaitingFirmware = true;
+                const QByteArray version = Rt21::queryVersion();
+                TrafficLog::instance().recordSession("FIND-TX", version);
+                port->write(version);
+                port->flush();
+                timer->start(std::max(1, request.serialTimeoutMs));
+                return;
+            }
+        } else if (const QString firmware = rt21Firmware(frame); !firmware.isEmpty()) {
             timer->stop();
             const Step step = steps.at(stepIndex);
             const QByteArray where = step.name.toLatin1() + " " + QByteArray::number(step.baud);
             TrafficLog::instance().recordSession("FIND-RX", rx);
-            TrafficLog::instance().recordSession("FIND", QByteArray("hit ") + where);
-            FoundRotor hit;
-            hit.endpoint.transport = RotorEndpoint::Transport::Serial;
-            hit.endpoint.serialPort = step.name;
-            hit.endpoint.baud = step.baud;
-            hit.heading = *heading;
-            const QString shown = step.kind.isEmpty() ? QStringLiteral("serial") : step.kind;
-            hit.label = foundRotorLabel(step.name, shown, step.baud, *heading);
-            pendingHit = hit;
+            TrafficLog::instance().recordSession("FIND", QByteArray("firmware ") + firmware.toLatin1());
+            pendingHit.firmware = firmware;
+            pendingHit.label += QStringLiteral(", ") + firmware;
             gotHit = true;
+            awaitingFirmware = false;
             destroyPort();
             QTimer::singleShot(0, this, &FindScan::afterPortClosed);
+            Q_UNUSED(where);
             return;
         }
     }
@@ -817,8 +866,10 @@ void FindScan::onTimeout()
         const Step step = steps.at(stepIndex);
         const QByteArray where = step.name.toLatin1() + " " + QByteArray::number(step.baud);
         TrafficLog::instance().recordSession("FIND-RX", rx);
-        TrafficLog::instance().recordSession("FIND", QByteArray("no reply ") + where);
+        TrafficLog::instance().recordSession(
+            "FIND", awaitingFirmware ? QByteArray("no firmware ") + where : QByteArray("no reply ") + where);
     }
+    awaitingFirmware = false;
     ++stepIndex;
     destroyPort();
     QTimer::singleShot(0, this, &FindScan::afterPortClosed);

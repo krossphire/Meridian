@@ -67,6 +67,7 @@ The command bytes are in [docs/RT21_PROTOCOL.md](docs/RT21_PROTOCOL.md). How the
 - The gear opens settings. On a very small window it stays hidden until the pointer is over the map. Ctrl+, opens settings too.
 - A rotor menu appears only when more than one rotor is saved.
 - The dot is the link: green connected, amber moving or connecting, red failed. The tooltip has the reason.
+- Hovering a country shows the DXCC name and its primary prefix, for example New Zealand over (ZL). Alaska, Hawaii, Puerto Rico, the Azores, Sardinia, and the French overseas territories are separate entities.
 - N, NE, E, SE, S, SW, W, and NW sit along the bottom. The pill nearest the heading is green, and amber while the rotor is moving. Settings can hide the row.
 - When a station is active, a small yellow button in the upper right reads “Beam toward” and the call. One click turns the short path. Settings can hide it. Callsigns, QRZ, and ports stay in Settings. QRZ XML is optional, on the Sources page. The password stays in the system keychain.
 - **Show sun & day/night** is on by default. The sun and the day/night tint are not clickable.
