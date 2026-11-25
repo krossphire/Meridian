@@ -42,13 +42,19 @@ inline StatusTone statusTone(const QString &text)
     return StatusTone::Neutral;
 }
 
+// Stopped, on-heading compass pill. The beaming button uses this same color.
+inline QColor onHeadingGreen()
+{
+    return QColor(125, 206, 160, 210);
+}
+
 inline QColor statusToneColor(StatusTone tone)
 {
     switch (tone) {
     case StatusTone::Busy:
         return QColor(224, 177, 92);
     case StatusTone::Success:
-        return QColor(125, 206, 160);
+        return QColor(onHeadingGreen().red(), onHeadingGreen().green(), onHeadingGreen().blue());
     case StatusTone::Failure:
         return QColor(224, 108, 92);
     case StatusTone::Neutral:
