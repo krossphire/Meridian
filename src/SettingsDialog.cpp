@@ -468,6 +468,13 @@ bool SettingsDialog::commitDraft(bool interactive)
         draft.loggerBeamButton = beamBox->isChecked();
     if (qrzUserEdit)
         draft.qrzUsername = qrzUserEdit->text().trimmed();
+    if (wsjtPortEdit) {
+        bool ok = false;
+        const int port = wsjtPortEdit->text().trimmed().toInt(&ok);
+        draft.wsjtPort = ok && port > 0 && port <= 65535 ? port : 0;
+    }
+    if (wsjtGroupEdit)
+        draft.wsjtMulticast = wsjtGroupEdit->text().trimmed();
     if (qrzPassEdit && !qrzPassEdit->text().isEmpty()) {
         if (!CredentialStore::store(draft.qrzUsername, qrzPassEdit->text()))
             setStatus(QStringLiteral("Couldn't save the QRZ password. It was not written to meridian.ini."));
@@ -497,6 +504,10 @@ void SettingsDialog::setConfig(const AppConfig &config)
         beamBox->setChecked(draft.loggerBeamButton);
     if (qrzUserEdit)
         qrzUserEdit->setText(draft.qrzUsername);
+    if (wsjtPortEdit)
+        wsjtPortEdit->setText(draft.wsjtPort > 0 ? QString::number(draft.wsjtPort) : QString());
+    if (wsjtGroupEdit)
+        wsjtGroupEdit->setText(draft.wsjtMulticast);
     if (qrzPassEdit) {
         qrzPassEdit->clear();
         qrzPassStored = !draft.qrzUsername.isEmpty() && !CredentialStore::load(draft.qrzUsername).isEmpty();
@@ -648,6 +659,24 @@ void SettingsDialog::buildSources()
     layout->addWidget(qrzUserEdit);
     layout->addWidget(qrzPassEdit);
     layout->addWidget(clear, 0, Qt::AlignLeft);
+    auto *wsjt = new QLabel(QStringLiteral(
+        "WSJT-X and WSJT-Z send a Status packet with the DX call and grid. "
+        "Meridian does not listen on 2237, so it does not take the port WSJT-X uses itself. "
+        "In QLog, open Settings, Network, WSJT-X, turn on UDP forward, and send it to 127.0.0.1 and the port you type here. "
+        "Or set WSJT-X Reporting to a multicast group such as 239.255.0.1 and the same port, and type that group here. "
+        "Leave the port empty and nothing is bound."));
+    wsjt->setWordWrap(true);
+    wsjt->setObjectName(QStringLiteral("hint"));
+    wsjtPortEdit = new QLineEdit(draft.wsjtPort > 0 ? QString::number(draft.wsjtPort) : QString());
+    wsjtPortEdit->setObjectName(QStringLiteral("wsjtPort"));
+    wsjtPortEdit->setPlaceholderText(QStringLiteral("QLog forward port"));
+    wsjtGroupEdit = new QLineEdit(draft.wsjtMulticast);
+    wsjtGroupEdit->setObjectName(QStringLiteral("wsjtMulticast"));
+    wsjtGroupEdit->setPlaceholderText(QStringLiteral("Multicast group, optional"));
+    layout->addSpacing(18);
+    layout->addWidget(wsjt);
+    layout->addWidget(wsjtPortEdit);
+    layout->addWidget(wsjtGroupEdit);
     layout->addStretch();
     tabs->addTab(page, QStringLiteral("Sources"));
 }

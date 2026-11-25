@@ -8,6 +8,10 @@
 #include "rotor/AppConfig.h"
 #include "sources/CredentialStore.h"
 #include "sources/QrzXml.h"
+#include "sources/WsjtSource.h"
+#include "sources/WsjtStatus.h"
+
+#include <QDataStream>
 
 #include <QFile>
 #include <QSettings>
@@ -20,6 +24,7 @@ class TestSources : public QObject
 private slots:
     void qrzXmlUsesLatLonNotBearing();
     void passwordStaysOutOfIni();
+    void wsjtStatusFixture();
 };
 
 void TestSources::qrzXmlUsesLatLonNotBearing()
@@ -86,6 +91,35 @@ void TestSources::passwordStaysOutOfIni()
     CredentialStore::forget(QStringLiteral("K5PO"));
     QVERIFY(CredentialStore::load(QStringLiteral("K5PO")).isEmpty());
     CredentialStore::useMemoryForTests(false);
+}
+
+void TestSources::wsjtStatusFixture()
+{
+    QVERIFY(!wsjtListenAllowed(0, QString()));
+    QVERIFY(!wsjtListenAllowed(2237, QString()));
+    QVERIFY(wsjtListenAllowed(2238, QString()));
+    QVERIFY(wsjtListenAllowed(2237, QStringLiteral("239.255.0.1")));
+    QCOMPARE(AppConfig::defaults().wsjtPort, 0);
+
+    QByteArray datagram;
+    QDataStream stream(&datagram, QIODevice::WriteOnly);
+    stream.setByteOrder(QDataStream::BigEndian);
+    stream << quint32(0xadbccbda) << quint32(3) << quint32(1);
+    stream << QByteArray("WSJT-X") << quint64(14074000) << QByteArray("FT8");
+    stream << QByteArray("C91RU") << QByteArray("-10") << QByteArray("FT8");
+    stream << true << false << false;
+    stream << quint32(1200) << quint32(1200);
+    stream << QByteArray("K5PO") << QByteArray("EM26") << QByteArray("KG54");
+    const WsjtStatus status = parseWsjtStatus(datagram);
+    QVERIFY(status.isStatus);
+    QCOMPARE(status.dxCall, QStringLiteral("C91RU"));
+    QCOMPARE(status.dxGrid, QStringLiteral("KG54"));
+
+    QByteArray heartbeat;
+    QDataStream heart(&heartbeat, QIODevice::WriteOnly);
+    heart.setByteOrder(QDataStream::BigEndian);
+    heart << quint32(0xadbccbda) << quint32(3) << quint32(0);
+    QVERIFY(!parseWsjtStatus(heartbeat).isStatus);
 }
 
 QTEST_MAIN(TestSources)

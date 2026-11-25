@@ -18,6 +18,7 @@
 #include "rotor/UserFiles.h"
 #include "sources/CredentialStore.h"
 #include "sources/QrzClient.h"
+#include "sources/WsjtSource.h"
 
 #include <QDateTime>
 #include <QFile>
@@ -57,6 +58,7 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
         offerStation(call, grid);
     });
     refreshQrz();
+    refreshWsjt();
     connect(globe, &GlobeWidget::rotorSelected, this, [this](int index) {
         if (index < 0 || index >= config.rotors.size() || index == config.active)
             return;
@@ -139,7 +141,23 @@ void MainWindow::applyConfig(const AppConfig &saved)
     globe->setCompassVisible(config.compassButtons);
     globe->setLoggerBeamEnabled(config.loggerBeamButton);
     refreshQrz();
+    refreshWsjt();
     syncDrivers();
+}
+
+void MainWindow::refreshWsjt()
+{
+    if (!wsjt) {
+        wsjt = new WsjtSource(this);
+        connect(wsjt, &WsjtSource::dxStation, this, [this](const QString &call, const QString &grid) {
+            offerStation(call, grid);
+        });
+        connect(wsjt, &WsjtSource::note, this, [this](const QString &text) {
+            if (globe)
+                globe->setStatusLine(text, StatusTone::Neutral);
+        });
+    }
+    wsjt->listen(config.wsjtPort, config.wsjtMulticast);
 }
 
 void MainWindow::refreshQrz()

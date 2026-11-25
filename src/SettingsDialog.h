@@ -109,6 +109,8 @@ private:
     QLineEdit *qrzUserEdit = nullptr;
     QLineEdit *qrzPassEdit = nullptr;
     bool qrzPassStored = false;
+    QLineEdit *wsjtPortEdit = nullptr;
+    QLineEdit *wsjtGroupEdit = nullptr;
     class QSpinBox *idleSpin = nullptr;
     QListWidget *rotorList = nullptr;
     QLineEdit *nameEdit = nullptr;

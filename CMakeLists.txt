@@ -38,6 +38,8 @@ add_library(meridian-core STATIC
     src/sources/QrzXml.cpp
     src/sources/CredentialStore.cpp
     src/sources/QrzClient.cpp
+    src/sources/WsjtStatus.cpp
+    src/sources/WsjtSource.cpp
 )
 target_include_directories(meridian-core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 # One version string: the CMake project version. Window title, QApplication,
