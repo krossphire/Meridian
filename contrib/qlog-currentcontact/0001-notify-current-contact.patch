@@ -1,0 +1,239 @@
+--- a/core/LogParam.h
++++ b/core/LogParam.h
+@@ -271,6 +271,8 @@
+     static void setNetworkNotifAlertsSpotAddrs(const QString &addrs);
+     static QString getNetworkNotifRigStateAddrs();
+     static void setNetworkNotifRigStateAddrs(const QString &addrs);
++    static QString getNetworkNotifCurrentContactAddrs();
++    static void setNetworkNotifCurrentContactAddrs(const QString &addrs);
+     static int getNetworkFldigiUDPListenerPort(int defaultPort);
+     static void setNetworkFldigiUDPListenerPort(int port);
+     static int getNetworkWsjtxListenerPort(int defaultPort);
+--- a/core/LogParam.cpp
++++ b/core/LogParam.cpp
+@@ -990,6 +990,16 @@
+     setParam("network/notif/rig/state/addrs", addrs);
+ }
+ 
++QString LogParam::getNetworkNotifCurrentContactAddrs()
++{
++    return getParam("network/notif/currentcontact/addrs").toString();
++}
++
++void LogParam::setNetworkNotifCurrentContactAddrs(const QString &addrs)
++{
++    setParam("network/notif/currentcontact/addrs", addrs);
++}
++
+ int LogParam::getNetworkFldigiUDPListenerPort(int defaultPort)
+ {
+     return getParam("network/listener/fldigi/udp/port", defaultPort).toInt();
+--- a/notification/NetworkNotification.h
++++ b/notification/NetworkNotification.h
+@@ -128,6 +128,17 @@
+ 
+ };
+ 
++class CurrentContactNotificationMsg : public GenericNotificationMsg
++{
++
++public:
++    explicit CurrentContactNotificationMsg(const QString &callsign,
++                                           const QString &grid,
++                                           double azimuth,
++                                           QObject *parent = nullptr);
++
++};
++
+ class NetworkNotification : public QObject
+ {
+     Q_OBJECT
+@@ -144,6 +155,8 @@
+     static void saveNotifSpotAlertAddrs(const QString &);
+     static QString getNotifRigStateAddrs();
+     static void saveNotifRigStateAddrs(const QString &);
++    static QString getNotifCurrentContactAddrs();
++    static void saveNotifCurrentContactAddrs(const QString &);
+ 
+ public slots:
+     void QSOInserted(const QSqlRecord &);
+@@ -156,6 +169,7 @@
+     void WSJTXCQSpot(const WsjtxEntry&);
+     void spotAlert(const SpotAlert&);
+     void rigStatus(const Rig::Status&);
++    void currentContact(const QString &callsign, const QString &grid, double azimuth);
+ 
+ private:
+ 
+--- a/notification/NetworkNotification.cpp
++++ b/notification/NetworkNotification.cpp
+@@ -1,4 +1,5 @@
+ #include <QUuid>
++#include <QtMath>
+ 
+ #include "NetworkNotification.h"
+ #include "core/debug.h"
+@@ -82,6 +83,20 @@
+      LogParam::setNetworkNotifRigStateAddrs(addresses);
+ }
+ 
++QString NetworkNotification::getNotifCurrentContactAddrs()
++{
++    FCT_IDENTIFICATION;
++
++    return LogParam::getNetworkNotifCurrentContactAddrs();
++}
++
++void NetworkNotification::saveNotifCurrentContactAddrs(const QString &addresses)
++{
++    FCT_IDENTIFICATION;
++
++    LogParam::setNetworkNotifCurrentContactAddrs(addresses);
++}
++
+ void NetworkNotification::QSOInserted(const QSqlRecord &record)
+ {
+     FCT_IDENTIFICATION;
+@@ -227,6 +242,19 @@
+     }
+ }
+ 
++void NetworkNotification::currentContact(const QString &callsign, const QString &grid, double azimuth)
++{
++    FCT_IDENTIFICATION;
++
++    HostsPortString destList(getNotifCurrentContactAddrs());
++
++    if ( destList.getAddrList().size() > 0 )
++    {
++        CurrentContactNotificationMsg msg(callsign, grid, azimuth);
++        send(msg.getJson(), destList);
++    }
++}
++
+ void NetworkNotification::send(const QByteArray &data, const HostsPortString &dests)
+ {
+     FCT_IDENTIFICATION;
+@@ -786,3 +814,22 @@
+     msg["msgtype"] = "rigstatus";
+     msg["data"] = rigData;
+ }
++
++CurrentContactNotificationMsg::CurrentContactNotificationMsg(const QString &callsign,
++                                                             const QString &grid,
++                                                             double azimuth,
++                                                             QObject *parent) :
++    GenericNotificationMsg(parent)
++{
++    FCT_IDENTIFICATION;
++
++    QJsonObject data;
++    data["callsign"] = callsign.trimmed().toUpper();
++    data["grid"] = grid.trimmed().toUpper();
++    if ( qIsFinite(azimuth) )
++        data["azimuth"] = azimuth;
++
++    msg["msgtype"] = "currentcontact";
++    msg["data"] = data;
++}
++
+--- a/ui/NewContactWidget.h
++++ b/ui/NewContactWidget.h
+@@ -239,6 +239,7 @@
+                         const QDateTime date);
+     void rigProfileChanged();
+     void callsignChanged(const QString& callsign);
++    void currentContactChanged(const QString &callsign, const QString &grid, double azimuth);
+     void stationCallsignChanged(const QString &callsign);
+     void contactReset();
+     void txBandChanged(const QString &bandName);
+--- a/ui/NewContactWidget.cpp
++++ b/ui/NewContactWidget.cpp
+@@ -511,6 +511,7 @@
+         setDxccInfo(DxccEntity());
+         updateTime();
+         stopContactTimer();
++        emit currentContactChanged(QString(), QString(), 0.0);
+     }
+     else
+     {
+@@ -2723,6 +2724,7 @@
+         ui->bearingInfo->setText(QString("%1° (%2: %3°)").arg(QString::number(bearing, '.', 1),
+                                                               tr("LP"),
+                                                               QString::number(LPBearing, '.', 1)));
++        emit currentContactChanged(ui->callsignEdit->text(), uiDynamic->gridEdit->text(), bearing);
+ 
+         QString partnerTimeZoneString = Data::instance()->getIANATimeZone(lat, lon);
+ 
+--- a/ui/MainWindow.cpp
++++ b/ui/MainWindow.cpp
+@@ -441,6 +441,7 @@
+     connect(ui->newContactWidget, &NewContactWidget::contactAdded, ui->logbookWidget, &LogbookWidget::updateTable);
+     connect(ui->newContactWidget, &NewContactWidget::contactAdded, ui->logbookWidget, &LogbookWidget::setDefaultSort);
+     connect(ui->newContactWidget, &NewContactWidget::contactAdded, &networknotification, &NetworkNotification::QSOInserted);
++    connect(ui->newContactWidget, &NewContactWidget::currentContactChanged, &networknotification, &NetworkNotification::currentContact);
+     connect(ui->newContactWidget, &NewContactWidget::contactAdded, ui->bandmapWidget, &BandmapWidget::updateSpotsStatusWhenQSOAdded);
+     connect(ui->newContactWidget, &NewContactWidget::contactAdded, ui->alertsWidget, &AlertWidget::updateSpotsStatusWhenQSOAdded);
+     connect(ui->newContactWidget, &NewContactWidget::contactAdded, ui->chatWidget, &ChatWidget::updateSpotsStatusWhenQSOAdded);
+--- a/ui/SettingsDialog.cpp
++++ b/ui/SettingsDialog.cpp
+@@ -614,7 +614,8 @@
+     {
+         ui->wsjtForwardEdit, ui->notifQSOEdit,
+         ui->notifDXSpotsEdit, ui->notifWSJTXCQSpotsEdit,
+-        ui->notifSpotAlertEdit, ui->notifRigEdit
++        ui->notifSpotAlertEdit, ui->notifRigEdit,
++        ui->notifCurrentContactEdit
+     };
+ 
+     for ( QLineEdit *edit : hostsPortEdits )
+@@ -3118,6 +3119,7 @@
+     ui->notifWSJTXCQSpotsEdit->setText(NetworkNotification::getNotifWSJTXCQSpotAddrs());
+     ui->notifSpotAlertEdit->setText(NetworkNotification::getNotifSpotAlertAddrs());
+     ui->notifRigEdit->setText(NetworkNotification::getNotifRigStateAddrs());
++    ui->notifCurrentContactEdit->setText(NetworkNotification::getNotifCurrentContactAddrs());
+ 
+     /*******/
+     /* GUI */
+@@ -3296,6 +3298,7 @@
+     NetworkNotification::saveNotifWSJTXCQSpotAddrs(ui->notifWSJTXCQSpotsEdit->text());
+     NetworkNotification::saveNotifSpotAlertAddrs(ui->notifSpotAlertEdit->text());
+     NetworkNotification::saveNotifRigStateAddrs(ui->notifRigEdit->text());
++    NetworkNotification::saveNotifCurrentContactAddrs(ui->notifCurrentContactEdit->text());
+ 
+     /*******/
+     /* GUI */
+--- a/ui/SettingsDialog.ui
++++ b/ui/SettingsDialog.ui
+@@ -4936,6 +4936,23 @@
+             </property>
+            </widget>
+           </item>
++          <item row="6" column="0">
++           <widget class="QLabel" name="notifCurrentContactLabel">
++            <property name="text">
++             <string>Current contact</string>
++            </property>
++           </widget>
++          </item>
++          <item row="6" column="1">
++           <widget class="QLineEdit" name="notifCurrentContactEdit">
++            <property name="toolTip">
++             <string>&lt;p&gt;List of IP addresses to which QLog sends a UDP notification when the New Contact callsign or grid changes.&lt;/p&gt;The message type is currentcontact and carries callsign, grid, and short-path azimuth. Addresses are separated by a space and have the form IP:PORT.</string>
++            </property>
++            <property name="placeholderText">
++             <string>ex. 127.0.0.1:2333</string>
++            </property>
++           </widget>
++          </item>
+          </layout>
+         </widget>
+        </item>
+@@ -5769,6 +5786,7 @@
+   <tabstop>notifQSOEdit</tabstop>
+   <tabstop>notifWSJTXCQSpotsEdit</tabstop>
+   <tabstop>notifRigEdit</tabstop>
++  <tabstop>notifCurrentContactEdit</tabstop>
+   <tabstop>tabWidget</tabstop>
+   <tabstop>tabWidget_2</tabstop>
+   <tabstop>cwHostNameEdit</tabstop>

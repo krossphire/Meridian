@@ -20,6 +20,7 @@
 #include "sources/CredentialStore.h"
 #include "sources/QrzClient.h"
 #include "sources/DxKeeperSource.h"
+#include "sources/QlogSource.h"
 #include "sources/N1mmSource.h"
 #include "sources/WsjtSource.h"
 
@@ -64,6 +65,7 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
     refreshWsjt();
     refreshN1mm();
     refreshDxKeeper();
+    refreshQlog();
     connect(globe, &GlobeWidget::rotorSelected, this, [this](int index) {
         if (index < 0 || index >= config.rotors.size() || index == config.active)
             return;
@@ -153,6 +155,7 @@ void MainWindow::applyConfig(const AppConfig &saved)
     refreshWsjt();
     refreshN1mm();
     refreshDxKeeper();
+    refreshQlog();
     syncDrivers();
 }
 
@@ -182,6 +185,27 @@ void MainWindow::refreshDxKeeper()
         connect(dxKeeper, &DxKeeperSource::cleared, this, [this]() { offerStation(QString(), QString()); });
     }
     dxKeeper->setEnabled(config.dxKeeper);
+}
+
+void MainWindow::refreshQlog()
+{
+    if (!qlog) {
+        qlog = new QlogSource(this);
+        connect(qlog, &QlogSource::currentContact, this,
+                [this](const QString &call, const QString &grid, double azimuth, bool haveAzimuth) {
+                    if (call.isEmpty()) {
+                        offerStation(QString(), QString());
+                        return;
+                    }
+                    if (!grid.isEmpty())
+                        offerStation(call, grid);
+                    else if (haveAzimuth && globe)
+                        globe->setBeamOffer(call, azimuth);
+                    else
+                        offerStation(call, QString());
+                });
+    }
+    qlog->listen(config.qlogPort);
 }
 
 void MainWindow::refreshWsjt()

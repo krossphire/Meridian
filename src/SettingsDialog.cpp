@@ -120,13 +120,13 @@ SettingsDialog::SettingsDialog(const AppConfig &config, const ZipDatabase *zipDb
     setupTabs->setDocumentMode(true);
     layout->addWidget(tabs, 1);
     buildStation();
-    buildSources();
     buildRotors();
     buildController();
     setupPanel = new SetupPanel(this);
     if (setupColumn)
         setupColumn->addTail(setupPanel->portsPage(), setupPanel->networkPage());
     tabs->addTab(setupTabs, QStringLiteral("Setup"));
+    buildSources();
     connect(setupPanel, &SetupPanel::statusMessage, this, [this](const QString &text) { setStatus(text); });
     connect(setupPanel, &SetupPanel::networkWriteRequested, this,
             [this](const QString &key, const QString &value, const QString &settingName) {
@@ -482,6 +482,11 @@ bool SettingsDialog::commitDraft(bool interactive)
     }
     if (dxKeeperBox)
         draft.dxKeeper = dxKeeperBox->isChecked();
+    if (qlogPortEdit) {
+        bool ok = false;
+        const int port = qlogPortEdit->text().trimmed().toInt(&ok);
+        draft.qlogPort = ok && port > 0 && port <= 65535 ? port : 0;
+    }
     if (qrzPassEdit && !qrzPassEdit->text().isEmpty()) {
         if (!CredentialStore::store(draft.qrzUsername, qrzPassEdit->text()))
             setStatus(QStringLiteral("Couldn't save the QRZ password. It was not written to meridian.ini."));
@@ -519,6 +524,8 @@ void SettingsDialog::setConfig(const AppConfig &config)
         n1mmPortEdit->setText(draft.n1mmPort > 0 ? QString::number(draft.n1mmPort) : QString());
     if (dxKeeperBox)
         dxKeeperBox->setChecked(draft.dxKeeper);
+    if (qlogPortEdit)
+        qlogPortEdit->setText(draft.qlogPort > 0 ? QString::number(draft.qlogPort) : QString());
     if (qrzPassEdit) {
         qrzPassEdit->clear();
         qrzPassStored = !draft.qrzUsername.isEmpty() && !CredentialStore::load(draft.qrzUsername).isEmpty();
@@ -719,6 +726,20 @@ void SettingsDialog::buildSources()
     layout->addSpacing(18);
     layout->addWidget(keeper);
     layout->addWidget(dxKeeperBox);
+    auto *qlog = new QLabel(QStringLiteral(
+        "QLog does not send the callsign under the cursor yet. "
+        "contrib/qlog-currentcontact/ is a draft patch that adds a UDP notification, msgtype currentcontact, "
+        "with the callsign, grid, and short-path azimuth, when the New Contact callsign or grid changes. "
+        "Point that notification at 127.0.0.1 and the port you type here. The port stays empty until you do. "
+        "Meridian turns from your home when the message includes a grid."));
+    qlog->setWordWrap(true);
+    qlog->setObjectName(QStringLiteral("hint"));
+    qlogPortEdit = new QLineEdit(draft.qlogPort > 0 ? QString::number(draft.qlogPort) : QString());
+    qlogPortEdit->setObjectName(QStringLiteral("qlogPort"));
+    qlogPortEdit->setPlaceholderText(QStringLiteral("QLog current-contact port"));
+    layout->addSpacing(18);
+    layout->addWidget(qlog);
+    layout->addWidget(qlogPortEdit);
     layout->addStretch();
     tabs->addTab(page, QStringLiteral("Sources"));
 }
