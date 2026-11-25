@@ -95,6 +95,8 @@ private:
     void placeCompass();
     int compassInset() const;
     void placeBeam();
+    void beginBeaming();
+    void abandonBeam();
     void commitHeading();
     void cancelHeading();
 
@@ -131,6 +133,8 @@ private:
     bool loggerBeam = true;
     QString beamCall;
     double beamAzimuth = 0;
+    double beamGap = -1;
+    bool beamClick = false;
     QAbstractButton *beam = nullptr;
     bool headingStale = false;
     bool sunDirty = true;
