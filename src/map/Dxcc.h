@@ -16,6 +16,8 @@
 
 #include <QString>
 
+#include <optional>
+
 struct DxccLabel {
     QString name;
     QString prefix;
@@ -39,3 +41,13 @@ DxccLabel dxccAt(double lat, double lon);
 
 // Natural Earth country name to the DXCC label. Prefix may be empty.
 DxccLabel dxccForCountry(const QString &naturalEarthName);
+
+// Longest prefix of a callsign in the local DXCC table.
+struct DxccCall {
+    QString prefix;
+    QString country;
+    bool havePoint = false;
+    double latitude = 0;
+    double longitude = 0;
+};
+std::optional<DxccCall> dxccForCallsign(const QString &call);
