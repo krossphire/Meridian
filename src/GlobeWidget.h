@@ -52,6 +52,9 @@ public:
     void setBeamOffer(const QString &call, double azimuth);
     void clearBeamOffer();
     void revealCallsign(const QString &seed = QString());
+    void setFindBusy(bool busy);
+    QString statusText() const { return statusLine; }
+    StatusTone statusToneValue() const { return statusToneNow; }
     void setSolarPreview(const QDateTime &utc);
     void setRotors(const QStringList &names, int active);
 
@@ -141,7 +144,9 @@ private:
     bool beamClick = false;
     QAbstractButton *beam = nullptr;
     QAbstractButton *callButton = nullptr;
+    QAbstractButton *findCall = nullptr;
     QLineEdit *callEdit = nullptr;
+    bool findBusy = false;
     bool callHover = false;
     bool headingStale = false;
     bool sunDirty = true;

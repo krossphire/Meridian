@@ -67,4 +67,5 @@ private:
     QrzClient *qrz = nullptr;
     WsjtSource *wsjt = nullptr;
     QString pendingCall;
+    qint64 findNoteUntilMs = 0;
 };

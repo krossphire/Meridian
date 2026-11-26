@@ -179,8 +179,14 @@ void MainWindow::refreshQrz()
                     offerStation(call.isEmpty() ? pendingCall : call, grid, latitude, longitude, havePoint, false);
                 });
         connect(qrz, &QrzClient::note, this, [this](const QString &text) {
+            if (!globe)
+                return;
+            globe->setStatusLine(text, StatusTone::Busy);
+            findNoteUntilMs = QDateTime::currentMSecsSinceEpoch() + 8000;
+        });
+        connect(qrz, &QrzClient::lookupFinished, this, [this](bool) {
             if (globe)
-                globe->setStatusLine(text, StatusTone::Neutral);
+                globe->setFindBusy(false);
         });
     }
     qrz->setUsername(config.qrzUsername);
@@ -202,8 +208,11 @@ void MainWindow::offerStation(const QString &call, const QString &grid, double l
     if (!havePoint) {
         if (grid.isEmpty() || !Gridsquare::toLatLon(grid, lat, lon)) {
             globe->clearBeamOffer();
-            if (allowLookup && grid.isEmpty() && qrz && qrz->configured())
+            if (allowLookup && grid.isEmpty() && qrz) {
+                globe->setFindBusy(true);
                 qrz->lookup(pendingCall);
+            } else if (globe)
+                globe->setFindBusy(false);
             return;
         }
         havePoint = true;
@@ -211,14 +220,18 @@ void MainWindow::offerStation(const QString &call, const QString &grid, double l
     double bearing = 0;
     if (!Gridsquare::bearingTo(globe->homeLat(), globe->homeLon(), lat, lon, bearing)) {
         globe->clearBeamOffer();
+        globe->setFindBusy(false);
         return;
     }
+    globe->setFindBusy(false);
     globe->setBeamOffer(pendingCall, bearing);
 }
 
 void MainWindow::refreshStatus()
 {
     if (!globe)
+        return;
+    if (QDateTime::currentMSecsSinceEpoch() < findNoteUntilMs)
         return;
     const RotorEndpoint *active = config.activeRotor();
     if (!active || !active->configured()) {
