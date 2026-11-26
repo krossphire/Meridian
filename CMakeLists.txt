@@ -140,6 +140,12 @@ function(meridian_test name)
     add_executable(${name} tests/${name}.cpp)
     target_link_libraries(${name} PRIVATE meridian-core meridian-mocklib Qt6::Test)
     target_compile_definitions(${name} PRIVATE MERIDIAN_DATA_DIR="${CMAKE_SOURCE_DIR}/data" MERIDIAN_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+    if(WIN32)
+        # Qt6::Widgets pulls in -mwindows. A GUI-subsystem test hides its
+        # console, so a crash reaches ctest with an empty log.
+        set_target_properties(${name} PROPERTIES WIN32_EXECUTABLE FALSE)
+        target_link_options(${name} PRIVATE -mconsole)
+    endif()
     add_test(NAME ${name} COMMAND ${name})
 endfunction()
 meridian_test(tst_core)

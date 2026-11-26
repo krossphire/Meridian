@@ -105,13 +105,12 @@ jobs:
           windeployqt --release --compiler-runtime --no-translations --no-system-d3d-compiler --no-opengl-sw --skip-plugin-types generic --exclude-plugins qgif,qico,qjpeg,qcertonlybackend (Join-Path $dest "meridian.exe")
           [System.IO.File]::WriteAllText((Join-Path $dest "qt.conf"), "[Paths]`nPrefix=.`nPlugins=.`n")
 
-          # Coastlines, DXCC outlines, the prefix table, and the licenses.
+          # Coastlines, DXCC outlines, the Big CTY prefix table, and the licenses.
           # These are also compiled into the exe. The loose copies travel with
-          # the test build so it shows what it was built from. The full Big CTY
-          # prefix file is not vendored; dxcc-names.tsv is the derived table,
-          # and LICENSE.CTY is its license.
+          # the test build so it shows what it was built from. cty.dat is
+          # vendored; dxcc-prefixes.tsv is the table the program loads.
           New-Item -ItemType Directory -Force (Join-Path $dest "data"), (Join-Path $dest "licenses") | Out-Null
-          Copy-Item data/map110.bin, data/map50.bin, data/zcta.bin, data/dxcc.bin, data/dxcc-names.tsv (Join-Path $dest "data")
+          Copy-Item data/map110.bin, data/map50.bin, data/zcta.bin, data/dxcc.bin, data/dxcc-names.tsv, data/dxcc-prefixes.tsv (Join-Path $dest "data")
           Copy-Item LICENSE (Join-Path $dest "licenses/GPL-3.0.txt")
           Copy-Item third_party/cty/LICENSE.CTY (Join-Path $dest "licenses/LICENSE.CTY")
           Copy-Item third_party/inter/OFL.txt (Join-Path $dest "licenses/OFL.txt")
@@ -137,7 +136,7 @@ jobs:
           $exe = Join-Path $dest "meridian.exe"
           if (-not (Test-Path $exe)) { throw "Package is missing meridian.exe." }
           foreach ($required in @(
-            "data/dxcc.bin", "data/dxcc-names.tsv", "data/map50.bin", "data/map110.bin",
+            "data/dxcc.bin", "data/dxcc-names.tsv", "data/dxcc-prefixes.tsv", "data/map50.bin", "data/map110.bin",
             "licenses/LICENSE.CTY", "licenses/GPL-3.0.txt", "licenses/OFL.txt", "qt.conf")) {
             if (-not (Test-Path (Join-Path $dest $required))) { throw "Package is missing $required." }
           }

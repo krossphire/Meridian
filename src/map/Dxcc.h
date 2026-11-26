@@ -33,7 +33,8 @@ struct DxccEntity {
     float maxLon = -180;
 };
 
-bool loadDxcc(const QByteArray &outlines, const QByteArray &names);
+// prefixes is optional Big CTY output: prefix, natural name, P or E.
+bool loadDxcc(const QByteArray &outlines, const QByteArray &names, const QByteArray &prefixes = {});
 const QVector<DxccEntity> &dxccEntities();
 
 // Split-entity polygon, or an empty label when the point is in the parent only.

@@ -18,6 +18,7 @@
 #include "rotor/Rt21Protocol.h"
 
 #include <QSettings>
+#include <QTemporaryDir>
 
 #include <QDateTime>
 #include <QFile>
@@ -44,6 +45,7 @@ private slots:
     void projectionRoundTrip();
     void countryHit();
     void dxccHover();
+    void homeCoordinatesRoundTrip();
     void framing();
     void strictSemicolonFrames();
     void commands();
@@ -244,7 +246,9 @@ void TestCore::preciseHomeBearing()
     QVERIFY(std::abs(degrees->latitude - 36.25) < 1e-9);
     QVERIFY(std::abs(degrees->longitude - (-94.25)) < 1e-9);
 
-    QSettings bare(QStringLiteral("meridian-empty-rotors.ini"), QSettings::IniFormat);
+    QTemporaryDir bareDir;
+    QVERIFY(bareDir.isValid());
+    QSettings bare(bareDir.filePath(QStringLiteral("meridian.ini")), QSettings::IniFormat);
     bare.clear();
     bare.setValue(QStringLiteral("home/text"), QStringLiteral("FN31"));
     bare.sync();
@@ -366,9 +370,11 @@ void TestCore::dxccHover()
 {
     QFile outlines(QStringLiteral(MERIDIAN_DATA_DIR) + QStringLiteral("/dxcc.bin"));
     QFile names(QStringLiteral(MERIDIAN_DATA_DIR) + QStringLiteral("/dxcc-names.tsv"));
+    QFile prefixes(QStringLiteral(MERIDIAN_DATA_DIR) + QStringLiteral("/dxcc-prefixes.tsv"));
     QVERIFY(outlines.open(QIODevice::ReadOnly));
     QVERIFY(names.open(QIODevice::ReadOnly));
-    QVERIFY(loadDxcc(outlines.readAll(), names.readAll()));
+    QVERIFY(prefixes.open(QIODevice::ReadOnly));
+    QVERIFY(loadDxcc(outlines.readAll(), names.readAll(), prefixes.readAll()));
     const DxccLabel zealand = dxccForCountry(QStringLiteral("New Zealand"));
     QCOMPARE(zealand.name, QStringLiteral("New Zealand"));
     QCOMPARE(zealand.prefix, QStringLiteral("ZL"));
@@ -390,6 +396,55 @@ void TestCore::dxccHover()
     QCOMPARE(mixed->havePoint, hawaiiCall->havePoint);
     QCOMPARE(mixed->latitude, hawaiiCall->latitude);
     QCOMPARE(mixed->longitude, hawaiiCall->longitude);
+
+    const auto k5po = dxccForCallsign(QStringLiteral("K5PO"));
+    QVERIFY(k5po);
+    QCOMPARE(k5po->country, QStringLiteral("United States of America"));
+    const auto kh6 = dxccForCallsign(QStringLiteral("KH6"));
+    QVERIFY(kh6);
+    QCOMPARE(kh6->country, QStringLiteral("Hawaii"));
+    const auto kl7 = dxccForCallsign(QStringLiteral("KL7RA"));
+    QVERIFY(kl7);
+    QCOMPARE(kl7->country, QStringLiteral("Alaska"));
+    const auto kp4 = dxccForCallsign(QStringLiteral("KP4"));
+    QVERIFY(kp4);
+    QCOMPARE(kp4->country, QStringLiteral("Puerto Rico"));
+    const auto falklands = dxccForCallsign(QStringLiteral("VP8ABC"));
+    QVERIFY(falklands);
+    QCOMPARE(falklands->country, QStringLiteral("Falkland Islands"));
+    const auto georgia = dxccForCallsign(QStringLiteral("VP8ABC/G"));
+    QVERIFY(georgia);
+    QCOMPARE(georgia->country, QStringLiteral("South Georgia and the Islands"));
+    const auto south = dxccForCallsign(QStringLiteral("VP0G"));
+    QVERIFY(south);
+    QCOMPARE(south->country, QStringLiteral("South Georgia and the Islands"));
+    const auto exact = dxccForCallsign(QStringLiteral("K6KO"));
+    QVERIFY(exact);
+    QCOMPARE(exact->country, QStringLiteral("Hawaii"));
+    QCOMPARE(exact->prefix, QStringLiteral("K6KO"));
+}
+
+void TestCore::homeCoordinatesRoundTrip()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QSettings ini(dir.filePath(QStringLiteral("meridian.ini")), QSettings::IniFormat);
+    ini.clear();
+    AppConfig config = AppConfig::defaults();
+    config.homeText = QStringLiteral("EM26");
+    config.homeLatitude = QStringLiteral("36.25");
+    config.homeLongitude = QStringLiteral("-94.25");
+    config.save(ini);
+    ini.sync();
+    const AppConfig loaded = AppConfig::load(ini);
+    QCOMPARE(loaded.homeText, QStringLiteral("EM26"));
+    QCOMPARE(loaded.homeLatitude, QStringLiteral("36.25"));
+    QCOMPARE(loaded.homeLongitude, QStringLiteral("-94.25"));
+    QString error;
+    const auto home = resolveHome(loaded.homeText, loaded.homeLatitude, loaded.homeLongitude, nullptr, &error);
+    QVERIFY2(home.has_value(), qPrintable(error));
+    QVERIFY(std::abs(home->latitude - 36.25) < 1e-9);
+    QVERIFY(std::abs(home->longitude - (-94.25)) < 1e-9);
 }
 
 void TestCore::framing()

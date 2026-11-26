@@ -1,0 +1,7650 @@
+# prefix<TAB>natural name<TAB>P prefix or E exact call. From third_party/cty/cty.dat.
+1A	Sov Mil Order of Malta	P
+9M0	Spratly Islands	P
+BM9S	Spratly Islands	P
+BN9S	Spratly Islands	P
+BO9S	Spratly Islands	P
+BP9S	Spratly Islands	P
+BQ9S	Spratly Islands	P
+BU9S	Spratly Islands	P
+BV9S	Spratly Islands	P
+BW9S	Spratly Islands	P
+BX9S	Spratly Islands	P
+1S	Spratly Islands	P
+3A	Monaco	P
+3B6	Agalega & St. Brandon	P
+3B7	Agalega & St. Brandon	P
+3B8	Mauritius	P
+3B9	Rodriguez Island	P
+3C	Equatorial Guinea	P
+3C0	Annobon Island	P
+3D2	Fiji	P
+3D2/C	Fiji	P
+3D2CCC	Fiji	E
+3D2/R	Fiji	P
+3D2RI	Fiji	E
+3DA	eSwatini	P
+3V	Tunisia	P
+TS	Tunisia	P
+3W	Vietnam	P
+XV	Vietnam	P
+3X	Guinea	P
+3Y/B	Bouvet	P
+3Y/LB5SH	Bouvet	E
+3Y/P	Peter 1 Island	P
+3Y0X	Peter 1 Island	E
+4J	Azerbaijan	P
+4K	Azerbaijan	P
+4L	Georgia	P
+4O	Montenegro	P
+4P	Sri Lanka	P
+4Q	Sri Lanka	P
+4R	Sri Lanka	P
+4S	Sri Lanka	P
+4U1I	ITU HQ	P
+4U0ITU	ITU HQ	E
+4U1ITU	ITU HQ	E
+4U1WRC	ITU HQ	E
+4U1U	United Nations HQ	P
+4U1UN	United Nations HQ	E
+*4U1V	Vienna Intl Ctr	P
+4U0R	Vienna Intl Ctr	E
+4U1A	Vienna Intl Ctr	E
+4U1VIC	Vienna Intl Ctr	E
+4U2U	Vienna Intl Ctr	E
+4UNR	Vienna Intl Ctr	E
+4Y1A	Vienna Intl Ctr	E
+C7A	Vienna Intl Ctr	E
+4W	East Timor	P
+4X	Israel	P
+4Z	Israel	P
+5A	Libya	P
+5B	Cyprus	P
+C4	Cyprus	P
+H2	Cyprus	P
+P3	Cyprus	P
+5H	United Republic of Tanzania	P
+5I	United Republic of Tanzania	P
+5N	Nigeria	P
+5O	Nigeria	P
+5R	Madagascar	P
+5S	Madagascar	P
+6X	Madagascar	P
+5T	Mauritania	P
+5U	Niger	P
+5V	Togo	P
+5W	Samoa	P
+5X	Uganda	P
+5Y	Kenya	P
+5Z	Kenya	P
+6V	Senegal	P
+6W	Senegal	P
+6Y	Jamaica	P
+7O	Yemen	P
+7P	Lesotho	P
+7Q	Malawi	P
+7R	Algeria	P
+7T	Algeria	P
+7U	Algeria	P
+7V	Algeria	P
+7W	Algeria	P
+7X	Algeria	P
+7Y	Algeria	P
+8P	Barbados	P
+8Q	Maldives	P
+8R	Guyana	P
+9A	Croatia	P
+9G	Ghana	P
+9H	Malta	P
+9I	Zambia	P
+9J	Zambia	P
+9K	Kuwait	P
+NLD	Kuwait	P
+9L	Sierra Leone	P
+9M	Malaysia	P
+9W	Malaysia	P
+9M2	Malaysia	P
+9M6	East Malaysia	P
+9M8	East Malaysia	P
+9W6	East Malaysia	P
+9W8	East Malaysia	P
+9M4CKR	East Malaysia	E
+9M4CHQ	East Malaysia	E
+9M4GKS	East Malaysia	E
+9N	Nepal	P
+9O	Democratic Republic of the Congo	P
+9P	Democratic Republic of the Congo	P
+9Q	Democratic Republic of the Congo	P
+9R	Democratic Republic of the Congo	P
+9S	Democratic Republic of the Congo	P
+9T	Democratic Republic of the Congo	P
+9U	Burundi	P
+9V	Singapore	P
+S6	Singapore	P
+9X	Rwanda	P
+9Y	Trinidad and Tobago	P
+9Z	Trinidad and Tobago	P
+8O	Botswana	P
+A2	Botswana	P
+A3	Tonga	P
+A4	Oman	P
+A5	Bhutan	P
+A6	United Arab Emirates	P
+A7	Qatar	P
+A9	Bahrain	P
+6P	Pakistan	P
+6Q	Pakistan	P
+6R	Pakistan	P
+6S	Pakistan	P
+AP	Pakistan	P
+AQ	Pakistan	P
+AR	Pakistan	P
+AS	Pakistan	P
+BS7	Scarborough Reef	P
+BS7H	Scarborough Reef	E
+BM	Taiwan	P
+BN	Taiwan	P
+BO	Taiwan	P
+BP	Taiwan	P
+BQ	Taiwan	P
+BU	Taiwan	P
+BV	Taiwan	P
+BW	Taiwan	P
+BX	Taiwan	P
+BM9P	Pratas Island	P
+BN9P	Pratas Island	P
+BO9P	Pratas Island	P
+BP9P	Pratas Island	P
+BQ9P	Pratas Island	P
+BU9P	Pratas Island	P
+BV9P	Pratas Island	P
+BW9P	Pratas Island	P
+BX9P	Pratas Island	P
+3H	China	P
+3H0	China	P
+3H9	China	P
+3I	China	P
+3I0	China	P
+3I9	China	P
+3J	China	P
+3J0	China	P
+3J9	China	P
+3K	China	P
+3K0	China	P
+3K9	China	P
+3L	China	P
+3L0	China	P
+3L9	China	P
+3M	China	P
+3M0	China	P
+3M9	China	P
+3N	China	P
+3N0	China	P
+3N9	China	P
+3O	China	P
+3O0	China	P
+3O9	China	P
+3P	China	P
+3P0	China	P
+3P9	China	P
+3Q	China	P
+3Q0	China	P
+3Q9	China	P
+3R	China	P
+3R0	China	P
+3R9	China	P
+3S	China	P
+3S0	China	P
+3S9	China	P
+3T	China	P
+3T0	China	P
+3T9	China	P
+3U	China	P
+3U0	China	P
+3U9	China	P
+B0	China	P
+B2	China	P
+B3	China	P
+B4	China	P
+B5	China	P
+B6	China	P
+B7	China	P
+B8	China	P
+B9	China	P
+BA	China	P
+BA0	China	P
+BA9	China	P
+BB	China	P
+BB0	China	P
+BB9	China	P
+BC	China	P
+BC0	China	P
+BC9	China	P
+BD	China	P
+BD0	China	P
+BD9	China	P
+BE	China	P
+BE0	China	P
+BE9	China	P
+BF	China	P
+BF0	China	P
+BF9	China	P
+BG	China	P
+BG0	China	P
+BG9	China	P
+BH	China	P
+BH0	China	P
+BH9	China	P
+BI	China	P
+BI0	China	P
+BI9	China	P
+BJ	China	P
+BK	China	P
+BK0	China	P
+BK9	China	P
+BL	China	P
+BL0	China	P
+BL9	China	P
+BT	China	P
+BT0	China	P
+BT9	China	P
+BY	China	P
+BY0	China	P
+BY9	China	P
+BZ	China	P
+BZ0	China	P
+BZ9	China	P
+XS	China	P
+XS0	China	P
+XS9	China	P
+B1	China	P
+B2A	China	P
+B2B	China	P
+B2C	China	P
+B2D	China	P
+B2E	China	P
+B2F	China	P
+B2G	China	P
+B2H	China	P
+B2I	China	P
+B2J	China	P
+B2K	China	P
+B2L	China	P
+B2M	China	P
+B2N	China	P
+B2O	China	P
+B2P	China	P
+B3G	China	P
+B3H	China	P
+B3I	China	P
+B3J	China	P
+B3K	China	P
+B3L	China	P
+B6Q	China	P
+B6R	China	P
+B6S	China	P
+B6T	China	P
+B6U	China	P
+B6V	China	P
+B6W	China	P
+B6X	China	P
+B7A	China	P
+B7B	China	P
+B7C	China	P
+B7D	China	P
+B7E	China	P
+B7F	China	P
+B7G	China	P
+B7H	China	P
+B7Q	China	P
+B7R	China	P
+B7S	China	P
+B7T	China	P
+B7U	China	P
+B7V	China	P
+B7W	China	P
+B7X	China	P
+B8A	China	P
+B8B	China	P
+B8C	China	P
+B8D	China	P
+B8E	China	P
+B8F	China	P
+B8G	China	P
+B8H	China	P
+B8I	China	P
+B8J	China	P
+B8K	China	P
+B8L	China	P
+B8M	China	P
+B8N	China	P
+B8O	China	P
+B8P	China	P
+B8Q	China	P
+B8R	China	P
+B8S	China	P
+B8T	China	P
+B8U	China	P
+B8V	China	P
+B8W	China	P
+B8X	China	P
+B9A	China	P
+B9B	China	P
+B9C	China	P
+B9D	China	P
+B9E	China	P
+B9F	China	P
+B9S	China	P
+B9T	China	P
+B9U	China	P
+B9V	China	P
+B9W	China	P
+B9X	China	P
+BA2A	China	P
+BA2B	China	P
+BA2C	China	P
+BA2D	China	P
+BA2E	China	P
+BA2F	China	P
+BA2G	China	P
+BA2H	China	P
+BA2I	China	P
+BA2J	China	P
+BA2K	China	P
+BA2L	China	P
+BA2M	China	P
+BA2N	China	P
+BA2O	China	P
+BA2P	China	P
+BA3G	China	P
+BA3H	China	P
+BA3I	China	P
+BA3J	China	P
+BA3K	China	P
+BA3L	China	P
+BA6Q	China	P
+BA6R	China	P
+BA6S	China	P
+BA6T	China	P
+BA6U	China	P
+BA6V	China	P
+BA6W	China	P
+BA6X	China	P
+BA7A	China	P
+BA7B	China	P
+BA7C	China	P
+BA7D	China	P
+BA7E	China	P
+BA7F	China	P
+BA7G	China	P
+BA7H	China	P
+BA7Q	China	P
+BA7R	China	P
+BA7S	China	P
+BA7T	China	P
+BA7U	China	P
+BA7V	China	P
+BA7W	China	P
+BA7X	China	P
+BA8A	China	P
+BA8B	China	P
+BA8C	China	P
+BA8D	China	P
+BA8E	China	P
+BA8F	China	P
+BA8G	China	P
+BA8H	China	P
+BA8I	China	P
+BA8J	China	P
+BA8K	China	P
+BA8L	China	P
+BA8M	China	P
+BA8N	China	P
+BA8O	China	P
+BA8P	China	P
+BA8Q	China	P
+BA8R	China	P
+BA8S	China	P
+BA8T	China	P
+BA8U	China	P
+BA8V	China	P
+BA8W	China	P
+BA8X	China	P
+BA9A	China	P
+BA9B	China	P
+BA9C	China	P
+BA9D	China	P
+BA9E	China	P
+BA9F	China	P
+BA9S	China	P
+BA9T	China	P
+BA9U	China	P
+BA9V	China	P
+BA9W	China	P
+BA9X	China	P
+BB2A	China	P
+BB2B	China	P
+BB2C	China	P
+BB2D	China	P
+BB2E	China	P
+BB2F	China	P
+BB2G	China	P
+BB2H	China	P
+BB2I	China	P
+BB2J	China	P
+BB2K	China	P
+BB2L	China	P
+BB2M	China	P
+BB2N	China	P
+BB2O	China	P
+BB2P	China	P
+BB3G	China	P
+BB3H	China	P
+BB3I	China	P
+BB3J	China	P
+BB3K	China	P
+BB3L	China	P
+BB6Q	China	P
+BB6R	China	P
+BB6S	China	P
+BB6T	China	P
+BB6U	China	P
+BB6V	China	P
+BB6W	China	P
+BB6X	China	P
+BB7A	China	P
+BB7B	China	P
+BB7C	China	P
+BB7D	China	P
+BB7E	China	P
+BB7F	China	P
+BB7G	China	P
+BB7H	China	P
+BB7Q	China	P
+BB7R	China	P
+BB7S	China	P
+BB7T	China	P
+BB7U	China	P
+BB7V	China	P
+BB7W	China	P
+BB7X	China	P
+BB8A	China	P
+BB8B	China	P
+BB8C	China	P
+BB8D	China	P
+BB8E	China	P
+BB8F	China	P
+BB8G	China	P
+BB8H	China	P
+BB8I	China	P
+BB8J	China	P
+BB8K	China	P
+BB8L	China	P
+BB8M	China	P
+BB8N	China	P
+BB8O	China	P
+BB8P	China	P
+BB8Q	China	P
+BB8R	China	P
+BB8S	China	P
+BB8T	China	P
+BB8U	China	P
+BB8V	China	P
+BB8W	China	P
+BB8X	China	P
+BB9A	China	P
+BB9B	China	P
+BB9C	China	P
+BB9D	China	P
+BB9E	China	P
+BB9F	China	P
+BB9S	China	P
+BB9T	China	P
+BB9U	China	P
+BB9V	China	P
+BB9W	China	P
+BB9X	China	P
+BC2A	China	P
+BC2B	China	P
+BC2C	China	P
+BC2D	China	P
+BC2E	China	P
+BC2F	China	P
+BC2G	China	P
+BC2H	China	P
+BC2I	China	P
+BC2J	China	P
+BC2K	China	P
+BC2L	China	P
+BC2M	China	P
+BC2N	China	P
+BC2O	China	P
+BC2P	China	P
+BC3G	China	P
+BC3H	China	P
+BC3I	China	P
+BC3J	China	P
+BC3K	China	P
+BC3L	China	P
+BC6Q	China	P
+BC6R	China	P
+BC6S	China	P
+BC6T	China	P
+BC6U	China	P
+BC6V	China	P
+BC6W	China	P
+BC6X	China	P
+BC7A	China	P
+BC7B	China	P
+BC7C	China	P
+BC7D	China	P
+BC7E	China	P
+BC7F	China	P
+BC7G	China	P
+BC7H	China	P
+BC7Q	China	P
+BC7R	China	P
+BC7S	China	P
+BC7T	China	P
+BC7U	China	P
+BC7V	China	P
+BC7W	China	P
+BC7X	China	P
+BC8A	China	P
+BC8B	China	P
+BC8C	China	P
+BC8D	China	P
+BC8E	China	P
+BC8F	China	P
+BC8G	China	P
+BC8H	China	P
+BC8I	China	P
+BC8J	China	P
+BC8K	China	P
+BC8L	China	P
+BC8M	China	P
+BC8N	China	P
+BC8O	China	P
+BC8P	China	P
+BC8Q	China	P
+BC8R	China	P
+BC8S	China	P
+BC8T	China	P
+BC8U	China	P
+BC8V	China	P
+BC8W	China	P
+BC8X	China	P
+BC9A	China	P
+BC9B	China	P
+BC9C	China	P
+BC9D	China	P
+BC9E	China	P
+BC9F	China	P
+BC9S	China	P
+BC9T	China	P
+BC9U	China	P
+BC9V	China	P
+BC9W	China	P
+BC9X	China	P
+BD2A	China	P
+BD2B	China	P
+BD2C	China	P
+BD2D	China	P
+BD2E	China	P
+BD2F	China	P
+BD2G	China	P
+BD2H	China	P
+BD2I	China	P
+BD2J	China	P
+BD2K	China	P
+BD2L	China	P
+BD2M	China	P
+BD2N	China	P
+BD2O	China	P
+BD2P	China	P
+BD3G	China	P
+BD3H	China	P
+BD3I	China	P
+BD3J	China	P
+BD3K	China	P
+BD3L	China	P
+BD6Q	China	P
+BD6R	China	P
+BD6S	China	P
+BD6T	China	P
+BD6U	China	P
+BD6V	China	P
+BD6W	China	P
+BD6X	China	P
+BD7A	China	P
+BD7B	China	P
+BD7C	China	P
+BD7D	China	P
+BD7E	China	P
+BD7F	China	P
+BD7G	China	P
+BD7H	China	P
+BD7Q	China	P
+BD7R	China	P
+BD7S	China	P
+BD7T	China	P
+BD7U	China	P
+BD7V	China	P
+BD7W	China	P
+BD7X	China	P
+BD8A	China	P
+BD8B	China	P
+BD8C	China	P
+BD8D	China	P
+BD8E	China	P
+BD8F	China	P
+BD8G	China	P
+BD8H	China	P
+BD8I	China	P
+BD8J	China	P
+BD8K	China	P
+BD8L	China	P
+BD8M	China	P
+BD8N	China	P
+BD8O	China	P
+BD8P	China	P
+BD8Q	China	P
+BD8R	China	P
+BD8S	China	P
+BD8T	China	P
+BD8U	China	P
+BD8V	China	P
+BD8W	China	P
+BD8X	China	P
+BD9A	China	P
+BD9B	China	P
+BD9C	China	P
+BD9D	China	P
+BD9E	China	P
+BD9F	China	P
+BD9S	China	P
+BD9T	China	P
+BD9U	China	P
+BD9V	China	P
+BD9W	China	P
+BD9X	China	P
+BE2A	China	P
+BE2B	China	P
+BE2C	China	P
+BE2D	China	P
+BE2E	China	P
+BE2F	China	P
+BE2G	China	P
+BE2H	China	P
+BE2I	China	P
+BE2J	China	P
+BE2K	China	P
+BE2L	China	P
+BE2M	China	P
+BE2N	China	P
+BE2O	China	P
+BE2P	China	P
+BE3G	China	P
+BE3H	China	P
+BE3I	China	P
+BE3J	China	P
+BE3K	China	P
+BE3L	China	P
+BE6Q	China	P
+BE6R	China	P
+BE6S	China	P
+BE6T	China	P
+BE6U	China	P
+BE6V	China	P
+BE6W	China	P
+BE6X	China	P
+BE7A	China	P
+BE7B	China	P
+BE7C	China	P
+BE7D	China	P
+BE7E	China	P
+BE7F	China	P
+BE7G	China	P
+BE7H	China	P
+BE7Q	China	P
+BE7R	China	P
+BE7S	China	P
+BE7T	China	P
+BE7U	China	P
+BE7V	China	P
+BE7W	China	P
+BE7X	China	P
+BE8A	China	P
+BE8B	China	P
+BE8C	China	P
+BE8D	China	P
+BE8E	China	P
+BE8F	China	P
+BE8G	China	P
+BE8H	China	P
+BE8I	China	P
+BE8J	China	P
+BE8K	China	P
+BE8L	China	P
+BE8M	China	P
+BE8N	China	P
+BE8O	China	P
+BE8P	China	P
+BE8Q	China	P
+BE8R	China	P
+BE8S	China	P
+BE8T	China	P
+BE8U	China	P
+BE8V	China	P
+BE8W	China	P
+BE8X	China	P
+BE9A	China	P
+BE9B	China	P
+BE9C	China	P
+BE9D	China	P
+BE9E	China	P
+BE9F	China	P
+BE9S	China	P
+BE9T	China	P
+BE9U	China	P
+BE9V	China	P
+BE9W	China	P
+BE9X	China	P
+BF2A	China	P
+BF2B	China	P
+BF2C	China	P
+BF2D	China	P
+BF2E	China	P
+BF2F	China	P
+BF2G	China	P
+BF2H	China	P
+BF2I	China	P
+BF2J	China	P
+BF2K	China	P
+BF2L	China	P
+BF2M	China	P
+BF2N	China	P
+BF2O	China	P
+BF2P	China	P
+BF3G	China	P
+BF3H	China	P
+BF3I	China	P
+BF3J	China	P
+BF3K	China	P
+BF3L	China	P
+BF6Q	China	P
+BF6R	China	P
+BF6S	China	P
+BF6T	China	P
+BF6U	China	P
+BF6V	China	P
+BF6W	China	P
+BF6X	China	P
+BF7A	China	P
+BF7B	China	P
+BF7C	China	P
+BF7D	China	P
+BF7E	China	P
+BF7F	China	P
+BF7G	China	P
+BF7H	China	P
+BF7Q	China	P
+BF7R	China	P
+BF7S	China	P
+BF7T	China	P
+BF7U	China	P
+BF7V	China	P
+BF7W	China	P
+BF7X	China	P
+BF8A	China	P
+BF8B	China	P
+BF8C	China	P
+BF8D	China	P
+BF8E	China	P
+BF8F	China	P
+BF8G	China	P
+BF8H	China	P
+BF8I	China	P
+BF8J	China	P
+BF8K	China	P
+BF8L	China	P
+BF8M	China	P
+BF8N	China	P
+BF8O	China	P
+BF8P	China	P
+BF8Q	China	P
+BF8R	China	P
+BF8S	China	P
+BF8T	China	P
+BF8U	China	P
+BF8V	China	P
+BF8W	China	P
+BF8X	China	P
+BF9A	China	P
+BF9B	China	P
+BF9C	China	P
+BF9D	China	P
+BF9E	China	P
+BF9F	China	P
+BF9S	China	P
+BF9T	China	P
+BF9U	China	P
+BF9V	China	P
+BF9W	China	P
+BF9X	China	P
+BG2A	China	P
+BG2B	China	P
+BG2C	China	P
+BG2D	China	P
+BG2E	China	P
+BG2F	China	P
+BG2G	China	P
+BG2H	China	P
+BG2I	China	P
+BG2J	China	P
+BG2K	China	P
+BG2L	China	P
+BG2M	China	P
+BG2N	China	P
+BG2O	China	P
+BG2P	China	P
+BG3G	China	P
+BG3H	China	P
+BG3I	China	P
+BG3J	China	P
+BG3K	China	P
+BG3L	China	P
+BG6Q	China	P
+BG6R	China	P
+BG6S	China	P
+BG6T	China	P
+BG6U	China	P
+BG6V	China	P
+BG6W	China	P
+BG6X	China	P
+BG7A	China	P
+BG7B	China	P
+BG7C	China	P
+BG7D	China	P
+BG7E	China	P
+BG7F	China	P
+BG7G	China	P
+BG7H	China	P
+BG7Q	China	P
+BG7R	China	P
+BG7S	China	P
+BG7T	China	P
+BG7U	China	P
+BG7V	China	P
+BG7W	China	P
+BG7X	China	P
+BG8A	China	P
+BG8B	China	P
+BG8C	China	P
+BG8D	China	P
+BG8E	China	P
+BG8F	China	P
+BG8G	China	P
+BG8H	China	P
+BG8I	China	P
+BG8J	China	P
+BG8K	China	P
+BG8L	China	P
+BG8M	China	P
+BG8N	China	P
+BG8O	China	P
+BG8P	China	P
+BG8Q	China	P
+BG8R	China	P
+BG8S	China	P
+BG8T	China	P
+BG8U	China	P
+BG8V	China	P
+BG8W	China	P
+BG8X	China	P
+BG9A	China	P
+BG9B	China	P
+BG9C	China	P
+BG9D	China	P
+BG9E	China	P
+BG9F	China	P
+BG9S	China	P
+BG9T	China	P
+BG9U	China	P
+BG9V	China	P
+BG9W	China	P
+BG9X	China	P
+BH2A	China	P
+BH2B	China	P
+BH2C	China	P
+BH2D	China	P
+BH2E	China	P
+BH2F	China	P
+BH2G	China	P
+BH2H	China	P
+BH2I	China	P
+BH2J	China	P
+BH2K	China	P
+BH2L	China	P
+BH2M	China	P
+BH2N	China	P
+BH2O	China	P
+BH2P	China	P
+BH3G	China	P
+BH3H	China	P
+BH3I	China	P
+BH3J	China	P
+BH3K	China	P
+BH3L	China	P
+BH6Q	China	P
+BH6R	China	P
+BH6S	China	P
+BH6T	China	P
+BH6U	China	P
+BH6V	China	P
+BH6W	China	P
+BH6X	China	P
+BH7A	China	P
+BH7B	China	P
+BH7C	China	P
+BH7D	China	P
+BH7E	China	P
+BH7F	China	P
+BH7G	China	P
+BH7H	China	P
+BH7Q	China	P
+BH7R	China	P
+BH7S	China	P
+BH7T	China	P
+BH7U	China	P
+BH7V	China	P
+BH7W	China	P
+BH7X	China	P
+BH8A	China	P
+BH8B	China	P
+BH8C	China	P
+BH8D	China	P
+BH8E	China	P
+BH8F	China	P
+BH8G	China	P
+BH8H	China	P
+BH8I	China	P
+BH8J	China	P
+BH8K	China	P
+BH8L	China	P
+BH8M	China	P
+BH8N	China	P
+BH8O	China	P
+BH8P	China	P
+BH8Q	China	P
+BH8R	China	P
+BH8S	China	P
+BH8T	China	P
+BH8U	China	P
+BH8V	China	P
+BH8W	China	P
+BH8X	China	P
+BH9A	China	P
+BH9B	China	P
+BH9C	China	P
+BH9D	China	P
+BH9E	China	P
+BH9F	China	P
+BH9S	China	P
+BH9T	China	P
+BH9U	China	P
+BH9V	China	P
+BH9W	China	P
+BH9X	China	P
+BI2A	China	P
+BI2B	China	P
+BI2C	China	P
+BI2D	China	P
+BI2E	China	P
+BI2F	China	P
+BI2G	China	P
+BI2H	China	P
+BI2I	China	P
+BI2J	China	P
+BI2K	China	P
+BI2L	China	P
+BI2M	China	P
+BI2N	China	P
+BI2O	China	P
+BI2P	China	P
+BI3G	China	P
+BI3H	China	P
+BI3I	China	P
+BI3J	China	P
+BI3K	China	P
+BI3L	China	P
+BI6Q	China	P
+BI6R	China	P
+BI6S	China	P
+BI6T	China	P
+BI6U	China	P
+BI6V	China	P
+BI6W	China	P
+BI6X	China	P
+BI7A	China	P
+BI7B	China	P
+BI7C	China	P
+BI7D	China	P
+BI7E	China	P
+BI7F	China	P
+BI7G	China	P
+BI7H	China	P
+BI7Q	China	P
+BI7R	China	P
+BI7S	China	P
+BI7T	China	P
+BI7U	China	P
+BI7V	China	P
+BI7W	China	P
+BI7X	China	P
+BI8A	China	P
+BI8B	China	P
+BI8C	China	P
+BI8D	China	P
+BI8E	China	P
+BI8F	China	P
+BI8G	China	P
+BI8H	China	P
+BI8I	China	P
+BI8J	China	P
+BI8K	China	P
+BI8L	China	P
+BI8M	China	P
+BI8N	China	P
+BI8O	China	P
+BI8P	China	P
+BI8Q	China	P
+BI8R	China	P
+BI8S	China	P
+BI8T	China	P
+BI8U	China	P
+BI8V	China	P
+BI8W	China	P
+BI8X	China	P
+BI9A	China	P
+BI9B	China	P
+BI9C	China	P
+BI9D	China	P
+BI9E	China	P
+BI9F	China	P
+BI9S	China	P
+BI9T	China	P
+BI9U	China	P
+BI9V	China	P
+BI9W	China	P
+BI9X	China	P
+BK2A	China	P
+BK2B	China	P
+BK2C	China	P
+BK2D	China	P
+BK2E	China	P
+BK2F	China	P
+BK2G	China	P
+BK2H	China	P
+BK2I	China	P
+BK2J	China	P
+BK2K	China	P
+BK2L	China	P
+BK2M	China	P
+BK2N	China	P
+BK2O	China	P
+BK2P	China	P
+BK3G	China	P
+BK3H	China	P
+BK3I	China	P
+BK3J	China	P
+BK3K	China	P
+BK3L	China	P
+BK6Q	China	P
+BK6R	China	P
+BK6S	China	P
+BK6T	China	P
+BK6U	China	P
+BK6V	China	P
+BK6W	China	P
+BK6X	China	P
+BK7A	China	P
+BK7B	China	P
+BK7C	China	P
+BK7D	China	P
+BK7E	China	P
+BK7F	China	P
+BK7G	China	P
+BK7H	China	P
+BK7Q	China	P
+BK7R	China	P
+BK7S	China	P
+BK7T	China	P
+BK7U	China	P
+BK7V	China	P
+BK7W	China	P
+BK7X	China	P
+BK8A	China	P
+BK8B	China	P
+BK8C	China	P
+BK8D	China	P
+BK8E	China	P
+BK8F	China	P
+BK8G	China	P
+BK8H	China	P
+BK8I	China	P
+BK8J	China	P
+BK8K	China	P
+BK8L	China	P
+BK8M	China	P
+BK8N	China	P
+BK8O	China	P
+BK8P	China	P
+BK8Q	China	P
+BK8R	China	P
+BK8S	China	P
+BK8T	China	P
+BK8U	China	P
+BK8V	China	P
+BK8W	China	P
+BK8X	China	P
+BK9A	China	P
+BK9B	China	P
+BK9C	China	P
+BK9D	China	P
+BK9E	China	P
+BK9F	China	P
+BK9S	China	P
+BK9T	China	P
+BK9U	China	P
+BK9V	China	P
+BK9W	China	P
+BK9X	China	P
+BL2A	China	P
+BL2B	China	P
+BL2C	China	P
+BL2D	China	P
+BL2E	China	P
+BL2F	China	P
+BL2G	China	P
+BL2H	China	P
+BL2I	China	P
+BL2J	China	P
+BL2K	China	P
+BL2L	China	P
+BL2M	China	P
+BL2N	China	P
+BL2O	China	P
+BL2P	China	P
+BL3G	China	P
+BL3H	China	P
+BL3I	China	P
+BL3J	China	P
+BL3K	China	P
+BL3L	China	P
+BL6Q	China	P
+BL6R	China	P
+BL6S	China	P
+BL6T	China	P
+BL6U	China	P
+BL6V	China	P
+BL6W	China	P
+BL6X	China	P
+BL7A	China	P
+BL7B	China	P
+BL7C	China	P
+BL7D	China	P
+BL7E	China	P
+BL7F	China	P
+BL7G	China	P
+BL7H	China	P
+BL7Q	China	P
+BL7R	China	P
+BL7S	China	P
+BL7T	China	P
+BL7U	China	P
+BL7V	China	P
+BL7W	China	P
+BL7X	China	P
+BL8A	China	P
+BL8B	China	P
+BL8C	China	P
+BL8D	China	P
+BL8E	China	P
+BL8F	China	P
+BL8G	China	P
+BL8H	China	P
+BL8I	China	P
+BL8J	China	P
+BL8K	China	P
+BL8L	China	P
+BL8M	China	P
+BL8N	China	P
+BL8O	China	P
+BL8P	China	P
+BL8Q	China	P
+BL8R	China	P
+BL8S	China	P
+BL8T	China	P
+BL8U	China	P
+BL8V	China	P
+BL8W	China	P
+BL8X	China	P
+BL9A	China	P
+BL9B	China	P
+BL9C	China	P
+BL9D	China	P
+BL9E	China	P
+BL9F	China	P
+BL9S	China	P
+BL9T	China	P
+BL9U	China	P
+BL9V	China	P
+BL9W	China	P
+BL9X	China	P
+BT2A	China	P
+BT2B	China	P
+BT2C	China	P
+BT2D	China	P
+BT2E	China	P
+BT2F	China	P
+BT2G	China	P
+BT2H	China	P
+BT2I	China	P
+BT2J	China	P
+BT2K	China	P
+BT2L	China	P
+BT2M	China	P
+BT2N	China	P
+BT2O	China	P
+BT2P	China	P
+BT3G	China	P
+BT3H	China	P
+BT3I	China	P
+BT3J	China	P
+BT3K	China	P
+BT3L	China	P
+BT6Q	China	P
+BT6R	China	P
+BT6S	China	P
+BT6T	China	P
+BT6U	China	P
+BT6V	China	P
+BT6W	China	P
+BT6X	China	P
+BT7A	China	P
+BT7B	China	P
+BT7C	China	P
+BT7D	China	P
+BT7E	China	P
+BT7F	China	P
+BT7G	China	P
+BT7H	China	P
+BT7Q	China	P
+BT7R	China	P
+BT7S	China	P
+BT7T	China	P
+BT7U	China	P
+BT7V	China	P
+BT7W	China	P
+BT7X	China	P
+BT8A	China	P
+BT8B	China	P
+BT8C	China	P
+BT8D	China	P
+BT8E	China	P
+BT8F	China	P
+BT8G	China	P
+BT8H	China	P
+BT8I	China	P
+BT8J	China	P
+BT8K	China	P
+BT8L	China	P
+BT8M	China	P
+BT8N	China	P
+BT8O	China	P
+BT8P	China	P
+BT8Q	China	P
+BT8R	China	P
+BT8S	China	P
+BT8T	China	P
+BT8U	China	P
+BT8V	China	P
+BT8W	China	P
+BT8X	China	P
+BT9A	China	P
+BT9B	China	P
+BT9C	China	P
+BT9D	China	P
+BT9E	China	P
+BT9F	China	P
+BT9S	China	P
+BT9T	China	P
+BT9U	China	P
+BT9V	China	P
+BT9W	China	P
+BT9X	China	P
+BY2A	China	P
+BY2B	China	P
+BY2C	China	P
+BY2D	China	P
+BY2E	China	P
+BY2F	China	P
+BY2G	China	P
+BY2H	China	P
+BY2I	China	P
+BY2J	China	P
+BY2K	China	P
+BY2L	China	P
+BY2M	China	P
+BY2N	China	P
+BY2O	China	P
+BY2P	China	P
+BY3G	China	P
+BY3H	China	P
+BY3I	China	P
+BY3J	China	P
+BY3K	China	P
+BY3L	China	P
+BY6Q	China	P
+BY6R	China	P
+BY6S	China	P
+BY6T	China	P
+BY6U	China	P
+BY6V	China	P
+BY6W	China	P
+BY6X	China	P
+BY7A	China	P
+BY7B	China	P
+BY7C	China	P
+BY7D	China	P
+BY7E	China	P
+BY7F	China	P
+BY7G	China	P
+BY7H	China	P
+BY7Q	China	P
+BY7R	China	P
+BY7S	China	P
+BY7T	China	P
+BY7U	China	P
+BY7V	China	P
+BY7W	China	P
+BY7X	China	P
+BY8A	China	P
+BY8B	China	P
+BY8C	China	P
+BY8D	China	P
+BY8E	China	P
+BY8F	China	P
+BY8G	China	P
+BY8H	China	P
+BY8I	China	P
+BY8J	China	P
+BY8K	China	P
+BY8L	China	P
+BY8M	China	P
+BY8N	China	P
+BY8O	China	P
+BY8P	China	P
+BY8Q	China	P
+BY8R	China	P
+BY8S	China	P
+BY8T	China	P
+BY8U	China	P
+BY8V	China	P
+BY8W	China	P
+BY8X	China	P
+BY9A	China	P
+BY9B	China	P
+BY9C	China	P
+BY9D	China	P
+BY9E	China	P
+BY9F	China	P
+BY9S	China	P
+BY9T	China	P
+BY9U	China	P
+BY9V	China	P
+BY9W	China	P
+BY9X	China	P
+BZ2A	China	P
+BZ2B	China	P
+BZ2C	China	P
+BZ2D	China	P
+BZ2E	China	P
+BZ2F	China	P
+BZ2G	China	P
+BZ2H	China	P
+BZ2I	China	P
+BZ2J	China	P
+BZ2K	China	P
+BZ2L	China	P
+BZ2M	China	P
+BZ2N	China	P
+BZ2O	China	P
+BZ2P	China	P
+BZ3G	China	P
+BZ3H	China	P
+BZ3I	China	P
+BZ3J	China	P
+BZ3K	China	P
+BZ3L	China	P
+BZ6Q	China	P
+BZ6R	China	P
+BZ6S	China	P
+BZ6T	China	P
+BZ6U	China	P
+BZ6V	China	P
+BZ6W	China	P
+BZ6X	China	P
+BZ7A	China	P
+BZ7B	China	P
+BZ7C	China	P
+BZ7D	China	P
+BZ7E	China	P
+BZ7F	China	P
+BZ7G	China	P
+BZ7H	China	P
+BZ7Q	China	P
+BZ7R	China	P
+BZ7S	China	P
+BZ7T	China	P
+BZ7U	China	P
+BZ7V	China	P
+BZ7W	China	P
+BZ7X	China	P
+BZ8A	China	P
+BZ8B	China	P
+BZ8C	China	P
+BZ8D	China	P
+BZ8E	China	P
+BZ8F	China	P
+BZ8G	China	P
+BZ8H	China	P
+BZ8I	China	P
+BZ8J	China	P
+BZ8K	China	P
+BZ8L	China	P
+BZ8M	China	P
+BZ8N	China	P
+BZ8O	China	P
+BZ8P	China	P
+BZ8Q	China	P
+BZ8R	China	P
+BZ8S	China	P
+BZ8T	China	P
+BZ8U	China	P
+BZ8V	China	P
+BZ8W	China	P
+BZ8X	China	P
+BZ9A	China	P
+BZ9B	China	P
+BZ9C	China	P
+BZ9D	China	P
+BZ9E	China	P
+BZ9F	China	P
+BZ9S	China	P
+BZ9T	China	P
+BZ9U	China	P
+BZ9V	China	P
+BZ9W	China	P
+BZ9X	China	P
+C2	Nauru	P
+C3	Andorra	P
+C5	Gambia	P
+C6	The Bahamas	P
+C8	Mozambique	P
+C9	Mozambique	P
+3G	Chile	P
+CA	Chile	P
+CB	Chile	P
+CC	Chile	P
+CD	Chile	P
+CE	Chile	P
+XQ	Chile	P
+XR	Chile	P
+3G7	Chile	P
+3G8	Chile	P
+CA7	Chile	P
+CA8	Chile	P
+CB7	Chile	P
+CB8	Chile	P
+CC7	Chile	P
+CC8	Chile	P
+CD7	Chile	P
+CD8	Chile	P
+CE7	Chile	P
+CE8	Chile	P
+XQ7	Chile	P
+XQ8	Chile	P
+XR7	Chile	P
+XR8	Chile	P
+CE6RFP	Chile	E
+XQ6CF	Chile	E
+XQ6OA	Chile	E
+XR90RG	Chile	E
+3G0X	San Felix & San Ambrosio	P
+CA0X	San Felix & San Ambrosio	P
+CB0X	San Felix & San Ambrosio	P
+CC0X	San Felix & San Ambrosio	P
+CD0X	San Felix & San Ambrosio	P
+CE0X	San Felix & San Ambrosio	P
+XQ0X	San Felix & San Ambrosio	P
+XR0X	San Felix & San Ambrosio	P
+3G0	Easter Island	P
+CA0	Easter Island	P
+CB0	Easter Island	P
+CC0	Easter Island	P
+CD0	Easter Island	P
+CE0	Easter Island	P
+XQ0	Easter Island	P
+XR0	Easter Island	P
+CE0Y	Easter Island	P
+3G0Z	Juan Fernandez Islands	P
+CA0Z	Juan Fernandez Islands	P
+CB0Z	Juan Fernandez Islands	P
+CC0Z	Juan Fernandez Islands	P
+CD0Z	Juan Fernandez Islands	P
+CE0I	Juan Fernandez Islands	P
+CE0Z	Juan Fernandez Islands	P
+XQ0Z	Juan Fernandez Islands	P
+XR0Z	Juan Fernandez Islands	P
+3Y	Antarctica	P
+AX0	Antarctica	P
+AY1Z	Antarctica	P
+AY2Z	Antarctica	P
+AY3Z	Antarctica	P
+AY4Z	Antarctica	P
+AY5Z	Antarctica	P
+AY6Z	Antarctica	P
+AY7Z	Antarctica	P
+AY8Z	Antarctica	P
+AY9Z	Antarctica	P
+FT0Y	Antarctica	P
+FT1Y	Antarctica	P
+FT2Y	Antarctica	P
+FT3Y	Antarctica	P
+FT4Y	Antarctica	P
+FT5Y	Antarctica	P
+FT6Y	Antarctica	P
+FT7Y	Antarctica	P
+FT8Y	Antarctica	P
+LU1Z	Antarctica	P
+LU2Z	Antarctica	P
+LU3Z	Antarctica	P
+LU4Z	Antarctica	P
+LU5Z	Antarctica	P
+LU6Z	Antarctica	P
+LU7Z	Antarctica	P
+LU8Z	Antarctica	P
+LU9Z	Antarctica	P
+RI1AN	Antarctica	P
+VI0	Antarctica	P
+VK0	Antarctica	P
+ZL5	Antarctica	P
+ZM5	Antarctica	P
+ZS7	Antarctica	P
+CE9	Antarctica	P
+8J1RL	Antarctica	E
+DP0GVN	Antarctica	E
+DP1POL	Antarctica	E
+KC4/KL5SE	Antarctica	E
+KC4/W1WCN	Antarctica	E
+KC4AAA	Antarctica	E
+KC4AAC	Antarctica	E
+KC4USB	Antarctica	E
+KC4USV	Antarctica	E
+RI1ANC	Antarctica	E
+RI1ANI	Antarctica	E
+RI1ANY	Antarctica	E
+VK0TBC	Antarctica	E
+CL	Cuba	P
+CM	Cuba	P
+CO	Cuba	P
+T4	Cuba	P
+5C	Morocco	P
+5D	Morocco	P
+5E	Morocco	P
+5F	Morocco	P
+5G	Morocco	P
+CN	Morocco	P
+CP	Bolivia	P
+CP2	Bolivia	P
+CP3	Bolivia	P
+CP4	Bolivia	P
+CP5	Bolivia	P
+CP6	Bolivia	P
+CP7	Bolivia	P
+CQ	Portugal	P
+CR	Portugal	P
+CS	Portugal	P
+CT	Portugal	P
+CQ2	Madeira	P
+CQ3	Madeira	P
+CQ9	Madeira	P
+CR3	Madeira	P
+CR9	Madeira	P
+CS3	Madeira	P
+CS9	Madeira	P
+CT3	Madeira	P
+CT9	Madeira	P
+CQ1	Azores	P
+CQ8	Azores	P
+CR1	Azores	P
+CR2	Azores	P
+CR8	Azores	P
+CS4	Azores	P
+CS8	Azores	P
+CT8	Azores	P
+CU	Azores	P
+CV	Uruguay	P
+CW	Uruguay	P
+CX	Uruguay	P
+CY0	Sable Island	P
+CY9	St. Paul Island	P
+D2	Angola	P
+D3	Angola	P
+D4	Cabo Verde	P
+D6	Comoros	P
+DA	Germany	P
+DB	Germany	P
+DC	Germany	P
+DD	Germany	P
+DF	Germany	P
+DG	Germany	P
+DH	Germany	P
+DJ	Germany	P
+DK	Germany	P
+DL	Germany	P
+DM	Germany	P
+DN	Germany	P
+DO	Germany	P
+DP	Germany	P
+DQ	Germany	P
+DR	Germany	P
+4D	Philippines	P
+4E	Philippines	P
+4F	Philippines	P
+4G	Philippines	P
+4H	Philippines	P
+4I	Philippines	P
+DU	Philippines	P
+DV	Philippines	P
+DW	Philippines	P
+DX	Philippines	P
+DY	Philippines	P
+DZ	Philippines	P
+E3	Eritrea	P
+E4	Palestine	P
+E5/N	Cook Islands	P
+E51MWA	Cook Islands	E
+E51PT	Cook Islands	E
+E51WL	Cook Islands	E
+E5	Cook Islands	P
+E5/S	Cook Islands	P
+E6	Niue	P
+E7	Bosnia and Herzegovina	P
+AM	Spain	P
+AN	Spain	P
+AO	Spain	P
+EA	Spain	P
+EB	Spain	P
+EC	Spain	P
+ED	Spain	P
+EE	Spain	P
+EF	Spain	P
+EG	Spain	P
+EH	Spain	P
+AM800CT	Spain	E
+EA2EZ/P	Spain	E
+EA5CC/P	Spain	E
+EA5IKT/P	Spain	E
+EA6SX/2	Spain	E
+EA6SX/5	Spain	E
+EA9HU	Spain	E
+EC5AHA/P	Spain	E
+AM6	Balearic Islands	P
+AN6	Balearic Islands	P
+AO6	Balearic Islands	P
+EA6	Balearic Islands	P
+EB6	Balearic Islands	P
+EC6	Balearic Islands	P
+ED6	Balearic Islands	P
+EE6	Balearic Islands	P
+EF6	Balearic Islands	P
+EG6	Balearic Islands	P
+EH6	Balearic Islands	P
+EA5IYX/P	Balearic Islands	E
+EA6XQ/P	Balearic Islands	E
+AM8	Canary Islands	P
+AN8	Canary Islands	P
+AO8	Canary Islands	P
+EA8	Canary Islands	P
+EB8	Canary Islands	P
+EC8	Canary Islands	P
+ED8	Canary Islands	P
+EE8	Canary Islands	P
+EF8	Canary Islands	P
+EG8	Canary Islands	P
+EH8	Canary Islands	P
+AM9	Ceuta & Melilla	P
+AN9	Ceuta & Melilla	P
+AO9	Ceuta & Melilla	P
+EA9	Ceuta & Melilla	P
+EB9	Ceuta & Melilla	P
+EC9	Ceuta & Melilla	P
+ED9	Ceuta & Melilla	P
+EE9	Ceuta & Melilla	P
+EF9	Ceuta & Melilla	P
+EG9	Ceuta & Melilla	P
+EH9	Ceuta & Melilla	P
+EA3JAQ/9	Ceuta & Melilla	E
+EA4GHH/9	Ceuta & Melilla	E
+EA4HUK/9	Ceuta & Melilla	E
+EA4IWX/9	Ceuta & Melilla	E
+EI	Ireland	P
+EJ	Ireland	P
+EK	Armenia	P
+5L	Liberia	P
+5M	Liberia	P
+6Z	Liberia	P
+A8	Liberia	P
+D5	Liberia	P
+EL	Liberia	P
+9B	Iran	P
+9C	Iran	P
+9D	Iran	P
+EP	Iran	P
+EQ	Iran	P
+ER	Moldova	P
+ES	Estonia	P
+9E	Ethiopia	P
+9F	Ethiopia	P
+ET	Ethiopia	P
+EU	Belarus	P
+EV	Belarus	P
+EW	Belarus	P
+EX	Kyrgyzstan	P
+EX0P	Kyrgyzstan	P
+EX0Q	Kyrgyzstan	P
+EX2P	Kyrgyzstan	P
+EX2Q	Kyrgyzstan	P
+EX6P	Kyrgyzstan	P
+EX6Q	Kyrgyzstan	P
+EX7P	Kyrgyzstan	P
+EX7Q	Kyrgyzstan	P
+EX8P	Kyrgyzstan	P
+EX8Q	Kyrgyzstan	P
+VERSION	Kyrgyzstan	E
+EY	Tajikistan	P
+EZ	Turkmenistan	P
+F	France	P
+HW	France	P
+HX	France	P
+HY	France	P
+TH	France	P
+TM	France	P
+TO	France	P
+TP	France	P
+TQ	France	P
+TV	France	P
+TX	France	P
+FG	Guadeloupe	P
+FH	Mayotte	P
+FJ	Saint Barthelemy	P
+FK	New Caledonia	P
+FK/C	New Caledonia	P
+TX3X	New Caledonia	E
+FM	Martinique	P
+TO4A	Martinique	E
+TO5A	Martinique	E
+TO7A	Martinique	E
+FO	French Polynesia	P
+FO/A	French Polynesia	P
+TX5EU	French Polynesia	E
+FO/C	French Polynesia	P
+TX5S	French Polynesia	E
+FO/M	French Polynesia	P
+FO5QS	French Polynesia	E
+FP	Saint Pierre and Miquelon	P
+FR	Reunion	P
+TO7K	Reunion	E
+FS	Saint Martin	P
+TO1O	Saint Martin	E
+TO5M	Saint Martin	E
+TO5T	Saint Martin	E
+TO9W	Saint Martin	E
+FT0G	French Southern and Antarctic Lands	P
+FT1G	French Southern and Antarctic Lands	P
+FT2G	French Southern and Antarctic Lands	P
+FT3G	French Southern and Antarctic Lands	P
+FT4G	French Southern and Antarctic Lands	P
+FT5G	French Southern and Antarctic Lands	P
+FT6G	French Southern and Antarctic Lands	P
+FT7G	French Southern and Antarctic Lands	P
+FT8G	French Southern and Antarctic Lands	P
+FT9G	French Southern and Antarctic Lands	P
+FT/G	French Southern and Antarctic Lands	P
+FT0E	French Southern and Antarctic Lands	P
+FT0J	French Southern and Antarctic Lands	P
+FT1E	French Southern and Antarctic Lands	P
+FT1J	French Southern and Antarctic Lands	P
+FT2E	French Southern and Antarctic Lands	P
+FT2J	French Southern and Antarctic Lands	P
+FT3E	French Southern and Antarctic Lands	P
+FT3J	French Southern and Antarctic Lands	P
+FT4E	French Southern and Antarctic Lands	P
+FT4J	French Southern and Antarctic Lands	P
+FT6E	French Southern and Antarctic Lands	P
+FT6J	French Southern and Antarctic Lands	P
+FT7E	French Southern and Antarctic Lands	P
+FT7J	French Southern and Antarctic Lands	P
+FT8E	French Southern and Antarctic Lands	P
+FT8J	French Southern and Antarctic Lands	P
+FT9E	French Southern and Antarctic Lands	P
+FT9J	French Southern and Antarctic Lands	P
+FT/J	French Southern and Antarctic Lands	P
+FT0T	French Southern and Antarctic Lands	P
+FT1T	French Southern and Antarctic Lands	P
+FT2T	French Southern and Antarctic Lands	P
+FT3T	French Southern and Antarctic Lands	P
+FT4T	French Southern and Antarctic Lands	P
+FT5T	French Southern and Antarctic Lands	P
+FT6T	French Southern and Antarctic Lands	P
+FT7T	French Southern and Antarctic Lands	P
+FT8T	French Southern and Antarctic Lands	P
+FT9T	French Southern and Antarctic Lands	P
+FT/T	French Southern and Antarctic Lands	P
+FT0W	French Southern and Antarctic Lands	P
+FT4W	French Southern and Antarctic Lands	P
+FT5W	French Southern and Antarctic Lands	P
+FT8W	French Southern and Antarctic Lands	P
+FT/W	French Southern and Antarctic Lands	P
+FT0X	French Southern and Antarctic Lands	P
+FT2X	French Southern and Antarctic Lands	P
+FT4X	French Southern and Antarctic Lands	P
+FT5X	French Southern and Antarctic Lands	P
+FT8X	French Southern and Antarctic Lands	P
+FT/X	French Southern and Antarctic Lands	P
+FT0Z	French Southern and Antarctic Lands	P
+FT1Z	French Southern and Antarctic Lands	P
+FT2Z	French Southern and Antarctic Lands	P
+FT3Z	French Southern and Antarctic Lands	P
+FT4Z	French Southern and Antarctic Lands	P
+FT5Z	French Southern and Antarctic Lands	P
+FT6Z	French Southern and Antarctic Lands	P
+FT7Z	French Southern and Antarctic Lands	P
+FT8Z	French Southern and Antarctic Lands	P
+FT/Z	French Southern and Antarctic Lands	P
+FW	Wallis and Futuna	P
+TW	Wallis and Futuna	P
+FY	French Guiana	P
+TO1A	French Guiana	E
+2E	United Kingdom	P
+G	United Kingdom	P
+M	United Kingdom	P
+2D	Isle of Man	P
+GD	Isle of Man	P
+GT	Isle of Man	P
+MD	Isle of Man	P
+MT	Isle of Man	P
+G6ICR	Isle of Man	E
+2I	Northern Ireland	P
+GI	Northern Ireland	P
+GN	Northern Ireland	P
+MI	Northern Ireland	P
+MN	Northern Ireland	P
+GB4SPD	Northern Ireland	E
+GB5NCL	Northern Ireland	E
+M8TSH	Northern Ireland	E
+M9SMC	Northern Ireland	E
+M9WGP	Northern Ireland	E
+2J	Jersey	P
+GH	Jersey	P
+GJ	Jersey	P
+MH	Jersey	P
+MJ	Jersey	P
+2A	Scotland	P
+2M	Scotland	P
+GM	Scotland	P
+GS	Scotland	P
+MA	Scotland	P
+MM	Scotland	P
+MS	Scotland	P
+G0HCQ	Scotland	E
+G0JCE	Scotland	E
+G1R	Scotland	E
+G1T	Scotland	E
+G4WZG	Scotland	E
+G4X	Scotland	E
+G5RDX	Scotland	E
+G5RRR	Scotland	E
+GB0GDS	Scotland	E
+GB1DAA	Scotland	E
+GB1RBL	Scotland	E
+GB2ELH	Scotland	E
+GB2JCM	Scotland	E
+GB3ANG	Scotland	E
+GB3LER	Scotland	E
+GB3LER/B	Scotland	E
+GB4LER	Scotland	E
+GM4AFF/P	Scotland	E
+M3I	Scotland	E
+M7HPC	Scotland	E
+M8IYV	Scotland	E
+M8LAO	Scotland	E
+M8NEG	Scotland	E
+M8SNT	Scotland	E
+M8UAT	Scotland	E
+M8XZA	Scotland	E
+M8YPH	Scotland	E
+M9SNW	Scotland	E
+M9SRU	Scotland	E
+M9YDD	Scotland	E
+*GM/S	Shetland Islands	P
+2M0BDR	Shetland Islands	E
+2M0BDT	Shetland Islands	E
+2M0CPN	Shetland Islands	E
+2M0GFC	Shetland Islands	E
+2M0SEG	Shetland Islands	E
+2M0SPX	Shetland Islands	E
+2M0ZET	Shetland Islands	E
+GM0AVR	Shetland Islands	E
+GM0EKM	Shetland Islands	E
+GM0GFL	Shetland Islands	E
+GM0ILB	Shetland Islands	E
+GM0JDB	Shetland Islands	E
+GM1FGN	Shetland Islands	E
+GM1KKI	Shetland Islands	E
+GM1ZNR	Shetland Islands	E
+GM3WHT	Shetland Islands	E
+GM3ZET	Shetland Islands	E
+GM4IPK	Shetland Islands	E
+GM4JPI	Shetland Islands	E
+GM4LBE	Shetland Islands	E
+GM4LER	Shetland Islands	E
+GM4PXG	Shetland Islands	E
+GM4SLV	Shetland Islands	E
+GM4WXQ	Shetland Islands	E
+GM4ZHL	Shetland Islands	E
+GM5E	Shetland Islands	E
+GM6RQW	Shetland Islands	E
+GM6YQA	Shetland Islands	E
+GM7AFE	Shetland Islands	E
+GM7GWW	Shetland Islands	E
+GM8LNH	Shetland Islands	E
+GM8MMA	Shetland Islands	E
+GM8YEC	Shetland Islands	E
+GS2MP	Shetland Islands	E
+GS3ZET	Shetland Islands	E
+GS7V	Shetland Islands	E
+MM0LSM	Shetland Islands	E
+MM0NQY	Shetland Islands	E
+MM0VIK	Shetland Islands	E
+MM0XAU	Shetland Islands	E
+MM0ZAL	Shetland Islands	E
+MM0ZCG	Shetland Islands	E
+MM0ZRC	Shetland Islands	E
+MM1FEO	Shetland Islands	E
+MM1FJM	Shetland Islands	E
+MM3VQO	Shetland Islands	E
+MM5PSL	Shetland Islands	E
+MM5YLO	Shetland Islands	E
+MM6BDU	Shetland Islands	E
+MM6BZQ	Shetland Islands	E
+MM6IKB	Shetland Islands	E
+MM6IMB	Shetland Islands	E
+MM6MFA	Shetland Islands	E
+MM6PTE	Shetland Islands	E
+MM6SJK	Shetland Islands	E
+MM6YLO	Shetland Islands	E
+MM6ZBG	Shetland Islands	E
+MM6ZDW	Shetland Islands	E
+MM7CGR	Shetland Islands	E
+MM7HBQ	Shetland Islands	E
+MM8A	Shetland Islands	E
+MS0ZCG	Shetland Islands	E
+MS0ZET	Shetland Islands	E
+MS5B	Shetland Islands	E
+2U	Guernsey	P
+GP	Guernsey	P
+GU	Guernsey	P
+MP	Guernsey	P
+MU	Guernsey	P
+2W	Wales	P
+GC	Wales	P
+GW	Wales	P
+MC	Wales	P
+MW	Wales	P
+G0X	Wales	E
+G5DXR	Wales	E
+G5MUT	Wales	E
+GB2IMD	Wales	E
+GB2TD	Wales	E
+GB4SDD	Wales	E
+GB5SJ	Wales	E
+M0KWG	Wales	E
+M7KOD	Wales	E
+M8CYE	Wales	E
+M8ENA	Wales	E
+M8FBB	Wales	E
+M9LPZ	Wales	E
+M9MMB	Wales	E
+M9MWZ	Wales	E
+M9SAE	Wales	E
+M9SAW	Wales	E
+M9TGX	Wales	E
+M9YCX	Wales	E
+H4	Solomon Islands	P
+H40	Temotu Province	P
+HA	Hungary	P
+HG	Hungary	P
+HB	Switzerland	P
+HE	Switzerland	P
+HB0	Liechtenstein	P
+HE0	Liechtenstein	P
+HC	Ecuador	P
+HD	Ecuador	P
+HC8M/5	Ecuador	E
+HC8	Galapagos Islands	P
+HD8	Galapagos Islands	P
+HD5MW/8	Galapagos Islands	E
+4V	Haiti	P
+HH	Haiti	P
+HI	Dominican Republic	P
+5J	Colombia	P
+5K	Colombia	P
+HJ	Colombia	P
+HK	Colombia	P
+HJ0JAP	Colombia	E
+HJ0JAP/2	Colombia	E
+5J0	San Andres & Providencia	P
+5K0	San Andres & Providencia	P
+HJ0	San Andres & Providencia	P
+HK0	San Andres & Providencia	P
+HK0/A	San Andres & Providencia	P
+HK4Q/0	San Andres & Providencia	E
+HJ0M	Malpelo Island	P
+HK0M	Malpelo Island	P
+HK0/M	Malpelo Island	P
+HK0TU	Malpelo Island	E
+6K	South Korea	P
+6L	South Korea	P
+6M	South Korea	P
+6N	South Korea	P
+D7	South Korea	P
+D8	South Korea	P
+D9	South Korea	P
+DS	South Korea	P
+DT	South Korea	P
+HL	South Korea	P
+KL9K	South Korea	P
+3E	Panama	P
+3F	Panama	P
+H3	Panama	P
+H8	Panama	P
+H9	Panama	P
+HO	Panama	P
+HP	Panama	P
+HQ	Honduras	P
+HR	Honduras	P
+E2	Thailand	P
+HS	Thailand	P
+HV	Vatican	P
+7Z	Saudi Arabia	P
+8Z	Saudi Arabia	P
+HZ	Saudi Arabia	P
+4U	Italy	P
+I	Italy	P
+IA5KRO/4	Italy	E
+IT9AAK/0	Italy	E
+IT9CLY/4	Italy	E
+IT9ELM/0	Italy	E
+IG9	African Italy	P
+IH9	African Italy	P
+*IG9	African Italy	P
+IM0	Sardinia	P
+IS0	Sardinia	P
+IW0U	Sardinia	P
+IW0V	Sardinia	P
+IW0W	Sardinia	P
+IW0X	Sardinia	P
+IW0Y	Sardinia	P
+IW0Z	Sardinia	P
+IS	Sardinia	P
+II0BV	Sardinia	E
+II0D	Sardinia	E
+II0ICH	Sardinia	E
+II0ICV	Sardinia	E
+II0IDP	Sardinia	E
+II0M	Sardinia	E
+IP0A	Sardinia	E
+IP0Y	Sardinia	E
+IQ0AAI	Sardinia	E
+IQ0AG	Sardinia	E
+IQ0AH	Sardinia	E
+IQ0AI	Sardinia	E
+IQ0AK	Sardinia	E
+IQ0AK/P	Sardinia	E
+IQ0AL	Sardinia	E
+IQ0AM	Sardinia	E
+IQ0EH	Sardinia	E
+IQ0HO	Sardinia	E
+IQ0ID	Sardinia	E
+IQ0NU	Sardinia	E
+IQ0OG	Sardinia	E
+IQ0PM	Sardinia	E
+IQ0QP	Sardinia	E
+IQ0SS	Sardinia	E
+IR0A	Sardinia	E
+IR0IDP	Sardinia	E
+IR0RIVA	Sardinia	E
+IY0GA	Sardinia	E
+IB9	Sicily	P
+ID9	Sicily	P
+IE9	Sicily	P
+IF9	Sicily	P
+II9	Sicily	P
+IJ9	Sicily	P
+IO9	Sicily	P
+IP9	Sicily	P
+IQ9	Sicily	P
+IR9	Sicily	P
+IT9	Sicily	P
+IU9	Sicily	P
+IW9	Sicily	P
+IY9	Sicily	P
+*IT9	Sicily	P
+IW0HBY/9	Sicily	E
+J2	Djibouti	P
+J3	Grenada	P
+J5	Guinea-Bissau	P
+J6	Saint Lucia	P
+J7	Dominica	P
+J8	Saint Vincent and the Grenadines	P
+7J	Japan	P
+7K	Japan	P
+7L	Japan	P
+7M	Japan	P
+7N	Japan	P
+8J	Japan	P
+8K	Japan	P
+8L	Japan	P
+8M	Japan	P
+8N	Japan	P
+JA	Japan	P
+JE	Japan	P
+JF	Japan	P
+JG	Japan	P
+JH	Japan	P
+JI	Japan	P
+JJ	Japan	P
+JK	Japan	P
+JL	Japan	P
+JM	Japan	P
+JN	Japan	P
+JO	Japan	P
+JP	Japan	P
+JQ	Japan	P
+JR	Japan	P
+JS	Japan	P
+JD1BPS/1	Japan	E
+JD/M	Minami Torishima	P
+JD1YBJ	Minami Torishima	E
+JG8NQJ/JD1	Minami Torishima	E
+JD1	Ogasawara	P
+JD/O	Ogasawara	P
+JT	Mongolia	P
+JU	Mongolia	P
+JV	Mongolia	P
+JT2	Mongolia	P
+JT3	Mongolia	P
+JU2	Mongolia	P
+JU3	Mongolia	P
+JV2	Mongolia	P
+JV3	Mongolia	P
+JW	Svalbard	P
+*JW/B	Bear Island	P
+JW5MUA	Bear Island	E
+JX	Jan Mayen	P
+JY	Jordan	P
+AA	United States of America	P
+AB	United States of America	P
+AC	United States of America	P
+AD	United States of America	P
+AE	United States of America	P
+AF	United States of America	P
+AG	United States of America	P
+AI	United States of America	P
+AJ	United States of America	P
+AK	United States of America	P
+K	United States of America	P
+N	United States of America	P
+W	United States of America	P
+4U1WB	United States of America	E
+AA0BY	United States of America	E
+AA0O	United States of America	E
+AA0Y	United States of America	E
+AA2F	United States of America	E
+AA2HJ	United States of America	E
+AA2IL	United States of America	E
+AA2MA	United States of America	E
+AA3C	United States of America	E
+AA4CS	United States of America	E
+AA4DD	United States of America	E
+AA4HV	United States of America	E
+AA4N	United States of America	E
+AA4NU	United States of America	E
+AA4PA	United States of America	E
+AA4PZ	United States of America	E
+AA4Q	United States of America	E
+AA4RY	United States of America	E
+AA4S	United States of America	E
+AA4WW	United States of America	E
+AA4WX	United States of America	E
+AA4XA	United States of America	E
+AA5JF	United States of America	E
+AA5NT	United States of America	E
+AA5TA	United States of America	E
+AA5TL	United States of America	E
+AA5UK	United States of America	E
+AA6DY	United States of America	E
+AA6KJ	United States of America	E
+AA6X	United States of America	E
+AA7G	United States of America	E
+AA7JV	United States of America	E
+AA9HQ	United States of America	E
+AA9JY	United States of America	E
+AB0YT	United States of America	E
+AB1HZ	United States of America	E
+AB1MM	United States of America	E
+AB1U	United States of America	E
+AB3AH	United States of America	E
+AB3DC	United States of America	E
+AB4B	United States of America	E
+AB4BA	United States of America	E
+AB4EJ	United States of America	E
+AB4GG	United States of America	E
+AB4IQ	United States of America	E
+AB4LD	United States of America	E
+AB4WL	United States of America	E
+AB4WV	United States of America	E
+AB5VJ	United States of America	E
+AB5ZA	United States of America	E
+AB6GS	United States of America	E
+AB8RL	United States of America	E
+AB8YZ	United States of America	E
+AB9BH	United States of America	E
+AC0WL	United States of America	E
+AC1W	United States of America	E
+AC2K	United States of America	E
+AC4CA	United States of America	E
+AC4G	United States of America	E
+AC4HI	United States of America	E
+AC4NK	United States of America	E
+AC4YD	United States of America	E
+AC5XK	United States of America	E
+AC6NN	United States of America	E
+AC6NT	United States of America	E
+AC6ZM	United States of America	E
+AC7AF	United States of America	E
+AC7GG	United States of America	E
+AC7P	United States of America	E
+AC8Y	United States of America	E
+AC9DX	United States of America	E
+AD1C	United States of America	E
+AD4DQ	United States of America	E
+AD4EB	United States of America	E
+AD4GG	United States of America	E
+AD4OS	United States of America	E
+AD4TA	United States of America	E
+AD7CL	United States of America	E
+AD7JL	United States of America	E
+AD7KI	United States of America	E
+AD8J	United States of America	E
+AD8P	United States of America	E
+AD9BT	United States of America	E
+AE2NY	United States of America	E
+AE2V	United States of America	E
+AE2W	United States of America	E
+AE4ED	United States of America	E
+AE4GS	United States of America	E
+AE4GW	United States of America	E
+AE4JC	United States of America	E
+AE4JL	United States of America	E
+AE4JM	United States of America	E
+AE4M	United States of America	E
+AE4O	United States of America	E
+AE5MI	United States of America	E
+AE5X	United States of America	E
+AE7AP	United States of America	E
+AE7EB	United States of America	E
+AE8EM	United States of America	E
+AE8J	United States of America	E
+AF4AI	United States of America	E
+AF4JF	United States of America	E
+AF4LL	United States of America	E
+AF4OZ	United States of America	E
+AF4T	United States of America	E
+AF5J	United States of America	E
+AF5T	United States of America	E
+AF6T	United States of America	E
+AF9W	United States of America	E
+AG1RL	United States of America	E
+AG1T	United States of America	E
+AG2T	United States of America	E
+AG2TH	United States of America	E
+AG3V	United States of America	E
+AG4DG	United States of America	E
+AG4V	United States of America	E
+AG4W	United States of America	E
+AG7AE	United States of America	E
+AG7O	United States of America	E
+AG8GT	United States of America	E
+AG9G	United States of America	E
+AH0U	United States of America	E
+AH2EJ	United States of America	E
+AH2O	United States of America	E
+AH2S	United States of America	E
+AH6FF	United States of America	E
+AH6FX	United States of America	E
+AH6JS	United States of America	E
+AH6LE	United States of America	E
+AH6SU	United States of America	E
+AH7T	United States of America	E
+AI1K	United States of America	E
+AI4DB	United States of America	E
+AI4IC	United States of America	E
+AI5FK	United States of America	E
+AI5HG	United States of America	E
+AI5SM	United States of America	E
+AI5ZK	United States of America	E
+AI6O	United States of America	E
+AI7FF	United States of America	E
+AI8F	United States of America	E
+AI8O	United States of America	E
+AI9K	United States of America	E
+AI9P	United States of America	E
+AJ0EF	United States of America	E
+AJ1F	United States of America	E
+AJ4A	United States of America	E
+AJ4F	United States of America	E
+AJ4SB	United States of America	E
+AJ6T	United States of America	E
+AJ6TE	United States of America	E
+AJ7G	United States of America	E
+AK1N	United States of America	E
+AK2B	United States of America	E
+AK4I	United States of America	E
+AK4QR	United States of America	E
+AK4R	United States of America	E
+AK4Z	United States of America	E
+AK5CT	United States of America	E
+AK8E	United States of America	E
+AK9B	United States of America	E
+AK9D	United States of America	E
+AK9TX	United States of America	E
+AL1VE	United States of America	E
+AL3X	United States of America	E
+AL4U	United States of America	E
+AL5M	United States of America	E
+AL5P	United States of America	E
+AL7BA	United States of America	E
+AL7BA/8	United States of America	E
+AL7CR	United States of America	E
+AL7R	United States of America	E
+AL7RF	United States of America	E
+AL7RT	United States of America	E
+AL7T	United States of America	E
+G8ERJ	United States of America	E
+K0ACP	United States of America	E
+K0AL	United States of America	E
+K0AU	United States of America	E
+K0BAK	United States of America	E
+K0CIE	United States of America	E
+K0CLI	United States of America	E
+K0DQ	United States of America	E
+K0DTJ	United States of America	E
+K0EJ	United States of America	E
+K0EMT	United States of America	E
+K0HNL	United States of America	E
+K0HT	United States of America	E
+K0IO	United States of America	E
+K0IP	United States of America	E
+K0JJ	United States of America	E
+K0KXF	United States of America	E
+K0LB	United States of America	E
+K0LUZ	United States of America	E
+K0MP	United States of America	E
+K0NG	United States of America	E
+K0NW	United States of America	E
+K0PG	United States of America	E
+K0PJ	United States of America	E
+K0PLC	United States of America	E
+K0RGI	United States of America	E
+K0RJW	United States of America	E
+K0RU	United States of America	E
+K0SM	United States of America	E
+K0SN	United States of America	E
+K0STP	United States of America	E
+K0TEA	United States of America	E
+K0TO	United States of America	E
+K0TQ	United States of America	E
+K0TZ	United States of America	E
+K0VSH	United States of America	E
+K0XP	United States of America	E
+K0XV	United States of America	E
+K0ZR	United States of America	E
+K1AUS	United States of America	E
+K1BJC	United States of America	E
+K1BV	United States of America	E
+K1CCN	United States of America	E
+K1CPT	United States of America	E
+K1DW	United States of America	E
+K1EAR	United States of America	E
+K1GI	United States of America	E
+K1GJQ	United States of America	E
+K1GU	United States of America	E
+K1HI	United States of America	E
+K1IEB	United States of America	E
+K1JD	United States of America	E
+K1JH	United States of America	E
+K1JHS	United States of America	E
+K1KD	United States of America	E
+K1LT	United States of America	E
+K1MWH	United States of America	E
+K1MZ	United States of America	E
+K1NQ	United States of America	E
+K1SP	United States of America	E
+K1UM	United States of America	E
+K1USA	United States of America	E
+K1VX	United States of America	E
+K1WTF	United States of America	E
+K1XT	United States of America	E
+K2AK	United States of America	E
+K2BA	United States of America	E
+K2BKD	United States of America	E
+K2BY	United States of America	E
+K2CUB	United States of America	E
+K2DP	United States of America	E
+K2DRH	United States of America	E
+K2DSW	United States of America	E
+K2GMM	United States of America	E
+K2GMY	United States of America	E
+K2HT	United States of America	E
+K2KAR	United States of America	E
+K2KMC	United States of America	E
+K2KR	United States of America	E
+K2ORC	United States of America	E
+K2PM	United States of America	E
+K2PO	United States of America	E
+K2RD	United States of America	E
+K2RP	United States of America	E
+K2SHN	United States of America	E
+K2SS	United States of America	E
+K2UR	United States of America	E
+K2VV	United States of America	E
+K2YAZ	United States of America	E
+K3DNP	United States of America	E
+K3EST	United States of America	E
+K3FBR	United States of America	E
+K3FR	United States of America	E
+K3GLM	United States of America	E
+K3GP	United States of America	E
+K3GX	United States of America	E
+K3IE	United States of America	E
+K3ILC	United States of America	E
+K3JWI	United States of America	E
+K3KEK	United States of America	E
+K3KO	United States of America	E
+K3MCM	United States of America	E
+K3NA	United States of America	E
+K3NQ	United States of America	E
+K3NT	United States of America	E
+K3PA	United States of America	E
+K3TD	United States of America	E
+K3USC	United States of America	E
+K3WYC	United States of America	E
+K3XC	United States of America	E
+K3YP	United States of America	E
+K4AB	United States of America	E
+K4AFE	United States of America	E
+K4AKK	United States of America	E
+K4AL	United States of America	E
+K4AMC	United States of America	E
+K4BFT	United States of America	E
+K4BP	United States of America	E
+K4BTR	United States of America	E
+K4BWP	United States of America	E
+K4BX	United States of America	E
+K4CNY	United States of America	E
+K4CVD	United States of America	E
+K4CWW	United States of America	E
+K4CX	United States of America	E
+K4DG	United States of America	E
+K4DR	United States of America	E
+K4DXV	United States of America	E
+K4DZR	United States of America	E
+K4EES	United States of America	E
+K4EQ	United States of America	E
+K4FN	United States of America	E
+K4FR	United States of America	E
+K4FTY	United States of America	E
+K4FWO	United States of America	E
+K4GIG	United States of America	E
+K4HAL	United States of America	E
+K4HWS	United States of America	E
+K4IDT	United States of America	E
+K4IE	United States of America	E
+K4IQJ	United States of America	E
+K4ISV	United States of America	E
+K4IU	United States of America	E
+K4KO	United States of America	E
+K4KSV	United States of America	E
+K4KYN	United States of America	E
+K4LEN	United States of America	E
+K4MCK	United States of America	E
+K4MGE	United States of America	E
+K4MMW	United States of America	E
+K4MQM	United States of America	E
+K4NAX	United States of America	E
+K4NO	United States of America	E
+K4OCE	United States of America	E
+K4PG	United States of America	E
+K4PKM	United States of America	E
+K4PP	United States of America	E
+K4RO	United States of America	E
+K4SPO	United States of America	E
+K4SX	United States of America	E
+K4SYD	United States of America	E
+K4TCG	United States of America	E
+K4TD	United States of America	E
+K4TG	United States of America	E
+K4TNX	United States of America	E
+K4TO	United States of America	E
+K4TXJ	United States of America	E
+K4TXL	United States of America	E
+K4TZ	United States of America	E
+K4UU	United States of America	E
+K4UY	United States of America	E
+K4VBM	United States of America	E
+K4VIG	United States of America	E
+K4VOZ	United States of America	E
+K4WI	United States of America	E
+K4WXP	United States of America	E
+K4XU	United States of America	E
+K4YJ	United States of America	E
+K4YR	United States of America	E
+K4YUC	United States of America	E
+K4ZGB	United States of America	E
+K4ZHM	United States of America	E
+K5AGC	United States of America	E
+K5AUP	United States of America	E
+K5CAO	United States of America	E
+K5EEE	United States of America	E
+K5EK	United States of America	E
+K5EM	United States of America	E
+K5FP	United States of America	E
+K5FZ	United States of America	E
+K5GM	United States of America	E
+K5HDU	United States of America	E
+K5HEM	United States of America	E
+K5HIP	United States of America	E
+K5JR	United States of America	E
+K5JSG	United States of America	E
+K5JSL	United States of America	E
+K5KG	United States of America	E
+K5KMB	United States of America	E
+K5LAD	United States of America	E
+K5MA	United States of America	E
+K5MDX	United States of America	E
+K5MH	United States of America	E
+K5MHR	United States of America	E
+K5ML	United States of America	E
+K5MO	United States of America	E
+K5OA	United States of America	E
+K5OF	United States of America	E
+K5OLV	United States of America	E
+K5PS	United States of America	E
+K5RQ	United States of America	E
+K5RR	United States of America	E
+K5SEU	United States of America	E
+K5TF	United States of America	E
+K5TT	United States of America	E
+K5UA	United States of America	E
+K5VG	United States of America	E
+K5VIP	United States of America	E
+K5VJZ	United States of America	E
+K5WBM	United States of America	E
+K5WI	United States of America	E
+K5WK	United States of America	E
+K5WP	United States of America	E
+K5YVY	United States of America	E
+K5ZD	United States of America	E
+K6ACV	United States of America	E
+K6AFW	United States of America	E
+K6BFL	United States of America	E
+K6DJ	United States of America	E
+K6ENF	United States of America	E
+K6ES	United States of America	E
+K6FX	United States of America	E
+K6HLC	United States of America	E
+K6JDC	United States of America	E
+K6LPO	United States of America	E
+K6ND	United States of America	E
+K6NHL	United States of America	E
+K6PJ	United States of America	E
+K6RM	United States of America	E
+K6TAA	United States of America	E
+K6ZB	United States of America	E
+K6ZED	United States of America	E
+K6ZZ	United States of America	E
+K7ABV	United States of America	E
+K7BG	United States of America	E
+K7CS	United States of America	E
+K7DR	United States of America	E
+K7DWI	United States of America	E
+K7EAR	United States of America	E
+K7FB	United States of America	E
+K7GM	United States of America	E
+K7IA	United States of America	E
+K7IKE	United States of America	E
+K7IOL	United States of America	E
+K7JN	United States of America	E
+K7KAR	United States of America	E
+K7KR	United States of America	E
+K7KX	United States of America	E
+K7LU	United States of America	E
+K7MOA	United States of America	E
+K7MOE	United States of America	E
+K7MS	United States of America	E
+K7MSO	United States of America	E
+K7MTD	United States of America	E
+K7NCK	United States of America	E
+K7OM	United States of America	E
+K7QA	United States of America	E
+K7RB	United States of America	E
+K7RE	United States of America	E
+K7SCX	United States of America	E
+K7SHR	United States of America	E
+K7SV	United States of America	E
+K7SWS	United States of America	E
+K7TAR	United States of America	E
+K7TD	United States of America	E
+K7TRF	United States of America	E
+K7TRT	United States of America	E
+K7UWR	United States of America	E
+K7VF	United States of America	E
+K7VIC	United States of America	E
+K7WAX	United States of America	E
+K7WWR	United States of America	E
+K7ZKM	United States of America	E
+K7ZYV	United States of America	E
+K7ZZ	United States of America	E
+K8AAT	United States of America	E
+K8AC	United States of America	E
+K8ARY	United States of America	E
+K8ATG	United States of America	E
+K8BN	United States of America	E
+K8CN	United States of America	E
+K8DF	United States of America	E
+K8DLZ	United States of America	E
+K8EX	United States of America	E
+K8FB	United States of America	E
+K8FC	United States of America	E
+K8GP	United States of America	E
+K8IA	United States of America	E
+K8IY	United States of America	E
+K8JQ	United States of America	E
+K8LBQ	United States of America	E
+K8LF	United States of America	E
+K8LT	United States of America	E
+K8MCN	United States of America	E
+K8MV	United States of America	E
+K8NS	United States of America	E
+K8NYG	United States of America	E
+K8OS	United States of America	E
+K8OZ	United States of America	E
+K8RAR	United States of America	E
+K8RRT	United States of America	E
+K8SYH	United States of America	E
+K8TE	United States of America	E
+K8TR	United States of America	E
+K8YC	United States of America	E
+K8YFM	United States of America	E
+K8YYY	United States of America	E
+K8ZAS	United States of America	E
+K9AIH	United States of America	E
+K9AJC	United States of America	E
+K9AXT	United States of America	E
+K9CHP	United States of America	E
+K9DN	United States of America	E
+K9DR	United States of America	E
+K9DU	United States of America	E
+K9DXM	United States of America	E
+K9EN	United States of America	E
+K9ES	United States of America	E
+K9EZ	United States of America	E
+K9FY	United States of America	E
+K9GS	United States of America	E
+K9GWH	United States of America	E
+K9GWS	United States of America	E
+K9HXO	United States of America	E
+K9IA	United States of America	E
+K9ILS	United States of America	E
+K9IVN	United States of America	E
+K9JE	United States of America	E
+K9JF	United States of America	E
+K9JHR	United States of America	E
+K9JM	United States of America	E
+K9KK	United States of America	E
+K9MK	United States of America	E
+K9MU	United States of America	E
+K9MWM	United States of America	E
+K9NS	United States of America	E
+K9OM	United States of America	E
+K9OQ	United States of America	E
+K9OR	United States of America	E
+K9OZ	United States of America	E
+K9PY	United States of America	E
+K9QC	United States of America	E
+K9RS	United States of America	E
+K9RZ	United States of America	E
+K9SAT	United States of America	E
+K9SF	United States of America	E
+K9TAD	United States of America	E
+K9TWW	United States of America	E
+K9VD	United States of America	E
+K9VIT	United States of America	E
+K9WA	United States of America	E
+K9WFX	United States of America	E
+K9WKJ	United States of America	E
+K9WZB	United States of America	E
+K9XV	United States of America	E
+K9YC	United States of America	E
+K9ZU	United States of America	E
+KA0AZS	United States of America	E
+KA0KVW	United States of America	E
+KA0WAS	United States of America	E
+KA0WWT	United States of America	E
+KA0ZPP	United States of America	E
+KA1LDD	United States of America	E
+KA1RUE	United States of America	E
+KA2MLH	United States of America	E
+KA3DRR	United States of America	E
+KA3MTT	United States of America	E
+KA3NAM	United States of America	E
+KA4BVG	United States of America	E
+KA4J	United States of America	E
+KA4OTB	United States of America	E
+KA4R	United States of America	E
+KA5USN	United States of America	E
+KA5WMF	United States of America	E
+KA5WSS	United States of America	E
+KA6U	United States of America	E
+KA6Y	United States of America	E
+KA7DOG	United States of America	E
+KA7PNH	United States of America	E
+KA8HDE	United States of America	E
+KA8MMI	United States of America	E
+KA8P	United States of America	E
+KA8Q	United States of America	E
+KA9A	United States of America	E
+KA9FCB	United States of America	E
+KA9FOX	United States of America	E
+KA9MDP	United States of America	E
+KA9OZP	United States of America	E
+KA9VVQ	United States of America	E
+KB0TTL	United States of America	E
+KB2FSK	United States of America	E
+KB2S	United States of America	E
+KB2UQS	United States of America	E
+KB3HF	United States of America	E
+KB4IRR	United States of America	E
+KB4LA	United States of America	E
+KB4QZH	United States of America	E
+KB4TLH	United States of America	E
+KB5NJU	United States of America	E
+KB5ZYC	United States of America	E
+KB6B	United States of America	E
+KB6OJE	United States of America	E
+KB6QPI	United States of America	E
+KB7MLK	United States of America	E
+KB7PF	United States of America	E
+KB7Q	United States of America	E
+KB8DX	United States of America	E
+KB8FLI	United States of America	E
+KB8KMH	United States of America	E
+KB8PKC	United States of America	E
+KB8UFP	United States of America	E
+KB8V	United States of America	E
+KB9DFE	United States of America	E
+KB9LEB	United States of America	E
+KB9RUG	United States of America	E
+KB9S	United States of America	E
+KB9TBB	United States of America	E
+KB9TVR	United States of America	E
+KB9TYC	United States of America	E
+KC0IYT	United States of America	E
+KC0VKN	United States of America	E
+KC0WEA	United States of America	E
+KC1BB	United States of America	E
+KC1DWP	United States of America	E
+KC1EO	United States of America	E
+KC1RFK	United States of America	E
+KC2DWG	United States of America	E
+KC2LM	United States of America	E
+KC3JPP	United States of America	E
+KC3MAL	United States of America	E
+KC3QND	United States of America	E
+KC3SJ	United States of America	E
+KC3WNX	United States of America	E
+KC4BB	United States of America	E
+KC4CR	United States of America	E
+KC4HAR	United States of America	E
+KC4HW	United States of America	E
+KC4IR	United States of America	E
+KC4KS	United States of America	E
+KC4LE	United States of America	E
+KC4NX	United States of America	E
+KC4OBX	United States of America	E
+KC4RNF	United States of America	E
+KC4TEO	United States of America	E
+KC4TNQ	United States of America	E
+KC4WQ	United States of America	E
+KC4ZMB	United States of America	E
+KC5ATJ	United States of America	E
+KC5CMX	United States of America	E
+KC5RFU	United States of America	E
+KC6CJY	United States of America	E
+KC6R	United States of America	E
+KC6T	United States of America	E
+KC6UCN	United States of America	E
+KC7JCV	United States of America	E
+KC7QY	United States of America	E
+KC7TY	United States of America	E
+KC8FDU	United States of America	E
+KC8GCR	United States of America	E
+KC8GZK	United States of America	E
+KC8J	United States of America	E
+KC8NFN	United States of America	E
+KC8OPV	United States of America	E
+KC8YEK	United States of America	E
+KC8YRK	United States of America	E
+KC9C	United States of America	E
+KC9DGP	United States of America	E
+KC9EI	United States of America	E
+KC9K	United States of America	E
+KC9UHI	United States of America	E
+KD0BTO	United States of America	E
+KD0EE	United States of America	E
+KD1RX	United States of America	E
+KD2FSH	United States of America	E
+KD2KW	United States of America	E
+KD2RPX	United States of America	E
+KD4ADC	United States of America	E
+KD4BWM	United States of America	E
+KD4EE	United States of America	E
+KD4LT	United States of America	E
+KD4SN	United States of America	E
+KD4ULD	United States of America	E
+KD4ULW	United States of America	E
+KD4Y	United States of America	E
+KD4YHE	United States of America	E
+KD5AJC	United States of America	E
+KD5DD	United States of America	E
+KD5EJG	United States of America	E
+KD5M	United States of America	E
+KD5PCK	United States of America	E
+KD5USA	United States of America	E
+KD5UVV	United States of America	E
+KD6AF	United States of America	E
+KD6HWF	United States of America	E
+KD6MCX	United States of America	E
+KD7ACB	United States of America	E
+KD7MT	United States of America	E
+KD8HE	United States of America	E
+KD8TF	United States of America	E
+KD9LTN	United States of America	E
+KD9QS	United States of America	E
+KD9RBY	United States of America	E
+KD9ZUN	United States of America	E
+KE0G	United States of America	E
+KE0GHY	United States of America	E
+KE0GXH	United States of America	E
+KE0L	United States of America	E
+KE0YI	United States of America	E
+KE1B	United States of America	E
+KE2VB	United States of America	E
+KE3K	United States of America	E
+KE4GOI	United States of America	E
+KE4KMG	United States of America	E
+KE4KY	United States of America	E
+KE4VAM	United States of America	E
+KE4WKH	United States of America	E
+KE4WVK	United States of America	E
+KE4XT	United States of America	E
+KE5HDE	United States of America	E
+KE5MIS	United States of America	E
+KE5NJ	United States of America	E
+KE6VRL	United States of America	E
+KE7LBB	United States of America	E
+KE8AE	United States of America	E
+KE8BII	United States of America	E
+KE8FT	United States of America	E
+KE8KMX	United States of America	E
+KE8NN	United States of America	E
+KE8QZC	United States of America	E
+KE8UN	United States of America	E
+KE8WIC	United States of America	E
+KE8YIK	United States of America	E
+KE8ZZH	United States of America	E
+KE9FCD	United States of America	E
+KF0CT	United States of America	E
+KF0IWN	United States of America	E
+KF4AV	United States of America	E
+KF4FMQ	United States of America	E
+KF4TY	United States of America	E
+KF5MU	United States of America	E
+KF6HDJ	United States of America	E
+KF6HI	United States of America	E
+KF7CG	United States of America	E
+KF7EB	United States of America	E
+KF7MD	United States of America	E
+KF7RO	United States of America	E
+KF7Z	United States of America	E
+KF7ZLU	United States of America	E
+KF8EXX	United States of America	E
+KF8N	United States of America	E
+KF9LI	United States of America	E
+KF9MT	United States of America	E
+KG1D	United States of America	E
+KG2E	United States of America	E
+KG2MD	United States of America	E
+KG4BIG	United States of America	E
+KG4CUY	United States of America	E
+KG4LKY	United States of America	E
+KG4STL	United States of America	E
+KG4V	United States of America	E
+KG5EG	United States of America	E
+KG5GCC	United States of America	E
+KG5OA	United States of America	E
+KG5SSB	United States of America	E
+KG5TA	United States of America	E
+KG5XR	United States of America	E
+KG6CIH	United States of America	E
+KG7VQ	United States of America	E
+KG8ZY	United States of America	E
+KG9V	United States of America	E
+KH2AR	United States of America	E
+KH2BR	United States of America	E
+KH2GM	United States of America	E
+KH2PM	United States of America	E
+KH2SR	United States of America	E
+KH2TJ	United States of America	E
+KH6CT	United States of America	E
+KH6GK	United States of America	E
+KH6HU	United States of America	E
+KH6JRB	United States of America	E
+KH6M	United States of America	E
+KH6ND	United States of America	E
+KH6VM	United States of America	E
+KH7DA/4	United States of America	E
+KH7X	United States of America	E
+KH7XS/4	United States of America	E
+KI0E	United States of America	E
+KI0EB	United States of America	E
+KI4EZC	United States of America	E
+KI4JFX	United States of America	E
+KI4KWR	United States of America	E
+KI4NG	United States of America	E
+KI4PHE	United States of America	E
+KI5HVD	United States of America	E
+KI5UXN	United States of America	E
+KI5VNB	United States of America	E
+KI5ZQZ	United States of America	E
+KI6DY	United States of America	E
+KI6HQT	United States of America	E
+KI6KGC	United States of America	E
+KI6QDH	United States of America	E
+KI6T	United States of America	E
+KI7ID	United States of America	E
+KI7LPT	United States of America	E
+KI7MJU	United States of America	E
+KI7WX	United States of America	E
+KI8I	United States of America	E
+KJ4AOM	United States of America	E
+KJ4BIX	United States of America	E
+KJ4JPV	United States of America	E
+KJ4KVC	United States of America	E
+KJ4LTA	United States of America	E
+KJ4M	United States of America	E
+KJ4MES	United States of America	E
+KJ4ND	United States of America	E
+KJ4OOR	United States of America	E
+KJ4QIS	United States of America	E
+KJ4UGO	United States of America	E
+KJ4YLR	United States of America	E
+KJ5BIN	United States of America	E
+KJ5JAU	United States of America	E
+KJ6DQ	United States of America	E
+KJ6GHN	United States of America	E
+KJ6SVE	United States of America	E
+KJ6XC	United States of America	E
+KJ6YXI	United States of America	E
+KJ9C	United States of America	E
+KJ9D	United States of America	E
+KK0L	United States of America	E
+KK0NIG	United States of America	E
+KK2A	United States of America	E
+KK4ADQ	United States of America	E
+KK4JW	United States of America	E
+KK4NAW	United States of America	E
+KK4OMJ	United States of America	E
+KK4OVW	United States of America	E
+KK4XA	United States of America	E
+KK5OQ	United States of America	E
+KK6L	United States of America	E
+KK6MC	United States of America	E
+KK6OKU	United States of America	E
+KK6SPK	United States of America	E
+KK7BWQ	United States of America	E
+KK7CJV	United States of America	E
+KK7LRD	United States of America	E
+KK7TZP	United States of America	E
+KK7VXK	United States of America	E
+KK8C	United States of America	E
+KK9A	United States of America	E
+KK9MHZ	United States of America	E
+KK9O	United States of America	E
+KL0D	United States of America	E
+KL0S	United States of America	E
+KL0SS	United States of America	E
+KL1A	United States of America	E
+KL1LF	United States of America	E
+KL2A/7	United States of America	E
+KL2YE	United States of America	E
+KL3KZ	United States of America	E
+KL4QZ	United States of America	E
+KL5MM	United States of America	E
+KL5NL	United States of America	E
+KL7AF	United States of America	E
+KL7DJ	United States of America	E
+KL7FDQ	United States of America	E
+KL7HDS	United States of America	E
+KL7HDS/6	United States of America	E
+KL7HQR	United States of America	E
+KL7IKV	United States of America	E
+KL7MJ/4	United States of America	E
+KL7NL	United States of America	E
+KL7NL/4	United States of America	E
+KL7NW	United States of America	E
+KL7OF	United States of America	E
+KL7OF/7	United States of America	E
+KL7QW	United States of America	E
+KL7YK	United States of America	E
+KM1Z	United States of America	E
+KM4CH	United States of America	E
+KM4DR	United States of America	E
+KM4FO	United States of America	E
+KM4FOC	United States of America	E
+KM4HQE	United States of America	E
+KM4IYW	United States of America	E
+KM4JAD	United States of America	E
+KM4RO	United States of America	E
+KM4RT	United States of America	E
+KM5AT	United States of America	E
+KM5E	United States of America	E
+KM6UH	United States of America	E
+KM7AFF	United States of America	E
+KM7AXV	United States of America	E
+KM7CT	United States of America	E
+KM7ENF	United States of America	E
+KM7SAD	United States of America	E
+KM7W	United States of America	E
+KM8L	United States of America	E
+KM9R	United States of America	E
+KN0A	United States of America	E
+KN0BLE	United States of America	E
+KN0W	United States of America	E
+KN1MT	United States of America	E
+KN4A	United States of America	E
+KN4AL	United States of America	E
+KN4CG	United States of America	E
+KN4CNU	United States of America	E
+KN4DUA	United States of America	E
+KN4IWO	United States of America	E
+KN4IXT	United States of America	E
+KN4JGH	United States of America	E
+KN4LIU	United States of America	E
+KN4OK	United States of America	E
+KN4PHS	United States of America	E
+KN4RD	United States of America	E
+KN4Y	United States of America	E
+KN4YAQ	United States of America	E
+KN6BU	United States of America	E
+KN6RO	United States of America	E
+KN6X	United States of America	E
+KN8U	United States of America	E
+KN9K	United States of America	E
+KO1H	United States of America	E
+KO1Z	United States of America	E
+KO2Y	United States of America	E
+KO4AWC	United States of America	E
+KO4CAA	United States of America	E
+KO4DCD	United States of America	E
+KO4DWB	United States of America	E
+KO4EVC	United States of America	E
+KO4FSZ	United States of America	E
+KO4FX	United States of America	E
+KO4HPC	United States of America	E
+KO4IDC	United States of America	E
+KO4LFZ	United States of America	E
+KO4MAO	United States of America	E
+KO4OL	United States of America	E
+KO4PZX	United States of America	E
+KO4TFE	United States of America	E
+KO4TUP	United States of America	E
+KO4UFD	United States of America	E
+KO4UOJ	United States of America	E
+KO4VJN	United States of America	E
+KO4XJ	United States of America	E
+KO4YIN	United States of America	E
+KO4Z	United States of America	E
+KO6BEN	United States of America	E
+KO8SCA	United States of America	E
+KO8V	United States of America	E
+KO9V	United States of America	E
+KP2BH	United States of America	E
+KP2BH/4	United States of America	E
+KP2X	United States of America	E
+KP2XX	United States of America	E
+KP3J	United States of America	E
+KP3U	United States of America	E
+KP4EOP	United States of America	E
+KP4MD	United States of America	E
+KP4PW	United States of America	E
+KP4WW	United States of America	E
+KQ0J	United States of America	E
+KQ4AHO	United States of America	E
+KQ4DUX	United States of America	E
+KQ4ETC	United States of America	E
+KQ4FIP	United States of America	E
+KQ4FWP	United States of America	E
+KQ4HNN	United States of America	E
+KQ4JEQ	United States of America	E
+KQ4MYC	United States of America	E
+KQ4NOM	United States of America	E
+KQ4SMI	United States of America	E
+KQ4SPR	United States of America	E
+KQ4TPD	United States of America	E
+KQ4TTY	United States of America	E
+KQ4UJG	United States of America	E
+KQ4VPZ	United States of America	E
+KQ4VSG	United States of America	E
+KQ4VT	United States of America	E
+KQ4VVQ	United States of America	E
+KQ4VYQ	United States of America	E
+KQ4WAY	United States of America	E
+KQ4YGJ	United States of America	E
+KQ4YOL	United States of America	E
+KQ9J	United States of America	E
+KR2E	United States of America	E
+KR3PS	United States of America	E
+KR4ABR	United States of America	E
+KR4AUX	United States of America	E
+KR4BEL	United States of America	E
+KR4DDW	United States of America	E
+KR4DFW	United States of America	E
+KR4EE	United States of America	E
+KR4EEG	United States of America	E
+KR4F	United States of America	E
+KR4FQG	United States of America	E
+KR4HIE	United States of America	E
+KR4HPQ	United States of America	E
+KR4IDJ	United States of America	E
+KR4KCP	United States of America	E
+KR5X	United States of America	E
+KR7C	United States of America	E
+KS0T	United States of America	E
+KS3CKC	United States of America	E
+KS4L	United States of America	E
+KS4NL	United States of America	E
+KS4VOL	United States of America	E
+KS4X	United States of America	E
+KS5A	United States of America	E
+KS7T	United States of America	E
+KS9A	United States of America	E
+KT0P	United States of America	E
+KT0V	United States of America	E
+KT1I	United States of America	E
+KT2R	United States of America	E
+KT3M	United States of America	E
+KT3R	United States of America	E
+KT3X	United States of America	E
+KT4O	United States of America	E
+KT4RH	United States of America	E
+KT4XA	United States of America	E
+KT6D	United States of America	E
+KT9T	United States of America	E
+KT9X	United States of America	E
+KU0D	United States of America	E
+KU0W	United States of America	E
+KU1CW	United States of America	E
+KU4A	United States of America	E
+KU4UK	United States of America	E
+KU8E	United States of America	E
+KU8V	United States of America	E
+KV0K	United States of America	E
+KV1E	United States of America	E
+KV1I	United States of America	E
+KV2M	United States of America	E
+KV3T	United States of America	E
+KV4T	United States of America	E
+KV8S	United States of America	E
+KW0A	United States of America	E
+KW4J	United States of America	E
+KW4LU	United States of America	E
+KW4OV	United States of America	E
+KW4SW	United States of America	E
+KW4YA	United States of America	E
+KW7D	United States of America	E
+KW7EET	United States of America	E
+KW7Q	United States of America	E
+KW9A	United States of America	E
+KX2P	United States of America	E
+KX3H	United States of America	E
+KX4AV	United States of America	E
+KX4BI	United States of America	E
+KX4PR	United States of America	E
+KX4X	United States of America	E
+KY0Q	United States of America	E
+KY0W	United States of America	E
+KY4DMD	United States of America	E
+KY4G	United States of America	E
+KY4HV	United States of America	E
+KY4KD	United States of America	E
+KY4KY	United States of America	E
+KY4NA	United States of America	E
+KY4XX	United States of America	E
+KY6AA	United States of America	E
+KZ1W	United States of America	E
+KZ2T	United States of America	E
+KZ2V	United States of America	E
+KZ4BE	United States of America	E
+KZ4G	United States of America	E
+KZ4KG	United States of America	E
+KZ4ML	United States of America	E
+KZ4WJ	United States of America	E
+KZ5DX	United States of America	E
+KZ5ED	United States of America	E
+KZ7A	United States of America	E
+KZ7Y	United States of America	E
+KZ9O	United States of America	E
+KZ9V	United States of America	E
+N0CVP	United States of America	E
+N0DIM	United States of America	E
+N0DQD	United States of America	E
+N0EUV	United States of America	E
+N0FUC	United States of America	E
+N0FW	United States of America	E
+N0GAF	United States of America	E
+N0GST	United States of America	E
+N0HF	United States of America	E
+N0KKJ	United States of America	E
+N0KRE	United States of America	E
+N0KWA	United States of America	E
+N0MH	United States of America	E
+N0MNY	United States of America	E
+N0OEP	United States of America	E
+N0OJ	United States of America	E
+N0QQ	United States of America	E
+N0SMX	United States of America	E
+N0VD	United States of America	E
+N0VRS	United States of America	E
+N0WOP	United States of America	E
+N0XMD	United States of America	E
+N0YFI	United States of America	E
+N0YO	United States of America	E
+N0YY	United States of America	E
+N1ADM	United States of America	E
+N1AL	United States of America	E
+N1AV	United States of America	E
+N1CC	United States of America	E
+N1CCC	United States of America	E
+N1CLC	United States of America	E
+N1DVM	United States of America	E
+N1EU	United States of America	E
+N1JM	United States of America	E
+N1KEZ	United States of America	E
+N1KW	United States of America	E
+N1NYT	United States of America	E
+N1OKL	United States of America	E
+N1RIP	United States of America	E
+N1RU	United States of America	E
+N1SLO	United States of America	E
+N1WQ	United States of America	E
+N1XK	United States of America	E
+N1XS	United States of America	E
+N2BJ	United States of America	E
+N2CB	United States of America	E
+N2CJN	United States of America	E
+N2FSM	United States of America	E
+N2GG	United States of America	E
+N2HC	United States of America	E
+N2HTE	United States of America	E
+N2IC	United States of America	E
+N2JF	United States of America	E
+N2JNR	United States of America	E
+N2NS	United States of America	E
+N2SRK	United States of America	E
+N2UN	United States of America	E
+N2UR	United States of America	E
+N2VW	United States of America	E
+N2WLG	United States of America	E
+N2WN	United States of America	E
+N3AIU	United States of America	E
+N3AWS	United States of America	E
+N3BB	United States of America	E
+N3BBQ	United States of America	E
+N3BEN	United States of America	E
+N3BUO	United States of America	E
+N3CI	United States of America	E
+N3CMI	United States of America	E
+N3CO	United States of America	E
+N3DEB	United States of America	E
+N3EG	United States of America	E
+N3EU	United States of America	E
+N3HE	United States of America	E
+N3KA	United States of America	E
+N3KCJ	United States of America	E
+N3OSI	United States of America	E
+N3QQ	United States of America	E
+N3RA	United States of America	E
+N3RC	United States of America	E
+N3UUS	United States of America	E
+N3ZZ	United States of America	E
+N4AB	United States of America	E
+N4ARO	United States of America	E
+N4ART	United States of America	E
+N4AU	United States of America	E
+N4BAA	United States of America	E
+N4BCD	United States of America	E
+N4BCJ	United States of America	E
+N4CC	United States of America	E
+N4CIO	United States of America	E
+N4CSV	United States of America	E
+N4DBR	United States of America	E
+N4DBY	United States of America	E
+N4DD	United States of America	E
+N4DLA	United States of America	E
+N4DTF	United States of America	E
+N4DW	United States of America	E
+N4DXN	United States of America	E
+N4EL	United States of America	E
+N4ETH	United States of America	E
+N4FUR	United States of America	E
+N4FZ	United States of America	E
+N4GK	United States of America	E
+N4GO	United States of America	E
+N4HAI	United States of America	E
+N4HID	United States of America	E
+N4IDH	United States of America	E
+N4IN	United States of America	E
+N4JDB	United States of America	E
+N4JEH	United States of America	E
+N4JF	United States of America	E
+N4JKO	United States of America	E
+N4JN	United States of America	E
+N4JQQ	United States of America	E
+N4JR	United States of America	E
+N4JRG	United States of America	E
+N4KC	United States of America	E
+N4KGL	United States of America	E
+N4KH	United States of America	E
+N4KZ	United States of America	E
+N4KZS	United States of America	E
+N4LJT	United States of America	E
+N4LR	United States of America	E
+N4LS	United States of America	E
+N4LSJ	United States of America	E
+N4MCC	United States of America	E
+N4MIK	United States of America	E
+N4MRM	United States of America	E
+N4MTE	United States of America	E
+N4NA	United States of America	E
+N4NM	United States of America	E
+N4NP	United States of America	E
+N4NT	United States of America	E
+N4NVG	United States of America	E
+N4OGW	United States of America	E
+N4OPI	United States of America	E
+N4PX	United States of America	E
+N4QS	United States of America	E
+N4QWZ	United States of America	E
+N4ROA	United States of America	E
+N4RRR	United States of America	E
+N4SCP	United States of America	E
+N4SS	United States of America	E
+N4SV	United States of America	E
+N4TFN	United States of America	E
+N4TY	United States of America	E
+N4TZ	United States of America	E
+N4UC	United States of America	E
+N4UL	United States of America	E
+N4UW	United States of America	E
+N4VI	United States of America	E
+N4VN	United States of America	E
+N4VV	United States of America	E
+N4WE	United States of America	E
+N4XH	United States of America	E
+N4XR	United States of America	E
+N4XTT	United States of America	E
+N4YHC	United States of America	E
+N4ZZ	United States of America	E
+N5BF	United States of America	E
+N5BLM	United States of America	E
+N5BLY	United States of America	E
+N5BNO	United States of America	E
+N5BO	United States of America	E
+N5CBP	United States of America	E
+N5CQ	United States of America	E
+N5CR	United States of America	E
+N5CW	United States of America	E
+N5DX	United States of America	E
+N5EP	United States of America	E
+N5FTY	United States of America	E
+N5GF	United States of America	E
+N5GI	United States of America	E
+N5GNA	United States of America	E
+N5HC	United States of America	E
+N5IE	United States of America	E
+N5JED	United States of America	E
+N5JEY	United States of America	E
+N5KO	United States of America	E
+N5LZ	United States of America	E
+N5MCP	United States of America	E
+N5PA	United States of America	E
+N5PO	United States of America	E
+N5PU	United States of America	E
+N5PYY	United States of America	E
+N5RP	United States of America	E
+N5SA	United States of America	E
+N5SMQ	United States of America	E
+N5TB	United States of America	E
+N5TOO	United States of America	E
+N5UE	United States of America	E
+N5VGK	United States of America	E
+N5VJX	United States of America	E
+N5VX	United States of America	E
+N5WCS	United States of America	E
+N5WR	United States of America	E
+N5YJZ	United States of America	E
+N5YT	United States of America	E
+N5ZO	United States of America	E
+N6AQ	United States of America	E
+N6AR	United States of America	E
+N6BM	United States of America	E
+N6DW	United States of America	E
+N6EE	United States of America	E
+N6ENO	United States of America	E
+N6FS	United States of America	E
+N6GQ	United States of America	E
+N6HEW	United States of America	E
+N6IGV	United States of America	E
+N6JRL	United States of America	E
+N6JS	United States of America	E
+N6MA	United States of America	E
+N6NT	United States of America	E
+N6PPP	United States of America	E
+N6RH	United States of America	E
+N6RSH	United States of America	E
+N6TW	United States of America	E
+N6US	United States of America	E
+N6WHV	United States of America	E
+N6YMM	United States of America	E
+N6ZFO	United States of America	E
+N7AGP	United States of America	E
+N7BD	United States of America	E
+N7DR	United States of America	E
+N7EMG	United States of America	E
+N7FF	United States of America	E
+N7FUL	United States of America	E
+N7GVV	United States of America	E
+N7IV	United States of America	E
+N7KA	United States of America	E
+N7KDT	United States of America	E
+N7MQ	United States of America	E
+N7MZW	United States of America	E
+N7NG	United States of America	E
+N7PMS	United States of America	E
+N7PVW	United States of America	E
+N7QAX	United States of America	E
+N7QJP	United States of America	E
+N7QS	United States of America	E
+N7SE	United States of America	E
+N7US	United States of America	E
+N7VR	United States of America	E
+N7WFK	United States of America	E
+N7WY	United States of America	E
+N7YA	United States of America	E
+N7YDH	United States of America	E
+N7ZG	United States of America	E
+N7ZZ	United States of America	E
+N8AAY	United States of America	E
+N8BM	United States of America	E
+N8CL	United States of America	E
+N8CQD	United States of America	E
+N8DAV	United States of America	E
+N8ELA	United States of America	E
+N8GB	United States of America	E
+N8GU	United States of America	E
+N8HM	United States of America	E
+N8II	United States of America	E
+N8IK	United States of America	E
+N8IVN	United States of America	E
+N8JAA	United States of America	E
+N8JAX	United States of America	E
+N8JOE	United States of America	E
+N8KH	United States of America	E
+N8MD	United States of America	E
+N8MXL	United States of America	E
+N8NA	United States of America	E
+N8NN	United States of America	E
+N8OO	United States of America	E
+N8OZY	United States of America	E
+N8PR	United States of America	E
+N8QOT	United States of America	E
+N8RA	United States of America	E
+N8RF	United States of America	E
+N8RR	United States of America	E
+N8SEW	United States of America	E
+N8SHL	United States of America	E
+N8SLT	United States of America	E
+N8UM	United States of America	E
+N8UOA	United States of America	E
+N8URE	United States of America	E
+N8VCL	United States of America	E
+N8VU	United States of America	E
+N8WRL	United States of America	E
+N8WXQ	United States of America	E
+N8XX	United States of America	E
+N8ZR	United States of America	E
+N9ADG	United States of America	E
+N9ARX	United States of America	E
+N9ATF	United States of America	E
+N9BD	United States of America	E
+N9BSO	United States of America	E
+N9CD	United States of America	E
+N9CIQ	United States of America	E
+N9CNF	United States of America	E
+N9DK	United States of America	E
+N9EA	United States of America	E
+N9EAT	United States of America	E
+N9FDE	United States of America	E
+N9GB	United States of America	E
+N9HDE	United States of America	E
+N9ISN	United States of America	E
+N9JF	United States of America	E
+N9JYJ	United States of America	E
+N9MM	United States of America	E
+N9MS	United States of America	E
+N9MTG	United States of America	E
+N9MXI	United States of America	E
+N9NA	United States of America	E
+N9NB	United States of America	E
+N9NC	United States of America	E
+N9NFT	United States of America	E
+N9NM	United States of America	E
+N9OF	United States of America	E
+N9OU	United States of America	E
+N9PGG	United States of America	E
+N9PQJ	United States of America	E
+N9QY	United States of America	E
+N9RV	United States of America	E
+N9SB	United States of America	E
+N9TTX	United States of America	E
+N9TX	United States of America	E
+N9UY	United States of America	E
+N9VPV	United States of America	E
+N9ZW	United States of America	E
+NA1KW	United States of America	E
+NA1LZ	United States of America	E
+NA2CC	United States of America	E
+NA2U	United States of America	E
+NA4A	United States of America	E
+NA4AU	United States of America	E
+NA4C	United States of America	E
+NA4DX	United States of America	E
+NA4M	United States of America	E
+NA4MM	United States of America	E
+NA4W	United States of America	E
+NA5DX	United States of America	E
+NA5NN	United States of America	E
+NA7L	United States of America	E
+NA9J	United States of America	E
+NA9RB	United States of America	E
+NB0O	United States of America	E
+NB1T	United States of America	E
+NB3C	United States of America	E
+NB4M	United States of America	E
+NB5E	United States of America	E
+NC0O	United States of America	E
+NC6K	United States of America	E
+NC8N	United States of America	E
+ND0L	United States of America	E
+ND2T	United States of America	E
+ND3N	United States of America	E
+ND4U	United States of America	E
+ND4X	United States of America	E
+ND4Y	United States of America	E
+ND7J	United States of America	E
+ND8L	United States of America	E
+ND8N	United States of America	E
+ND9M	United States of America	E
+NE1LA	United States of America	E
+NE2I	United States of America	E
+NE4AA	United States of America	E
+NE4M	United States of America	E
+NE4TN	United States of America	E
+NE5BO	United States of America	E
+NE5W	United States of America	E
+NE7DX	United States of America	E
+NE8P	United States of America	E
+NE9U	United States of America	E
+NF1R	United States of America	E
+NF4J	United States of America	E
+NF5KF	United States of America	E
+NF6P	United States of America	E
+NF7D	United States of America	E
+NG2G	United States of America	E
+NG2S	United States of America	E
+NG3Q	United States of America	E
+NG4V	United States of America	E
+NG6X	United States of America	E
+NG7A	United States of America	E
+NG7IL	United States of America	E
+NG9B	United States of America	E
+NG9T	United States of America	E
+NH6L	United States of America	E
+NH6PK	United States of America	E
+NH6T	United States of America	E
+NH6Z	United States of America	E
+NH7C	United States of America	E
+NH7CY	United States of America	E
+NH7TV	United States of America	E
+NH8S	United States of America	E
+NI0C	United States of America	E
+NI2M	United States of America	E
+NI5L	United States of America	E
+NI7R	United States of America	E
+NJ0U	United States of America	E
+NJ4P	United States of America	E
+NJ8G	United States of America	E
+NJ8J	United States of America	E
+NJ8M	United States of America	E
+NK3L	United States of America	E
+NK4I	United States of America	E
+NK4P	United States of America	E
+NK7U	United States of America	E
+NK9I	United States of America	E
+NL7CO	United States of America	E
+NL7CQ	United States of America	E
+NL7D	United States of America	E
+NL7WA	United States of America	E
+NL7XM	United States of America	E
+NL7XM/B	United States of America	E
+NL7XT	United States of America	E
+NM4M	United States of America	E
+NM7W	United States of America	E
+NN3U	United States of America	E
+NN4DX	United States of America	E
+NN4MM	United States of America	E
+NN4NT	United States of America	E
+NN4SA	United States of America	E
+NN4US	United States of America	E
+NN5O	United States of America	E
+NN5SS	United States of America	E
+NN6TT	United States of America	E
+NN7A	United States of America	E
+NN7CW	United States of America	E
+NN7V	United States of America	E
+NN9DD	United States of America	E
+NO2D	United States of America	E
+NO2R	United States of America	E
+NO3OO	United States of America	E
+NO9E	United States of America	E
+NP2GG	United States of America	E
+NP3FB	United States of America	E
+NP3K	United States of America	E
+NP3XP	United States of America	E
+NP4IW	United States of America	E
+NP4Z/2	United States of America	E
+NQ4U	United States of America	E
+NQ4Y	United States of America	E
+NQ8C	United States of America	E
+NR4L	United States of America	E
+NR5NN	United States of America	E
+NR5W	United States of America	E
+NR7DX	United States of America	E
+NR7E	United States of America	E
+NR8Z	United States of America	E
+NR9Q	United States of America	E
+NS0I	United States of America	E
+NS2X	United States of America	E
+NS3Q	United States of America	E
+NS4X	United States of America	E
+NT0K	United States of America	E
+NT3S	United States of America	E
+NT4H	United States of America	E
+NT4J	United States of America	E
+NT4TN	United States of America	E
+NT4W	United States of America	E
+NU0L	United States of America	E
+NU4B	United States of America	E
+NU4N	United States of America	E
+NV4B	United States of America	E
+NV4G	United States of America	E
+NV9L	United States of America	E
+NW8U	United States of America	E
+NX1P	United States of America	E
+NX7W	United States of America	E
+NX9T	United States of America	E
+NY1V	United States of America	E
+NY4JB	United States of America	E
+NY5E	United States of America	E
+NY6DX	United States of America	E
+NY9H	United States of America	E
+NZ2S	United States of America	E
+NZ6T	United States of America	E
+NZ7Q	United States of America	E
+NZ9Y	United States of America	E
+W0AG	United States of America	E
+W0AH	United States of America	E
+W0AO	United States of America	E
+W0BF	United States of America	E
+W0CGC	United States of America	E
+W0FLZ	United States of America	E
+W0GG	United States of America	E
+W0GUY	United States of America	E
+W0JAY	United States of America	E
+W0JX	United States of America	E
+W0LL	United States of America	E
+W0LV	United States of America	E
+W0MHK	United States of America	E
+W0NF	United States of America	E
+W0ODS	United States of America	E
+W0OIT	United States of America	E
+W0PV	United States of America	E
+W0RHX	United States of America	E
+W0RIC	United States of America	E
+W0RSJ	United States of America	E
+W0SK	United States of America	E
+W0YK	United States of America	E
+W1BBT	United States of America	E
+W1CHL	United States of America	E
+W1CR	United States of America	E
+W1DGL	United States of America	E
+W1EG	United States of America	E
+W1ESE	United States of America	E
+W1FU	United States of America	E
+W1GKT	United States of America	E
+W1HRB	United States of America	E
+W1IG	United States of America	E
+W1JCW	United States of America	E
+W1LTC	United States of America	E
+W1MJC	United States of America	E
+W1NA	United States of America	E
+W1NN	United States of America	E
+W1NV	United States of America	E
+W1PAA	United States of America	E
+W1PD	United States of America	E
+W1PR	United States of America	E
+W1QC	United States of America	E
+W1RH	United States of America	E
+W1SAV	United States of America	E
+W1SRD	United States of America	E
+W1TM	United States of America	E
+W1WSF	United States of America	E
+W1YY	United States of America	E
+W1ZD	United States of America	E
+W2AA	United States of America	E
+W2ACY	United States of America	E
+W2AX	United States of America	E
+W2BJN	United States of America	E
+W2CO	United States of America	E
+W2DB	United States of America	E
+W2DON	United States of America	E
+W2GS	United States of America	E
+W2HZ	United States of America	E
+W2IY	United States of America	E
+W2KGO	United States of America	E
+W2NQ	United States of America	E
+W2OO	United States of America	E
+W2SA	United States of America	E
+W2SKI	United States of America	E
+W2STE	United States of America	E
+W2UP	United States of America	E
+W2VJN	United States of America	E
+W2XX	United States of America	E
+W3ACO	United States of America	E
+W3ACR	United States of America	E
+W3CB	United States of America	E
+W3CRZ	United States of America	E
+W3DEV	United States of America	E
+W3DQN	United States of America	E
+W3FF	United States of America	E
+W3HDH	United States of America	E
+W3HKK	United States of America	E
+W3IQ	United States of America	E
+W3LCP	United States of America	E
+W3PWF	United States of America	E
+W3RZ	United States of America	E
+W3TB	United States of America	E
+W3TZ	United States of America	E
+W3WRC	United States of America	E
+W3XO	United States of America	E
+W4ARM	United States of America	E
+W4AUB	United States of America	E
+W4BQK	United States of America	E
+W4BQN	United States of America	E
+W4CDA	United States of America	E
+W4CMG	United States of America	E
+W4CQE	United States of America	E
+W4CRV	United States of America	E
+W4CV	United States of America	E
+W4DAN	United States of America	E
+W4DTA	United States of America	E
+W4DTB	United States of America	E
+W4EF	United States of America	E
+W4ER	United States of America	E
+W4ETA	United States of America	E
+W4FCL	United States of America	E
+W4FT	United States of America	E
+W4GB	United States of America	E
+W4GHD	United States of America	E
+W4GKM	United States of America	E
+W4GV	United States of America	E
+W4GZX	United States of America	E
+W4HRC	United States of America	E
+W4HVH	United States of America	E
+W4IDX	United States of America	E
+W4IFI	United States of America	E
+W4IL	United States of America	E
+W4IOD	United States of America	E
+W4IOJ	United States of America	E
+W4IX	United States of America	E
+W4JHV	United States of America	E
+W4JNB	United States of America	E
+W4JUU	United States of America	E
+W4KW	United States of America	E
+W4LC	United States of America	E
+W4LOO	United States of America	E
+W4MF	United States of America	E
+W4ML	United States of America	E
+W4MTM	United States of America	E
+W4NBS	United States of America	E
+W4NEU	United States of America	E
+W4NI	United States of America	E
+W4NNF	United States of America	E
+W4NZ	United States of America	E
+W4ORS	United States of America	E
+W4PA	United States of America	E
+W4PF	United States of America	E
+W4PGM	United States of America	E
+W4PHS	United States of America	E
+W4PV	United States of America	E
+W4QLC	United States of America	E
+W4RK	United States of America	E
+W4RLB	United States of America	E
+W4RXR	United States of America	E
+W4RYW	United States of America	E
+W4SDX	United States of America	E
+W4SIG	United States of America	E
+W4SK	United States of America	E
+W4SSF	United States of America	E
+W4TLK	United States of America	E
+W4TTA	United States of America	E
+W4UAL	United States of America	E
+W4UAT	United States of America	E
+W4UT	United States of America	E
+W4UWC	United States of America	E
+W4WJK	United States of America	E
+W4WKU	United States of America	E
+W4WTS	United States of America	E
+W4XK	United States of America	E
+W4XTT	United States of America	E
+W4YA	United States of America	E
+W4YEM	United States of America	E
+W4YPW	United States of America	E
+W4YTO	United States of America	E
+W4ZIP	United States of America	E
+W5ACQ	United States of America	E
+W5BMO	United States of America	E
+W5DT	United States of America	E
+W5DX	United States of America	E
+W5EK	United States of America	E
+W5FB	United States of America	E
+W5GAI	United States of America	E
+W5JR	United States of America	E
+W5KBW	United States of America	E
+W5LE	United States of America	E
+W5LNX	United States of America	E
+W5MMW	United States of America	E
+W5MPB	United States of America	E
+W5MX	United States of America	E
+W5NZ	United States of America	E
+W5OM	United States of America	E
+W5ORC	United States of America	E
+W5PET	United States of America	E
+W5RCG	United States of America	E
+W5SGL	United States of America	E
+W5THT	United States of America	E
+W5UE	United States of America	E
+W5UHQ	United States of America	E
+W5VE	United States of America	E
+W5VS	United States of America	E
+W5WGF	United States of America	E
+W5WTX	United States of America	E
+W5XB	United States of America	E
+W5YD	United States of America	E
+W6ADE	United States of America	E
+W6AQ	United States of America	E
+W6BIV	United States of America	E
+W6BSD	United States of America	E
+W6DVS	United States of America	E
+W6EHY	United States of America	E
+W6EMM	United States of America	E
+W6FB	United States of America	E
+W6GX	United States of America	E
+W6HDG	United States of America	E
+W6HGF	United States of America	E
+W6IZT	United States of America	E
+W6JSL	United States of America	E
+W6JTB	United States of America	E
+W6KGP	United States of America	E
+W6KW	United States of America	E
+W6LFB	United States of America	E
+W6NDE	United States of America	E
+W6NJB	United States of America	E
+W6NWS	United States of America	E
+W6QUV	United States of America	E
+W6RIF	United States of America	E
+W6SAI	United States of America	E
+W6SFG	United States of America	E
+W6SID	United States of America	E
+W6SJ	United States of America	E
+W6UB	United States of America	E
+W6WU	United States of America	E
+W6XR	United States of America	E
+W6ZD	United States of America	E
+W7APZ	United States of America	E
+W7BAZ	United States of America	E
+W7CSA	United States of America	E
+W7DGR	United States of America	E
+W7DXX	United States of America	E
+W7ED	United States of America	E
+W7EE	United States of America	E
+W7EY	United States of America	E
+W7FW	United States of America	E
+W7GKF	United States of America	E
+W7HU	United States of America	E
+W7II	United States of America	E
+W7IJ	United States of America	E
+W7IMP	United States of America	E
+W7IV	United States of America	E
+W7IY	United States of America	E
+W7JW	United States of America	E
+W7KAM	United States of America	E
+W7KF	United States of America	E
+W7KK	United States of America	E
+W7LG	United States of America	E
+W7NX	United States of America	E
+W7PIA	United States of America	E
+W7PX	United States of America	E
+W7QC	United States of America	E
+W7RF	United States of America	E
+W7RIP	United States of America	E
+W7RY	United States of America	E
+W7UT	United States of America	E
+W7WXR	United States of America	E
+W7WZ	United States of America	E
+W7XT	United States of America	E
+W8AKS	United States of America	E
+W8AT	United States of America	E
+W8BAR	United States of America	E
+W8BFX	United States of America	E
+W8BLA	United States of America	E
+W8BRY	United States of America	E
+W8CS	United States of America	E
+W8CUL	United States of America	E
+W8DDS	United States of America	E
+W8DOF	United States of America	E
+W8FJ	United States of America	E
+W8FN	United States of America	E
+W8GG	United States of America	E
+W8GJK	United States of America	E
+W8HAP	United States of America	E
+W8HC	United States of America	E
+W8HMK	United States of America	E
+W8HY	United States of America	E
+W8IX	United States of America	E
+W8JA	United States of America	E
+W8JMV	United States of America	E
+W8KA	United States of America	E
+W8KR	United States of America	E
+W8KRZ	United States of America	E
+W8LYJ	United States of America	E
+W8NOR	United States of America	E
+W8OP	United States of America	E
+W8OV	United States of America	E
+W8QZA	United States of America	E
+W8RA	United States of America	E
+W8RKW	United States of America	E
+W8RMB	United States of America	E
+W8SGK	United States of America	E
+W8SP	United States of America	E
+W8TJM	United States of America	E
+W8TK	United States of America	E
+W8TN	United States of America	E
+W8UL	United States of America	E
+W8WEJ	United States of America	E
+W8WVA	United States of America	E
+W8WZ	United States of America	E
+W8XAL	United States of America	E
+W8XC	United States of America	E
+W8ZN	United States of America	E
+W8ZR	United States of America	E
+W9ARO	United States of America	E
+W9AVM	United States of America	E
+W9AWE	United States of America	E
+W9BM	United States of America	E
+W9BS	United States of America	E
+W9CF	United States of America	E
+W9CPD	United States of America	E
+W9CTY	United States of America	E
+W9DKB	United States of America	E
+W9DP	United States of America	E
+W9DX	United States of America	E
+W9EAU	United States of America	E
+W9ERE	United States of America	E
+W9ET	United States of America	E
+W9FF	United States of America	E
+W9FI	United States of America	E
+W9FST	United States of America	E
+W9FZ	United States of America	E
+W9GE	United States of America	E
+W9GNW	United States of America	E
+W9GOL	United States of America	E
+W9GYK	United States of America	E
+W9IL	United States of America	E
+W9IU	United States of America	E
+W9JA	United States of America	E
+W9JJ	United States of America	E
+W9KB	United States of America	E
+W9KXI	United States of America	E
+W9LCQ	United States of America	E
+W9LG	United States of America	E
+W9LWO	United States of America	E
+W9MAF	United States of America	E
+W9MAK	United States of America	E
+W9MEG	United States of America	E
+W9MIC	United States of America	E
+W9RM	United States of America	E
+W9RNY	United States of America	E
+W9TCV	United States of America	E
+W9TTT	United States of America	E
+W9TVX	United States of America	E
+W9TW	United States of America	E
+W9WE	United States of America	E
+W9XG	United States of America	E
+W9YZR	United States of America	E
+WA0CIE	United States of America	E
+WA0KDS	United States of America	E
+WA0PFC	United States of America	E
+WA0RMW	United States of America	E
+WA0WWW	United States of America	E
+WA0YPC	United States of America	E
+WA1FCN	United States of America	E
+WA1FMM	United States of America	E
+WA1KXV	United States of America	E
+WA1NHZ	United States of America	E
+WA1TYB	United States of America	E
+WA1X	United States of America	E
+WA2DHG	United States of America	E
+WA2DLN	United States of America	E
+WA2EDJ	United States of America	E
+WA2JQZ	United States of America	E
+WA2PCN	United States of America	E
+WA2USA	United States of America	E
+WA2VAM	United States of America	E
+WA2VJL	United States of America	E
+WA2VOI	United States of America	E
+WA2VYA	United States of America	E
+WA3C	United States of America	E
+WA3JAT	United States of America	E
+WA4CAX	United States of America	E
+WA4CB	United States of America	E
+WA4CQG	United States of America	E
+WA4ELK	United States of America	E
+WA4GGK	United States of America	E
+WA4GMW	United States of America	E
+WA4GNL	United States of America	E
+WA4HEI	United States of America	E
+WA4III	United States of America	E
+WA4JA	United States of America	E
+WA4JQS	United States of America	E
+WA4MIT	United States of America	E
+WA4TTK	United States of America	E
+WA4TTP	United States of America	E
+WA4USA	United States of America	E
+WA4VEK	United States of America	E
+WA4VGZ	United States of America	E
+WA4WZR	United States of America	E
+WA4ZXV	United States of America	E
+WA5POK	United States of America	E
+WA5VGI	United States of America	E
+WA6MM	United States of America	E
+WA6VZN	United States of America	E
+WA7AFV	United States of America	E
+WA7IND	United States of America	E
+WA7NPX	United States of America	E
+WA8AHZ	United States of America	E
+WA8KAN	United States of America	E
+WA8NLX	United States of America	E
+WA8OJR	United States of America	E
+WA8YVF	United States of America	E
+WA8ZBT	United States of America	E
+WA8ZID	United States of America	E
+WA9AFM	United States of America	E
+WA9JBR	United States of America	E
+WA9KIA	United States of America	E
+WA9LT	United States of America	E
+WA9TTC	United States of America	E
+WA9YEE	United States of America	E
+WA9Z	United States of America	E
+WB0CJB	United States of America	E
+WB0KWJ	United States of America	E
+WB0NDY	United States of America	E
+WB1BWQ	United States of America	E
+WB2GDD	United States of America	E
+WB2JEP	United States of America	E
+WB2MFU	United States of America	E
+WB3JFS	United States of America	E
+WB3JKQ	United States of America	E
+WB4BMQ	United States of America	E
+WB4CS	United States of America	E
+WB4E	United States of America	E
+WB4GHZ	United States of America	E
+WB4IT	United States of America	E
+WB4KDI	United States of America	E
+WB4VAM	United States of America	E
+WB4WXE	United States of America	E
+WB4YDL	United States of America	E
+WB4YDY	United States of America	E
+WB4ZBI	United States of America	E
+WB4ZUT	United States of America	E
+WB5EVF	United States of America	E
+WB5NHL	United States of America	E
+WB5SKM	United States of America	E
+WB5WAH	United States of America	E
+WB5WAJ	United States of America	E
+WB6HYH	United States of America	E
+WB6RAB	United States of America	E
+WB6UIA	United States of America	E
+WB7BNE	United States of America	E
+WB7BWZ	United States of America	E
+WB7GR	United States of America	E
+WB7PMP	United States of America	E
+WB7RAV	United States of America	E
+WB7S	United States of America	E
+WB7UOF	United States of America	E
+WB8BPU	United States of America	E
+WB8CQV	United States of America	E
+WB8EJN	United States of America	E
+WB8EKG	United States of America	E
+WB8FVB	United States of America	E
+WB8IMY	United States of America	E
+WB8LYJ	United States of America	E
+WB8QZM	United States of America	E
+WB8YQJ	United States of America	E
+WB8YYY	United States of America	E
+WB9EWM	United States of America	E
+WB9G	United States of America	E
+WB9LUR	United States of America	E
+WB9PRG	United States of America	E
+WB9RRU	United States of America	E
+WB9YLZ	United States of America	E
+WB9Z	United States of America	E
+WC0W	United States of America	E
+WC4D	United States of America	E
+WC7S	United States of America	E
+WC8L	United States of America	E
+WC9B	United States of America	E
+WC9D	United States of America	E
+WD0ETG	United States of America	E
+WD0FYV	United States of America	E
+WD4CFN	United States of America	E
+WD4IXD	United States of America	E
+WD4KTF	United States of America	E
+WD4MRI	United States of America	E
+WD4OHD	United States of America	E
+WD4PTJ	United States of America	E
+WD4XA	United States of America	E
+WD5CCA	United States of America	E
+WD5FCA	United States of America	E
+WD6BNY	United States of America	E
+WD8DSV	United States of America	E
+WD8RYV	United States of America	E
+WD9EXD	United States of America	E
+WD9GMK	United States of America	E
+WD9IGL	United States of America	E
+WE2DX	United States of America	E
+WE4BY	United States of America	E
+WE4DX	United States of America	E
+WE6EZ	United States of America	E
+WE8R	United States of America	E
+WE8RV	United States of America	E
+WE8USN	United States of America	E
+WE9N	United States of America	E
+WF1A	United States of America	E
+WF3H	United States of America	E
+WF3T	United States of America	E
+WF4U	United States of America	E
+WF5K	United States of America	E
+WF5W	United States of America	E
+WF7I	United States of America	E
+WF7T	United States of America	E
+WF8D	United States of America	E
+WF8E	United States of America	E
+WF9A	United States of America	E
+WG4M	United States of America	E
+WG8Y	United States of America	E
+WH0AI	United States of America	E
+WH2T	United States of America	E
+WH2X	United States of America	E
+WH6A	United States of America	E
+WH6AQ	United States of America	E
+WH6FAM	United States of America	E
+WH6LE	United States of America	E
+WH6VL	United States of America	E
+WH7R	United States of America	E
+WI4T	United States of America	E
+WJ8L	United States of America	E
+WJ9B	United States of America	E
+WL7E	United States of America	E
+WL7OU	United States of America	E
+WM0G	United States of America	E
+WM4Q	United States of America	E
+WM5DX	United States of America	E
+WM9X	United States of America	E
+WN2E	United States of America	E
+WN4AAA	United States of America	E
+WN4AT	United States of America	E
+WN7S	United States of America	E
+WN7Y	United States of America	E
+WN8KXY	United States of America	E
+WN8R	United States of America	E
+WO1S	United States of America	E
+WO3X	United States of America	E
+WO7U	United States of America	E
+WP3ME	United States of America	E
+WP4NIB	United States of America	E
+WP4OUE	United States of America	E
+WQ0RVO	United States of America	E
+WQ3U	United States of America	E
+WQ5L	United States of America	E
+WQ5O	United States of America	E
+WQ9T	United States of America	E
+WR3O	United States of America	E
+WR4F	United States of America	E
+WR4T	United States of America	E
+WR5J	United States of America	E
+WR7AY	United States of America	E
+WR8AA	United States of America	E
+WS0I	United States of America	E
+WS5H	United States of America	E
+WS6K	United States of America	E
+WS6X	United States of America	E
+WS7X	United States of America	E
+WS9M	United States of America	E
+WT1L	United States of America	E
+WT2P	United States of America	E
+WT4DX	United States of America	E
+WT4R	United States of America	E
+WT5A	United States of America	E
+WT5L	United States of America	E
+WT5R	United States of America	E
+WT7TT	United States of America	E
+WT8P	United States of America	E
+WT8V	United States of America	E
+WT9Q	United States of America	E
+WU0B	United States of America	E
+WU5E	United States of America	E
+WU5SKY	United States of America	E
+WU6W	United States of America	E
+WU8T	United States of America	E
+WU9B	United States of America	E
+WV0T	United States of America	E
+WV1K	United States of America	E
+WV4E	United States of America	E
+WV4P	United States of America	E
+WV5JW	United States of America	E
+WV7MS	United States of America	E
+WV8TG	United States of America	E
+WW0WWW	United States of America	E
+WW3K	United States of America	E
+WW4DD	United States of America	E
+WW4R	United States of America	E
+WW5M	United States of America	E
+WW6W	United States of America	E
+WW8RR	United States of America	E
+WW8RT	United States of America	E
+WW8USA	United States of America	E
+WX4HP	United States of America	E
+WX4W	United States of America	E
+WX4WKY	United States of America	E
+WX5S	United States of America	E
+WX7AA	United States of America	E
+WX7B	United States of America	E
+WX7MB	United States of America	E
+WX7P	United States of America	E
+WX7T	United States of America	E
+WX7V	United States of America	E
+WX8C	United States of America	E
+WY4Y	United States of America	E
+WY5I	United States of America	E
+WY7AA	United States of America	E
+WY7DT	United States of America	E
+WY7FD	United States of America	E
+WY7I	United States of America	E
+WY7KY	United States of America	E
+WY7M	United States of America	E
+WY7MT	United States of America	E
+WZ4F	United States of America	E
+WZ7I	United States of America	E
+WZ8T	United States of America	E
+KG4	Guantanamo Bay	P
+KG4NE	Guantanamo Bay	E
+AH0	Northern Mariana Islands	P
+KH0	Northern Mariana Islands	P
+NH0	Northern Mariana Islands	P
+WH0	Northern Mariana Islands	P
+NB9G	Northern Mariana Islands	E
+NH2B	Northern Mariana Islands	E
+AH1	Baker & Howland Islands	P
+KH1	Baker & Howland Islands	P
+NH1	Baker & Howland Islands	P
+WH1	Baker & Howland Islands	P
+AH2	Guam	P
+KH2	Guam	P
+NH2	Guam	P
+WH2	Guam	P
+KB0MMR	Guam	E
+KG5MAF	Guam	E
+KG6DX	Guam	E
+KG6JDX	Guam	E
+KH6KK	Guam	E
+KH8K	Guam	E
+KK7FAU	Guam	E
+KO6JHQ	Guam	E
+W4MIC	Guam	E
+WB5WB	Guam	E
+AH3	Johnston Island	P
+KH3	Johnston Island	P
+NH3	Johnston Island	P
+WH3	Johnston Island	P
+AH4	Midway Island	P
+KH4	Midway Island	P
+NH4	Midway Island	P
+WH4	Midway Island	P
+AH5	Palmyra & Jarvis Islands	P
+KH5	Palmyra & Jarvis Islands	P
+NH5	Palmyra & Jarvis Islands	P
+WH5	Palmyra & Jarvis Islands	P
+AH6	Hawaii	P
+AH7	Hawaii	P
+KH6	Hawaii	P
+KH7	Hawaii	P
+NH6	Hawaii	P
+NH7	Hawaii	P
+WH6	Hawaii	P
+WH7	Hawaii	P
+AC1WV	Hawaii	E
+AG7XY	Hawaii	E
+K2GT	Hawaii	E
+K4XV	Hawaii	E
+K6KO	Hawaii	E
+K6MGD	Hawaii	E
+K9LX	Hawaii	E
+KA0RGT	Hawaii	E
+KB0VKF	Hawaii	E
+KB6EGA	Hawaii	E
+KD7WJM	Hawaii	E
+KE0JTC	Hawaii	E
+KE2BBI	Hawaii	E
+KE6FZD	Hawaii	E
+KE7SWC	Hawaii	E
+KF4DUN	Hawaii	E
+KH0WJ	Hawaii	E
+KH3AE	Hawaii	E
+KK7OMR	Hawaii	E
+KM6FSE	Hawaii	E
+KM7BNX	Hawaii	E
+KM7FTJ	Hawaii	E
+N2HNQ	Hawaii	E
+N4ZSU	Hawaii	E
+N5MRJ	Hawaii	E
+N6AZU	Hawaii	E
+N6VHF	Hawaii	E
+N8USA	Hawaii	E
+ND1A	Hawaii	E
+WB4JTT	Hawaii	E
+WB7N	Hawaii	E
+WB7TSO	Hawaii	E
+WV6K	Hawaii	E
+AH7K	Kure Island	P
+KH7K	Kure Island	P
+NH7K	Kure Island	P
+WH7K	Kure Island	P
+AH8	American Samoa	P
+KH8	American Samoa	P
+NH8	American Samoa	P
+WH8	American Samoa	P
+KH8A	American Samoa	E
+KH8/S	American Samoa	P
+K9CS/KH8S	American Samoa	E
+AH9	Wake Island	P
+KH9	Wake Island	P
+NH9	Wake Island	P
+WH9	Wake Island	P
+AL	Alaska	P
+KL	Alaska	P
+NL	Alaska	P
+WL	Alaska	P
+AI7CC	Alaska	E
+AK6VK	Alaska	E
+K1LH	Alaska	E
+K2KRG	Alaska	E
+K7ZAP	Alaska	E
+K7ZVZ	Alaska	E
+K9RH	Alaska	E
+KA1NCN	Alaska	E
+KA2ZSD	Alaska	E
+KB1OHI	Alaska	E
+KB6KSD	Alaska	E
+KC5FTM	Alaska	E
+KC5SGK	Alaska	E
+KC8DIO	Alaska	E
+KD2GBT	Alaska	E
+KD7RF	Alaska	E
+KE0GUV	Alaska	E
+KE0HMK	Alaska	E
+KE7IIJ	Alaska	E
+KE7PA	Alaska	E
+KE8WEQ	Alaska	E
+KF7MMO	Alaska	E
+KF7ROC	Alaska	E
+KF8ENL	Alaska	E
+KG4HZF	Alaska	E
+KG6EMQ	Alaska	E
+KG7DVC	Alaska	E
+KH6WI	Alaska	E
+KI5LTT	Alaska	E
+KJ7IEZ	Alaska	E
+KK6WJY	Alaska	E
+KK7FVU	Alaska	E
+KK7JVV	Alaska	E
+KK7PAG	Alaska	E
+KM4CVQ	Alaska	E
+KM4ZBQ	Alaska	E
+KM6EJL	Alaska	E
+KN4ICW	Alaska	E
+KN6PHX	Alaska	E
+KO4BJA	Alaska	E
+KQ4EWC	Alaska	E
+KQ4TUP	Alaska	E
+KR4CNM	Alaska	E
+KR8KEN	Alaska	E
+KS4VIN	Alaska	E
+N1IDR	Alaska	E
+N1TX	Alaska	E
+N4IJB	Alaska	E
+N5UC	Alaska	E
+N6QEK	Alaska	E
+N7CGC	Alaska	E
+N7DKL	Alaska	E
+NA7CW	Alaska	E
+W3ALF	Alaska	E
+W5MFH	Alaska	E
+W7CB	Alaska	E
+WA1EXZ	Alaska	E
+WD4DUO	Alaska	E
+KP1	Navassa Island	P
+NP1	Navassa Island	P
+WP1	Navassa Island	P
+KP2	United States Virgin Islands	P
+NP2	United States Virgin Islands	P
+WP2	United States Virgin Islands	P
+K4JWO	United States Virgin Islands	E
+K9VV	United States Virgin Islands	E
+KC2LMZ	United States Virgin Islands	E
+KD4CDL	United States Virgin Islands	E
+KG5NSU	United States Virgin Islands	E
+W4LIS	United States Virgin Islands	E
+KP3	Puerto Rico	P
+KP4	Puerto Rico	P
+NP3	Puerto Rico	P
+NP4	Puerto Rico	P
+WP3	Puerto Rico	P
+WP4	Puerto Rico	P
+K1D	Puerto Rico	E
+K1PT	Puerto Rico	E
+K2IDA	Puerto Rico	E
+K4V	Puerto Rico	E
+K4VIC	Puerto Rico	E
+K7D	Puerto Rico	E
+KB1RHJ	Puerto Rico	E
+KB1RUQ	Puerto Rico	E
+KB2YLE	Puerto Rico	E
+KD2BK	Puerto Rico	E
+KD2GQL	Puerto Rico	E
+KF3BJ	Puerto Rico	E
+KI5JBR	Puerto Rico	E
+KO4EKW	Puerto Rico	E
+KP2Z	Puerto Rico	E
+N2LTE	Puerto Rico	E
+N4GN	Puerto Rico	E
+N7BPT	Puerto Rico	E
+NP2R/4	Puerto Rico	E
+W4ASC	Puerto Rico	E
+KP5	Desecheo Island	P
+NP5	Desecheo Island	P
+WP5	Desecheo Island	P
+LA	Norway	P
+LB	Norway	P
+LC	Norway	P
+LD	Norway	P
+LE	Norway	P
+LF	Norway	P
+LG	Norway	P
+LH	Norway	P
+LI	Norway	P
+LJ	Norway	P
+LK	Norway	P
+LL	Norway	P
+LM	Norway	P
+LN	Norway	P
+AY	Argentina	P
+AZ	Argentina	P
+L1	Argentina	P
+L2	Argentina	P
+L3	Argentina	P
+L4	Argentina	P
+L5	Argentina	P
+L6	Argentina	P
+L7	Argentina	P
+L8	Argentina	P
+L9	Argentina	P
+LO	Argentina	P
+LP	Argentina	P
+LQ	Argentina	P
+LR	Argentina	P
+LS	Argentina	P
+LT	Argentina	P
+LU	Argentina	P
+LV	Argentina	P
+LW	Argentina	P
+AY0V	Argentina	P
+AY0W	Argentina	P
+AY0X	Argentina	P
+AY0Y	Argentina	P
+AY1V	Argentina	P
+AY1W	Argentina	P
+AY1X	Argentina	P
+AY1Y	Argentina	P
+AY2V	Argentina	P
+AY2W	Argentina	P
+AY2X	Argentina	P
+AY2Y	Argentina	P
+AY3V	Argentina	P
+AY3W	Argentina	P
+AY3X	Argentina	P
+AY3Y	Argentina	P
+AY4V	Argentina	P
+AY4W	Argentina	P
+AY4X	Argentina	P
+AY4Y	Argentina	P
+AY5V	Argentina	P
+AY5W	Argentina	P
+AY5X	Argentina	P
+AY5Y	Argentina	P
+AY6V	Argentina	P
+AY6W	Argentina	P
+AY6X	Argentina	P
+AY6Y	Argentina	P
+AY7V	Argentina	P
+AY7W	Argentina	P
+AY7X	Argentina	P
+AY7Y	Argentina	P
+AY8V	Argentina	P
+AY8W	Argentina	P
+AY8X	Argentina	P
+AY8Y	Argentina	P
+AY9V	Argentina	P
+AY9W	Argentina	P
+AY9X	Argentina	P
+AY9Y	Argentina	P
+AZ0V	Argentina	P
+AZ0W	Argentina	P
+AZ0X	Argentina	P
+AZ0Y	Argentina	P
+AZ1V	Argentina	P
+AZ1W	Argentina	P
+AZ1X	Argentina	P
+AZ1Y	Argentina	P
+AZ2V	Argentina	P
+AZ2W	Argentina	P
+AZ2X	Argentina	P
+AZ2Y	Argentina	P
+AZ3V	Argentina	P
+AZ3W	Argentina	P
+AZ3X	Argentina	P
+AZ3Y	Argentina	P
+AZ4V	Argentina	P
+AZ4W	Argentina	P
+AZ4X	Argentina	P
+AZ4Y	Argentina	P
+AZ5V	Argentina	P
+AZ5W	Argentina	P
+AZ5X	Argentina	P
+AZ5Y	Argentina	P
+AZ6V	Argentina	P
+AZ6W	Argentina	P
+AZ6X	Argentina	P
+AZ6Y	Argentina	P
+AZ7V	Argentina	P
+AZ7W	Argentina	P
+AZ7X	Argentina	P
+AZ7Y	Argentina	P
+AZ8V	Argentina	P
+AZ8W	Argentina	P
+AZ8X	Argentina	P
+AZ8Y	Argentina	P
+AZ9V	Argentina	P
+AZ9W	Argentina	P
+AZ9X	Argentina	P
+AZ9Y	Argentina	P
+L20V	Argentina	P
+L20W	Argentina	P
+L20X	Argentina	P
+L20Y	Argentina	P
+L21V	Argentina	P
+L21W	Argentina	P
+L21X	Argentina	P
+L21Y	Argentina	P
+L22V	Argentina	P
+L22W	Argentina	P
+L22X	Argentina	P
+L22Y	Argentina	P
+L23V	Argentina	P
+L23W	Argentina	P
+L23X	Argentina	P
+L23Y	Argentina	P
+L24V	Argentina	P
+L24W	Argentina	P
+L24X	Argentina	P
+L24Y	Argentina	P
+L25V	Argentina	P
+L25W	Argentina	P
+L25X	Argentina	P
+L25Y	Argentina	P
+L26V	Argentina	P
+L26W	Argentina	P
+L26X	Argentina	P
+L26Y	Argentina	P
+L27V	Argentina	P
+L27W	Argentina	P
+L27X	Argentina	P
+L27Y	Argentina	P
+L28V	Argentina	P
+L28W	Argentina	P
+L28X	Argentina	P
+L28Y	Argentina	P
+L29V	Argentina	P
+L29W	Argentina	P
+L29X	Argentina	P
+L29Y	Argentina	P
+L30V	Argentina	P
+L30W	Argentina	P
+L30X	Argentina	P
+L30Y	Argentina	P
+L31V	Argentina	P
+L31W	Argentina	P
+L31X	Argentina	P
+L31Y	Argentina	P
+L32V	Argentina	P
+L32W	Argentina	P
+L32X	Argentina	P
+L32Y	Argentina	P
+L33V	Argentina	P
+L33W	Argentina	P
+L33X	Argentina	P
+L33Y	Argentina	P
+L34V	Argentina	P
+L34W	Argentina	P
+L34X	Argentina	P
+L34Y	Argentina	P
+L35V	Argentina	P
+L35W	Argentina	P
+L35X	Argentina	P
+L35Y	Argentina	P
+L36V	Argentina	P
+L36W	Argentina	P
+L36X	Argentina	P
+L36Y	Argentina	P
+L37V	Argentina	P
+L37W	Argentina	P
+L37X	Argentina	P
+L37Y	Argentina	P
+L38V	Argentina	P
+L38W	Argentina	P
+L38X	Argentina	P
+L38Y	Argentina	P
+L39V	Argentina	P
+L39W	Argentina	P
+L39X	Argentina	P
+L39Y	Argentina	P
+L40V	Argentina	P
+L40W	Argentina	P
+L40X	Argentina	P
+L40Y	Argentina	P
+L41V	Argentina	P
+L41W	Argentina	P
+L41X	Argentina	P
+L41Y	Argentina	P
+L42V	Argentina	P
+L42W	Argentina	P
+L42X	Argentina	P
+L42Y	Argentina	P
+L43V	Argentina	P
+L43W	Argentina	P
+L43X	Argentina	P
+L43Y	Argentina	P
+L44V	Argentina	P
+L44W	Argentina	P
+L44X	Argentina	P
+L44Y	Argentina	P
+L45V	Argentina	P
+L45W	Argentina	P
+L45X	Argentina	P
+L45Y	Argentina	P
+L46V	Argentina	P
+L46W	Argentina	P
+L46X	Argentina	P
+L46Y	Argentina	P
+L47V	Argentina	P
+L47W	Argentina	P
+L47X	Argentina	P
+L47Y	Argentina	P
+L48V	Argentina	P
+L48W	Argentina	P
+L48X	Argentina	P
+L48Y	Argentina	P
+L49V	Argentina	P
+L49W	Argentina	P
+L49X	Argentina	P
+L49Y	Argentina	P
+L50V	Argentina	P
+L50W	Argentina	P
+L50X	Argentina	P
+L50Y	Argentina	P
+L51V	Argentina	P
+L51W	Argentina	P
+L51X	Argentina	P
+L51Y	Argentina	P
+L52V	Argentina	P
+L52W	Argentina	P
+L52X	Argentina	P
+L52Y	Argentina	P
+L53V	Argentina	P
+L53W	Argentina	P
+L53X	Argentina	P
+L53Y	Argentina	P
+L54V	Argentina	P
+L54W	Argentina	P
+L54X	Argentina	P
+L54Y	Argentina	P
+L55V	Argentina	P
+L55W	Argentina	P
+L55X	Argentina	P
+L55Y	Argentina	P
+L56V	Argentina	P
+L56W	Argentina	P
+L56X	Argentina	P
+L56Y	Argentina	P
+L57V	Argentina	P
+L57W	Argentina	P
+L57X	Argentina	P
+L57Y	Argentina	P
+L58V	Argentina	P
+L58W	Argentina	P
+L58X	Argentina	P
+L58Y	Argentina	P
+L59V	Argentina	P
+L59W	Argentina	P
+L59X	Argentina	P
+L59Y	Argentina	P
+L60V	Argentina	P
+L60W	Argentina	P
+L60X	Argentina	P
+L60Y	Argentina	P
+L61V	Argentina	P
+L61W	Argentina	P
+L61X	Argentina	P
+L61Y	Argentina	P
+L62V	Argentina	P
+L62W	Argentina	P
+L62X	Argentina	P
+L62Y	Argentina	P
+L63V	Argentina	P
+L63W	Argentina	P
+L63X	Argentina	P
+L63Y	Argentina	P
+L64V	Argentina	P
+L64W	Argentina	P
+L64X	Argentina	P
+L64Y	Argentina	P
+L65V	Argentina	P
+L65W	Argentina	P
+L65X	Argentina	P
+L65Y	Argentina	P
+L66V	Argentina	P
+L66W	Argentina	P
+L66X	Argentina	P
+L66Y	Argentina	P
+L67V	Argentina	P
+L67W	Argentina	P
+L67X	Argentina	P
+L67Y	Argentina	P
+L68V	Argentina	P
+L68W	Argentina	P
+L68X	Argentina	P
+L68Y	Argentina	P
+L69V	Argentina	P
+L69W	Argentina	P
+L69X	Argentina	P
+L69Y	Argentina	P
+L70V	Argentina	P
+L70W	Argentina	P
+L70X	Argentina	P
+L70Y	Argentina	P
+L71V	Argentina	P
+L71W	Argentina	P
+L71X	Argentina	P
+L71Y	Argentina	P
+L72V	Argentina	P
+L72W	Argentina	P
+L72X	Argentina	P
+L72Y	Argentina	P
+L73V	Argentina	P
+L73W	Argentina	P
+L73X	Argentina	P
+L73Y	Argentina	P
+L74V	Argentina	P
+L74W	Argentina	P
+L74X	Argentina	P
+L74Y	Argentina	P
+L75V	Argentina	P
+L75W	Argentina	P
+L75X	Argentina	P
+L75Y	Argentina	P
+L76V	Argentina	P
+L76W	Argentina	P
+L76X	Argentina	P
+L76Y	Argentina	P
+L77V	Argentina	P
+L77W	Argentina	P
+L77X	Argentina	P
+L77Y	Argentina	P
+L78V	Argentina	P
+L78W	Argentina	P
+L78X	Argentina	P
+L78Y	Argentina	P
+L79V	Argentina	P
+L79W	Argentina	P
+L79X	Argentina	P
+L79Y	Argentina	P
+L80V	Argentina	P
+L80W	Argentina	P
+L80X	Argentina	P
+L80Y	Argentina	P
+L81V	Argentina	P
+L81W	Argentina	P
+L81X	Argentina	P
+L81Y	Argentina	P
+L82V	Argentina	P
+L82W	Argentina	P
+L82X	Argentina	P
+L82Y	Argentina	P
+L83V	Argentina	P
+L83W	Argentina	P
+L83X	Argentina	P
+L83Y	Argentina	P
+L84V	Argentina	P
+L84W	Argentina	P
+L84X	Argentina	P
+L84Y	Argentina	P
+L85V	Argentina	P
+L85W	Argentina	P
+L85X	Argentina	P
+L85Y	Argentina	P
+L86V	Argentina	P
+L86W	Argentina	P
+L86X	Argentina	P
+L86Y	Argentina	P
+L87V	Argentina	P
+L87W	Argentina	P
+L87X	Argentina	P
+L87Y	Argentina	P
+L88V	Argentina	P
+L88W	Argentina	P
+L88X	Argentina	P
+L88Y	Argentina	P
+L89V	Argentina	P
+L89W	Argentina	P
+L89X	Argentina	P
+L89Y	Argentina	P
+L90V	Argentina	P
+L90W	Argentina	P
+L90X	Argentina	P
+L90Y	Argentina	P
+L91V	Argentina	P
+L91W	Argentina	P
+L91X	Argentina	P
+L91Y	Argentina	P
+L92V	Argentina	P
+L92W	Argentina	P
+L92X	Argentina	P
+L92Y	Argentina	P
+L93V	Argentina	P
+L93W	Argentina	P
+L93X	Argentina	P
+L93Y	Argentina	P
+L94V	Argentina	P
+L94W	Argentina	P
+L94X	Argentina	P
+L94Y	Argentina	P
+L95V	Argentina	P
+L95W	Argentina	P
+L95X	Argentina	P
+L95Y	Argentina	P
+L96V	Argentina	P
+L96W	Argentina	P
+L96X	Argentina	P
+L96Y	Argentina	P
+L97V	Argentina	P
+L97W	Argentina	P
+L97X	Argentina	P
+L97Y	Argentina	P
+L98V	Argentina	P
+L98W	Argentina	P
+L98X	Argentina	P
+L98Y	Argentina	P
+L99V	Argentina	P
+L99W	Argentina	P
+L99X	Argentina	P
+L99Y	Argentina	P
+LO0V	Argentina	P
+LO0W	Argentina	P
+LO0X	Argentina	P
+LO0Y	Argentina	P
+LO1V	Argentina	P
+LO1W	Argentina	P
+LO1X	Argentina	P
+LO1Y	Argentina	P
+LO2V	Argentina	P
+LO2W	Argentina	P
+LO2X	Argentina	P
+LO2Y	Argentina	P
+LO3V	Argentina	P
+LO3W	Argentina	P
+LO3X	Argentina	P
+LO3Y	Argentina	P
+LO4V	Argentina	P
+LO4W	Argentina	P
+LO4X	Argentina	P
+LO4Y	Argentina	P
+LO5V	Argentina	P
+LO5W	Argentina	P
+LO5X	Argentina	P
+LO5Y	Argentina	P
+LO6V	Argentina	P
+LO6W	Argentina	P
+LO6X	Argentina	P
+LO6Y	Argentina	P
+LO7V	Argentina	P
+LO7W	Argentina	P
+LO7X	Argentina	P
+LO7Y	Argentina	P
+LO8V	Argentina	P
+LO8W	Argentina	P
+LO8X	Argentina	P
+LO8Y	Argentina	P
+LO9V	Argentina	P
+LO9W	Argentina	P
+LO9X	Argentina	P
+LO9Y	Argentina	P
+LP0V	Argentina	P
+LP0W	Argentina	P
+LP0X	Argentina	P
+LP0Y	Argentina	P
+LP1V	Argentina	P
+LP1W	Argentina	P
+LP1X	Argentina	P
+LP1Y	Argentina	P
+LP2V	Argentina	P
+LP2W	Argentina	P
+LP2X	Argentina	P
+LP2Y	Argentina	P
+LP3V	Argentina	P
+LP3W	Argentina	P
+LP3X	Argentina	P
+LP3Y	Argentina	P
+LP4V	Argentina	P
+LP4W	Argentina	P
+LP4X	Argentina	P
+LP4Y	Argentina	P
+LP5V	Argentina	P
+LP5W	Argentina	P
+LP5X	Argentina	P
+LP5Y	Argentina	P
+LP6V	Argentina	P
+LP6W	Argentina	P
+LP6X	Argentina	P
+LP6Y	Argentina	P
+LP7V	Argentina	P
+LP7W	Argentina	P
+LP7X	Argentina	P
+LP7Y	Argentina	P
+LP8V	Argentina	P
+LP8W	Argentina	P
+LP8X	Argentina	P
+LP8Y	Argentina	P
+LP9V	Argentina	P
+LP9W	Argentina	P
+LP9X	Argentina	P
+LP9Y	Argentina	P
+LQ0V	Argentina	P
+LQ0W	Argentina	P
+LQ0X	Argentina	P
+LQ0Y	Argentina	P
+LQ1V	Argentina	P
+LQ1W	Argentina	P
+LQ1X	Argentina	P
+LQ1Y	Argentina	P
+LQ2V	Argentina	P
+LQ2W	Argentina	P
+LQ2X	Argentina	P
+LQ2Y	Argentina	P
+LQ3V	Argentina	P
+LQ3W	Argentina	P
+LQ3X	Argentina	P
+LQ3Y	Argentina	P
+LQ4V	Argentina	P
+LQ4W	Argentina	P
+LQ4X	Argentina	P
+LQ4Y	Argentina	P
+LQ5V	Argentina	P
+LQ5W	Argentina	P
+LQ5X	Argentina	P
+LQ5Y	Argentina	P
+LQ6V	Argentina	P
+LQ6W	Argentina	P
+LQ6X	Argentina	P
+LQ6Y	Argentina	P
+LQ7V	Argentina	P
+LQ7W	Argentina	P
+LQ7X	Argentina	P
+LQ7Y	Argentina	P
+LQ8V	Argentina	P
+LQ8W	Argentina	P
+LQ8X	Argentina	P
+LQ8Y	Argentina	P
+LQ9V	Argentina	P
+LQ9W	Argentina	P
+LQ9X	Argentina	P
+LQ9Y	Argentina	P
+LR0V	Argentina	P
+LR0W	Argentina	P
+LR0X	Argentina	P
+LR0Y	Argentina	P
+LR1V	Argentina	P
+LR1W	Argentina	P
+LR1X	Argentina	P
+LR1Y	Argentina	P
+LR2V	Argentina	P
+LR2W	Argentina	P
+LR2X	Argentina	P
+LR2Y	Argentina	P
+LR3V	Argentina	P
+LR3W	Argentina	P
+LR3X	Argentina	P
+LR3Y	Argentina	P
+LR4V	Argentina	P
+LR4W	Argentina	P
+LR4X	Argentina	P
+LR4Y	Argentina	P
+LR5V	Argentina	P
+LR5W	Argentina	P
+LR5X	Argentina	P
+LR5Y	Argentina	P
+LR6V	Argentina	P
+LR6W	Argentina	P
+LR6X	Argentina	P
+LR6Y	Argentina	P
+LR7V	Argentina	P
+LR7W	Argentina	P
+LR7X	Argentina	P
+LR7Y	Argentina	P
+LR8V	Argentina	P
+LR8W	Argentina	P
+LR8X	Argentina	P
+LR8Y	Argentina	P
+LR9V	Argentina	P
+LR9W	Argentina	P
+LR9X	Argentina	P
+LR9Y	Argentina	P
+LS0V	Argentina	P
+LS0W	Argentina	P
+LS0X	Argentina	P
+LS0Y	Argentina	P
+LS1V	Argentina	P
+LS1W	Argentina	P
+LS1X	Argentina	P
+LS1Y	Argentina	P
+LS2V	Argentina	P
+LS2W	Argentina	P
+LS2X	Argentina	P
+LS2Y	Argentina	P
+LS3V	Argentina	P
+LS3W	Argentina	P
+LS3X	Argentina	P
+LS3Y	Argentina	P
+LS4V	Argentina	P
+LS4W	Argentina	P
+LS4X	Argentina	P
+LS4Y	Argentina	P
+LS5V	Argentina	P
+LS5W	Argentina	P
+LS5X	Argentina	P
+LS5Y	Argentina	P
+LS6V	Argentina	P
+LS6W	Argentina	P
+LS6X	Argentina	P
+LS6Y	Argentina	P
+LS7V	Argentina	P
+LS7W	Argentina	P
+LS7X	Argentina	P
+LS7Y	Argentina	P
+LS8V	Argentina	P
+LS8W	Argentina	P
+LS8X	Argentina	P
+LS8Y	Argentina	P
+LS9V	Argentina	P
+LS9W	Argentina	P
+LS9X	Argentina	P
+LS9Y	Argentina	P
+LT0V	Argentina	P
+LT0W	Argentina	P
+LT0X	Argentina	P
+LT0Y	Argentina	P
+LT1V	Argentina	P
+LT1W	Argentina	P
+LT1X	Argentina	P
+LT1Y	Argentina	P
+LT2V	Argentina	P
+LT2W	Argentina	P
+LT2X	Argentina	P
+LT2Y	Argentina	P
+LT3V	Argentina	P
+LT3W	Argentina	P
+LT3X	Argentina	P
+LT3Y	Argentina	P
+LT4V	Argentina	P
+LT4W	Argentina	P
+LT4X	Argentina	P
+LT4Y	Argentina	P
+LT5V	Argentina	P
+LT5W	Argentina	P
+LT5X	Argentina	P
+LT5Y	Argentina	P
+LT6V	Argentina	P
+LT6W	Argentina	P
+LT6X	Argentina	P
+LT6Y	Argentina	P
+LT7V	Argentina	P
+LT7W	Argentina	P
+LT7X	Argentina	P
+LT7Y	Argentina	P
+LT8V	Argentina	P
+LT8W	Argentina	P
+LT8X	Argentina	P
+LT8Y	Argentina	P
+LT9V	Argentina	P
+LT9W	Argentina	P
+LT9X	Argentina	P
+LT9Y	Argentina	P
+LU0V	Argentina	P
+LU0W	Argentina	P
+LU0X	Argentina	P
+LU0Y	Argentina	P
+LU1V	Argentina	P
+LU1W	Argentina	P
+LU1X	Argentina	P
+LU1Y	Argentina	P
+LU2V	Argentina	P
+LU2W	Argentina	P
+LU2X	Argentina	P
+LU2Y	Argentina	P
+LU3V	Argentina	P
+LU3W	Argentina	P
+LU3X	Argentina	P
+LU3Y	Argentina	P
+LU4V	Argentina	P
+LU4W	Argentina	P
+LU4X	Argentina	P
+LU4Y	Argentina	P
+LU5V	Argentina	P
+LU5W	Argentina	P
+LU5X	Argentina	P
+LU5Y	Argentina	P
+LU6V	Argentina	P
+LU6W	Argentina	P
+LU6X	Argentina	P
+LU6Y	Argentina	P
+LU7V	Argentina	P
+LU7W	Argentina	P
+LU7X	Argentina	P
+LU7Y	Argentina	P
+LU8V	Argentina	P
+LU8W	Argentina	P
+LU8X	Argentina	P
+LU8Y	Argentina	P
+LU9V	Argentina	P
+LU9W	Argentina	P
+LU9X	Argentina	P
+LU9Y	Argentina	P
+LV0V	Argentina	P
+LV0W	Argentina	P
+LV0X	Argentina	P
+LV0Y	Argentina	P
+LV1V	Argentina	P
+LV1W	Argentina	P
+LV1X	Argentina	P
+LV1Y	Argentina	P
+LV2V	Argentina	P
+LV2W	Argentina	P
+LV2X	Argentina	P
+LV2Y	Argentina	P
+LV3V	Argentina	P
+LV3W	Argentina	P
+LV3X	Argentina	P
+LV3Y	Argentina	P
+LV4V	Argentina	P
+LV4W	Argentina	P
+LV4X	Argentina	P
+LV4Y	Argentina	P
+LV5V	Argentina	P
+LV5W	Argentina	P
+LV5X	Argentina	P
+LV5Y	Argentina	P
+LV6V	Argentina	P
+LV6W	Argentina	P
+LV6X	Argentina	P
+LV6Y	Argentina	P
+LV7V	Argentina	P
+LV7W	Argentina	P
+LV7X	Argentina	P
+LV7Y	Argentina	P
+LV8V	Argentina	P
+LV8W	Argentina	P
+LV8X	Argentina	P
+LV8Y	Argentina	P
+LV9V	Argentina	P
+LV9W	Argentina	P
+LV9X	Argentina	P
+LV9Y	Argentina	P
+LW0V	Argentina	P
+LW0W	Argentina	P
+LW0X	Argentina	P
+LW0Y	Argentina	P
+LW1V	Argentina	P
+LW1W	Argentina	P
+LW1X	Argentina	P
+LW1Y	Argentina	P
+LW2V	Argentina	P
+LW2W	Argentina	P
+LW2X	Argentina	P
+LW2Y	Argentina	P
+LW3V	Argentina	P
+LW3W	Argentina	P
+LW3X	Argentina	P
+LW3Y	Argentina	P
+LW4V	Argentina	P
+LW4W	Argentina	P
+LW4X	Argentina	P
+LW4Y	Argentina	P
+LW5V	Argentina	P
+LW5W	Argentina	P
+LW5X	Argentina	P
+LW5Y	Argentina	P
+LW6V	Argentina	P
+LW6W	Argentina	P
+LW6X	Argentina	P
+LW6Y	Argentina	P
+LW7V	Argentina	P
+LW7W	Argentina	P
+LW7X	Argentina	P
+LW7Y	Argentina	P
+LW8V	Argentina	P
+LW8W	Argentina	P
+LW8X	Argentina	P
+LW8Y	Argentina	P
+LW9V	Argentina	P
+LW9W	Argentina	P
+LW9X	Argentina	P
+LW9Y	Argentina	P
+LO7E/D	Argentina	E
+LU1ALF/D	Argentina	E
+LU1AM/D	Argentina	E
+LU1ANG/D	Argentina	E
+LU1ANG/H	Argentina	E
+LU1APS/H	Argentina	E
+LU1DHL/D	Argentina	E
+LU1DLF/D	Argentina	E
+LU1DNQ/D	Argentina	E
+LU1DUA/D	Argentina	E
+LU1EAF/D	Argentina	E
+LU1EAF/F	Argentina	E
+LU1EAF/K	Argentina	E
+LU1EAF/Q	Argentina	E
+LU1EAF/U	Argentina	E
+LU1EJK/K	Argentina	E
+LU1EVW/D	Argentina	E
+LU1HIP/H	Argentina	E
+LU1HIP/Y	Argentina	E
+LU1HLN/H	Argentina	E
+LU1HT/H	Argentina	E
+LU1MAW/D	Argentina	E
+LU1UG/U	Argentina	E
+LU1VNH/V	Argentina	E
+LU1VZ/V	Argentina	E
+LU1WF/W	Argentina	E
+LU1XAV/XA	Argentina	E
+LU2AOG/D	Argentina	E
+LU2DGI/D	Argentina	E
+LU2DT/D	Argentina	E
+LU2EUX/D	Argentina	E
+LU2FEL/F	Argentina	E
+LU2HDT/H	Argentina	E
+LU2WA/W	Argentina	E
+LU3DAR/D	Argentina	E
+LU3DVN/X	Argentina	E
+LU3DXG/D	Argentina	E
+LU3EMN/W	Argentina	E
+LU3EMN/XA	Argentina	E
+LU3EP/D	Argentina	E
+LU3EU/E	Argentina	E
+LU3HBC/U	Argentina	E
+LU3HGB/H	Argentina	E
+LU3HGB/V	Argentina	E
+LU3HKA/H	Argentina	E
+LU3YA/V	Argentina	E
+LU4ARU/D	Argentina	E
+LU4DPL/H	Argentina	E
+LU4DQ/D	Argentina	E
+LU4FRN/V	Argentina	E
+LU4HDE/H	Argentina	E
+LU4HFB/H	Argentina	E
+LU4HK/H	Argentina	E
+LU4HNE/H	Argentina	E
+LU4JFM/L	Argentina	E
+LU4SCM/S	Argentina	E
+LU5DA/D	Argentina	E
+LU5DJE/D	Argentina	E
+LU5OIJ/O	Argentina	E
+LU5SDL/S	Argentina	E
+LU5UMB/Q	Argentina	E
+LU5UMB/U	Argentina	E
+LU5VGP/V	Argentina	E
+LU5VNL/V	Argentina	E
+LU5YS/V	Argentina	E
+LU6DDC/D	Argentina	E
+LU6HL/H	Argentina	E
+LU6HPA/H	Argentina	E
+LU6UVI/D	Argentina	E
+LU7BMW/D	Argentina	E
+LU7CC/E	Argentina	E
+LU7DYL/K	Argentina	E
+LU7DYL/S	Argentina	E
+LU7DZV/D	Argentina	E
+LU7EYX/D	Argentina	E
+LU7HBM/H	Argentina	E
+LU7VRC/V	Argentina	E
+LU7YG/Y	Argentina	E
+LU7YKR/V	Argentina	E
+LU8DAL/D	Argentina	E
+LU8DZE/D	Argentina	E
+LU8EMD/D	Argentina	E
+LU8HPA/H	Argentina	E
+LU8JNS/H	Argentina	E
+LU8JNS/W	Argentina	E
+LU8JNS/XA	Argentina	E
+LU8SAM/S	Argentina	E
+LU8VLW/V	Argentina	E
+LU9CNS/D	Argentina	E
+LU9CNS/H	Argentina	E
+LU9IMM/L	Argentina	E
+LU9WT/W	Argentina	E
+LW2HAR/H	Argentina	E
+LW3DKC/D	Argentina	E
+LW3DMV/D	Argentina	E
+LW3EST/D	Argentina	E
+LW4DAF/D	Argentina	E
+LW4EIN/D	Argentina	E
+LW5ECI/D	Argentina	E
+LW6DGI/D	Argentina	E
+LW6DNF/D	Argentina	E
+LX	Luxembourg	P
+LY	Lithuania	P
+LZ	Bulgaria	P
+4T	Peru	P
+OA	Peru	P
+OB	Peru	P
+OC	Peru	P
+OD	Lebanon	P
+OE	Austria	P
+OF	Finland	P
+OG	Finland	P
+OH	Finland	P
+OI	Finland	P
+OJ	Finland	P
+OF0	Aland	P
+OG0	Aland	P
+OH0	Aland	P
+OI0	Aland	P
+OJ0	Market Reef	P
+OK	Czechia	P
+OL	Czechia	P
+OM	Slovakia	P
+ON	Belgium	P
+OO	Belgium	P
+OP	Belgium	P
+OQ	Belgium	P
+OR	Belgium	P
+OS	Belgium	P
+OT	Belgium	P
+OX	Greenland	P
+XP	Greenland	P
+OW	Faroe Islands	P
+OY	Faroe Islands	P
+5P	Denmark	P
+5Q	Denmark	P
+OU	Denmark	P
+OV	Denmark	P
+OZ	Denmark	P
+P2	Papua New Guinea	P
+P4	Aruba	P
+P5	North Korea	P
+P6	North Korea	P
+P7	North Korea	P
+P8	North Korea	P
+P9	North Korea	P
+PA	Netherlands	P
+PB	Netherlands	P
+PC	Netherlands	P
+PD	Netherlands	P
+PE	Netherlands	P
+PF	Netherlands	P
+PG	Netherlands	P
+PH	Netherlands	P
+PI	Netherlands	P
+PA1EDL/J	Netherlands	E
+PA25ASP/J	Netherlands	E
+PA3EFR/J	Netherlands	E
+PA45NZG/J	Netherlands	E
+PA4AGO/J	Netherlands	E
+PA6RCG/J	Netherlands	E
+PA95KALI/J	Netherlands	E
+PD1BHZ/J	Netherlands	E
+PI4S/J	Netherlands	E
+PI9TP/J	Netherlands	E
+PJ2	Curacao	P
+PJ4	Bonaire	P
+PJ5	Saba & St. Eustatius	P
+PJ6	Saba & St. Eustatius	P
+PJ0	Sint Maarten	P
+PJ7	Sint Maarten	P
+PJ8	Sint Maarten	P
+PP	Brazil	P
+PQ	Brazil	P
+PR	Brazil	P
+PS	Brazil	P
+PT	Brazil	P
+PU	Brazil	P
+PV	Brazil	P
+PW	Brazil	P
+PX	Brazil	P
+PY	Brazil	P
+ZV	Brazil	P
+ZW	Brazil	P
+ZX	Brazil	P
+ZY	Brazil	P
+ZZ	Brazil	P
+PP6	Brazil	P
+PP7	Brazil	P
+PP8	Brazil	P
+PP9	Brazil	P
+PQ2	Brazil	P
+PQ6	Brazil	P
+PQ7	Brazil	P
+PQ8	Brazil	P
+PQ9	Brazil	P
+PR6	Brazil	P
+PR7	Brazil	P
+PR8	Brazil	P
+PR9	Brazil	P
+PS6	Brazil	P
+PS7	Brazil	P
+PS8	Brazil	P
+PS9	Brazil	P
+PT2	Brazil	P
+PT6	Brazil	P
+PT7	Brazil	P
+PT8	Brazil	P
+PU6	Brazil	P
+PU7	Brazil	P
+PU8	Brazil	P
+PU9	Brazil	P
+PV6	Brazil	P
+PV7	Brazil	P
+PV8	Brazil	P
+PV9	Brazil	P
+PW6	Brazil	P
+PW7	Brazil	P
+PW8	Brazil	P
+PW9	Brazil	P
+PX6	Brazil	P
+PX7	Brazil	P
+PX8	Brazil	P
+PX9	Brazil	P
+PY6	Brazil	P
+PY7	Brazil	P
+PY8	Brazil	P
+PY9	Brazil	P
+ZV6	Brazil	P
+ZV7	Brazil	P
+ZV8	Brazil	P
+ZV9	Brazil	P
+ZW6	Brazil	P
+ZW7	Brazil	P
+ZW8	Brazil	P
+ZW9	Brazil	P
+ZX6	Brazil	P
+ZX7	Brazil	P
+ZX8	Brazil	P
+ZX9	Brazil	P
+ZY6	Brazil	P
+ZY7	Brazil	P
+ZY8	Brazil	P
+ZY9	Brazil	P
+ZZ6	Brazil	P
+ZZ7	Brazil	P
+ZZ8	Brazil	P
+ZZ9	Brazil	P
+PP0F	Fernando de Noronha	P
+PP0ZF	Fernando de Noronha	P
+PQ0F	Fernando de Noronha	P
+PQ0ZF	Fernando de Noronha	P
+PR0F	Fernando de Noronha	P
+PR0ZF	Fernando de Noronha	P
+PS0F	Fernando de Noronha	P
+PS0ZF	Fernando de Noronha	P
+PT0F	Fernando de Noronha	P
+PT0ZF	Fernando de Noronha	P
+PU0F	Fernando de Noronha	P
+PU0ZF	Fernando de Noronha	P
+PV0F	Fernando de Noronha	P
+PV0ZF	Fernando de Noronha	P
+PW0F	Fernando de Noronha	P
+PW0ZF	Fernando de Noronha	P
+PX0F	Fernando de Noronha	P
+PX0ZF	Fernando de Noronha	P
+PY0F	Fernando de Noronha	P
+PY0Z	Fernando de Noronha	P
+ZV0F	Fernando de Noronha	P
+ZV0ZF	Fernando de Noronha	P
+ZW0F	Fernando de Noronha	P
+ZW0ZF	Fernando de Noronha	P
+ZX0F	Fernando de Noronha	P
+ZX0ZF	Fernando de Noronha	P
+ZY0F	Fernando de Noronha	P
+ZY0Z	Fernando de Noronha	P
+ZZ0F	Fernando de Noronha	P
+ZZ0ZF	Fernando de Noronha	P
+PP0R	Fernando de Noronha	P
+PP0ZR	Fernando de Noronha	P
+PQ0R	Fernando de Noronha	P
+PQ0ZR	Fernando de Noronha	P
+PR0R	Fernando de Noronha	P
+PR0ZR	Fernando de Noronha	P
+PS0R	Fernando de Noronha	P
+PS0ZR	Fernando de Noronha	P
+PT0R	Fernando de Noronha	P
+PT0ZR	Fernando de Noronha	P
+PU0R	Fernando de Noronha	P
+PU0ZR	Fernando de Noronha	P
+PV0R	Fernando de Noronha	P
+PV0ZR	Fernando de Noronha	P
+PW0R	Fernando de Noronha	P
+PW0ZR	Fernando de Noronha	P
+PX0R	Fernando de Noronha	P
+PX0ZR	Fernando de Noronha	P
+PY0R	Fernando de Noronha	P
+ZV0R	Fernando de Noronha	P
+ZV0ZR	Fernando de Noronha	P
+ZW0R	Fernando de Noronha	P
+ZW0ZR	Fernando de Noronha	P
+ZX0R	Fernando de Noronha	P
+ZX0ZR	Fernando de Noronha	P
+ZY0R	Fernando de Noronha	P
+ZZ0R	Fernando de Noronha	P
+ZZ0ZR	Fernando de Noronha	P
+PP0S	St. Peter & St. Paul	P
+PP0ZS	St. Peter & St. Paul	P
+PQ0S	St. Peter & St. Paul	P
+PQ0ZS	St. Peter & St. Paul	P
+PR0S	St. Peter & St. Paul	P
+PR0ZS	St. Peter & St. Paul	P
+PS0S	St. Peter & St. Paul	P
+PS0ZS	St. Peter & St. Paul	P
+PT0S	St. Peter & St. Paul	P
+PT0ZS	St. Peter & St. Paul	P
+PU0S	St. Peter & St. Paul	P
+PU0ZS	St. Peter & St. Paul	P
+PV0S	St. Peter & St. Paul	P
+PV0ZS	St. Peter & St. Paul	P
+PW0S	St. Peter & St. Paul	P
+PW0ZS	St. Peter & St. Paul	P
+PX0S	St. Peter & St. Paul	P
+PX0ZS	St. Peter & St. Paul	P
+PY0S	St. Peter & St. Paul	P
+PY0ZS	St. Peter & St. Paul	P
+ZV0S	St. Peter & St. Paul	P
+ZV0ZS	St. Peter & St. Paul	P
+ZW0S	St. Peter & St. Paul	P
+ZW0ZS	St. Peter & St. Paul	P
+ZX0S	St. Peter & St. Paul	P
+ZX0ZS	St. Peter & St. Paul	P
+ZY0S	St. Peter & St. Paul	P
+ZY0ZS	St. Peter & St. Paul	P
+ZZ0S	St. Peter & St. Paul	P
+ZZ0ZS	St. Peter & St. Paul	P
+PP0T	Trindade & Martim Vaz	P
+PP0ZT	Trindade & Martim Vaz	P
+PQ0T	Trindade & Martim Vaz	P
+PQ0ZT	Trindade & Martim Vaz	P
+PR0T	Trindade & Martim Vaz	P
+PR0ZT	Trindade & Martim Vaz	P
+PS0T	Trindade & Martim Vaz	P
+PS0ZT	Trindade & Martim Vaz	P
+PT0T	Trindade & Martim Vaz	P
+PT0ZT	Trindade & Martim Vaz	P
+PU0T	Trindade & Martim Vaz	P
+PU0ZT	Trindade & Martim Vaz	P
+PV0T	Trindade & Martim Vaz	P
+PV0ZT	Trindade & Martim Vaz	P
+PW0T	Trindade & Martim Vaz	P
+PW0ZT	Trindade & Martim Vaz	P
+PX0T	Trindade & Martim Vaz	P
+PX0ZT	Trindade & Martim Vaz	P
+PY0T	Trindade & Martim Vaz	P
+PY0ZT	Trindade & Martim Vaz	P
+ZV0T	Trindade & Martim Vaz	P
+ZV0ZT	Trindade & Martim Vaz	P
+ZW0T	Trindade & Martim Vaz	P
+ZW0ZT	Trindade & Martim Vaz	P
+ZX0T	Trindade & Martim Vaz	P
+ZX0ZT	Trindade & Martim Vaz	P
+ZY0T	Trindade & Martim Vaz	P
+ZY0ZT	Trindade & Martim Vaz	P
+ZZ0T	Trindade & Martim Vaz	P
+ZZ0ZT	Trindade & Martim Vaz	P
+PZ	Suriname	P
+RI1F	Franz Josef Land	P
+R1FJ	Franz Josef Land	P
+S0	Western Sahara	P
+S2	Bangladesh	P
+S3	Bangladesh	P
+S5	Slovenia	P
+S7	Seychelles	P
+S9	Sao Tome & Principe	P
+7S	Sweden	P
+8S	Sweden	P
+SA	Sweden	P
+SB	Sweden	P
+SC	Sweden	P
+SD	Sweden	P
+SE	Sweden	P
+SF	Sweden	P
+SG	Sweden	P
+SH	Sweden	P
+SI	Sweden	P
+SJ	Sweden	P
+SK	Sweden	P
+SL	Sweden	P
+SM	Sweden	P
+3Z	Poland	P
+HF	Poland	P
+SN	Poland	P
+SO	Poland	P
+SP	Poland	P
+SQ	Poland	P
+SR	Poland	P
+6T	Sudan	P
+6U	Sudan	P
+ST	Sudan	P
+6A	Egypt	P
+6B	Egypt	P
+SS	Egypt	P
+SU	Egypt	P
+J4	Greece	P
+SV	Greece	P
+SW	Greece	P
+SX	Greece	P
+SY	Greece	P
+SZ	Greece	P
+SV/A	Greece	P
+SV2RSG/A	Greece	E
+J45	Dodecanese	P
+SV5	Dodecanese	P
+SW5	Dodecanese	P
+SX5	Dodecanese	P
+SY5	Dodecanese	P
+SZ5	Dodecanese	P
+J49	Crete	P
+SV9	Crete	P
+SW9	Crete	P
+SX9	Crete	P
+SY9	Crete	P
+SZ9	Crete	P
+SV0XAZ	Crete	E
+T2	Tuvalu	P
+T30	Kiribati	P
+T31	Central Kiribati	P
+T32	Eastern Kiribati	P
+T33	Banaba Island	P
+6O	Somalia	P
+T5	Somalia	P
+T7	San Marino	P
+T8	Palau	P
+TA	Turkey	P
+TB	Turkey	P
+TC	Turkey	P
+YM	Turkey	P
+TA1	European Turkey	P
+TB1	European Turkey	P
+TC1	European Turkey	P
+YM1	European Turkey	P
+*TA1	European Turkey	P
+TA3AC/1	European Turkey	E
+TA6CQ/1	European Turkey	E
+TA7H/1	European Turkey	E
+TC29ATA	European Turkey	E
+TC29TC	European Turkey	E
+TF	Iceland	P
+TD	Guatemala	P
+TG	Guatemala	P
+TE	Costa Rica	P
+TI	Costa Rica	P
+TE9	Cocos Island	P
+TI9	Cocos Island	P
+TJ	Cameroon	P
+TK	Corsica	P
+TL	Central African Republic	P
+TN	Republic of the Congo	P
+TR	Gabon	P
+TT	Chad	P
+TU	Ivory Coast	P
+TY	Benin	P
+TZ	Mali	P
+R	Russia	P
+U	Russia	P
+R1I	Russia	P
+R1N	Russia	P
+R1O	Russia	P
+R1P	Russia	P
+R1Y	Russia	P
+R1Z	Russia	P
+R4H	Russia	P
+R4I	Russia	P
+R4W	Russia	P
+R8F	Russia	P
+R8G	Russia	P
+R8X	Russia	P
+R9F	Russia	P
+R9G	Russia	P
+R9X	Russia	P
+RA1I	Russia	P
+RA1N	Russia	P
+RA1O	Russia	P
+RA1P	Russia	P
+RA1Y	Russia	P
+RA1Z	Russia	P
+RA4H	Russia	P
+RA4I	Russia	P
+RA4W	Russia	P
+RA8F	Russia	P
+RA8G	Russia	P
+RA8X	Russia	P
+RA9F	Russia	P
+RA9G	Russia	P
+RA9X	Russia	P
+RC1I	Russia	P
+RC1N	Russia	P
+RC1O	Russia	P
+RC1P	Russia	P
+RC1Y	Russia	P
+RC1Z	Russia	P
+RC4H	Russia	P
+RC4I	Russia	P
+RC4W	Russia	P
+RC8F	Russia	P
+RC8G	Russia	P
+RC8X	Russia	P
+RC9F	Russia	P
+RC9G	Russia	P
+RC9X	Russia	P
+RD1I	Russia	P
+RD1N	Russia	P
+RD1O	Russia	P
+RD1P	Russia	P
+RD1Y	Russia	P
+RD1Z	Russia	P
+RD4H	Russia	P
+RD4I	Russia	P
+RD4W	Russia	P
+RD8F	Russia	P
+RD8G	Russia	P
+RD8X	Russia	P
+RD9F	Russia	P
+RD9G	Russia	P
+RD9X	Russia	P
+RE1I	Russia	P
+RE1N	Russia	P
+RE1O	Russia	P
+RE1P	Russia	P
+RE1Y	Russia	P
+RE1Z	Russia	P
+RE4H	Russia	P
+RE4I	Russia	P
+RE4W	Russia	P
+RE8F	Russia	P
+RE8G	Russia	P
+RE8X	Russia	P
+RE9F	Russia	P
+RE9G	Russia	P
+RE9X	Russia	P
+RF1I	Russia	P
+RF1N	Russia	P
+RF1O	Russia	P
+RF1P	Russia	P
+RF1Y	Russia	P
+RF1Z	Russia	P
+RF4H	Russia	P
+RF4I	Russia	P
+RF4W	Russia	P
+RF8F	Russia	P
+RF8G	Russia	P
+RF8X	Russia	P
+RF9F	Russia	P
+RF9G	Russia	P
+RF9X	Russia	P
+RG1I	Russia	P
+RG1N	Russia	P
+RG1O	Russia	P
+RG1P	Russia	P
+RG1Y	Russia	P
+RG1Z	Russia	P
+RG4H	Russia	P
+RG4I	Russia	P
+RG4W	Russia	P
+RG8F	Russia	P
+RG8G	Russia	P
+RG8X	Russia	P
+RG9F	Russia	P
+RG9G	Russia	P
+RG9X	Russia	P
+RI8X	Russia	P
+RI9X	Russia	P
+RJ1I	Russia	P
+RJ1N	Russia	P
+RJ1O	Russia	P
+RJ1P	Russia	P
+RJ1Y	Russia	P
+RJ1Z	Russia	P
+RJ4H	Russia	P
+RJ4I	Russia	P
+RJ4W	Russia	P
+RJ8F	Russia	P
+RJ8G	Russia	P
+RJ8X	Russia	P
+RJ9F	Russia	P
+RJ9G	Russia	P
+RJ9X	Russia	P
+RK1I	Russia	P
+RK1N	Russia	P
+RK1O	Russia	P
+RK1P	Russia	P
+RK1Y	Russia	P
+RK1Z	Russia	P
+RK4H	Russia	P
+RK4I	Russia	P
+RK4W	Russia	P
+RK8F	Russia	P
+RK8G	Russia	P
+RK8X	Russia	P
+RK9F	Russia	P
+RK9G	Russia	P
+RK9X	Russia	P
+RL1I	Russia	P
+RL1N	Russia	P
+RL1O	Russia	P
+RL1P	Russia	P
+RL1Y	Russia	P
+RL1Z	Russia	P
+RL4H	Russia	P
+RL4I	Russia	P
+RL4W	Russia	P
+RL8F	Russia	P
+RL8G	Russia	P
+RL8X	Russia	P
+RL9F	Russia	P
+RL9G	Russia	P
+RL9X	Russia	P
+RM1I	Russia	P
+RM1N	Russia	P
+RM1O	Russia	P
+RM1P	Russia	P
+RM1Y	Russia	P
+RM1Z	Russia	P
+RM4H	Russia	P
+RM4I	Russia	P
+RM4W	Russia	P
+RM8F	Russia	P
+RM8G	Russia	P
+RM8X	Russia	P
+RM9F	Russia	P
+RM9G	Russia	P
+RM9X	Russia	P
+RN1I	Russia	P
+RN1N	Russia	P
+RN1O	Russia	P
+RN1P	Russia	P
+RN1Y	Russia	P
+RN1Z	Russia	P
+RN4H	Russia	P
+RN4I	Russia	P
+RN4W	Russia	P
+RN8F	Russia	P
+RN8G	Russia	P
+RN8X	Russia	P
+RN9F	Russia	P
+RN9G	Russia	P
+RN9X	Russia	P
+RO1I	Russia	P
+RO1N	Russia	P
+RO1O	Russia	P
+RO1P	Russia	P
+RO1Y	Russia	P
+RO1Z	Russia	P
+RO4H	Russia	P
+RO4I	Russia	P
+RO4W	Russia	P
+RO8F	Russia	P
+RO8G	Russia	P
+RO8X	Russia	P
+RO9F	Russia	P
+RO9G	Russia	P
+RO9X	Russia	P
+RQ1I	Russia	P
+RQ1N	Russia	P
+RQ1O	Russia	P
+RQ1P	Russia	P
+RQ1Y	Russia	P
+RQ1Z	Russia	P
+RQ4H	Russia	P
+RQ4I	Russia	P
+RQ4W	Russia	P
+RQ8F	Russia	P
+RQ8G	Russia	P
+RQ8X	Russia	P
+RQ9F	Russia	P
+RQ9G	Russia	P
+RQ9X	Russia	P
+RT1I	Russia	P
+RT1N	Russia	P
+RT1O	Russia	P
+RT1P	Russia	P
+RT1Y	Russia	P
+RT1Z	Russia	P
+RT4H	Russia	P
+RT4I	Russia	P
+RT4W	Russia	P
+RT8F	Russia	P
+RT8G	Russia	P
+RT8X	Russia	P
+RT9F	Russia	P
+RT9G	Russia	P
+RT9X	Russia	P
+RU1I	Russia	P
+RU1N	Russia	P
+RU1O	Russia	P
+RU1P	Russia	P
+RU1Y	Russia	P
+RU1Z	Russia	P
+RU4H	Russia	P
+RU4I	Russia	P
+RU4W	Russia	P
+RU8F	Russia	P
+RU8G	Russia	P
+RU8X	Russia	P
+RU9F	Russia	P
+RU9G	Russia	P
+RU9X	Russia	P
+RV1I	Russia	P
+RV1N	Russia	P
+RV1O	Russia	P
+RV1P	Russia	P
+RV1Y	Russia	P
+RV1Z	Russia	P
+RV4H	Russia	P
+RV4I	Russia	P
+RV4W	Russia	P
+RV8F	Russia	P
+RV8G	Russia	P
+RV8X	Russia	P
+RV9F	Russia	P
+RV9G	Russia	P
+RV9X	Russia	P
+RW1I	Russia	P
+RW1N	Russia	P
+RW1O	Russia	P
+RW1P	Russia	P
+RW1Y	Russia	P
+RW1Z	Russia	P
+RW4H	Russia	P
+RW4I	Russia	P
+RW4W	Russia	P
+RW8F	Russia	P
+RW8G	Russia	P
+RW8X	Russia	P
+RW9F	Russia	P
+RW9G	Russia	P
+RW9X	Russia	P
+RX1I	Russia	P
+RX1N	Russia	P
+RX1O	Russia	P
+RX1P	Russia	P
+RX1Y	Russia	P
+RX1Z	Russia	P
+RX4H	Russia	P
+RX4I	Russia	P
+RX4W	Russia	P
+RX8F	Russia	P
+RX8G	Russia	P
+RX8X	Russia	P
+RX9F	Russia	P
+RX9G	Russia	P
+RX9X	Russia	P
+RY1I	Russia	P
+RY1N	Russia	P
+RY1O	Russia	P
+RY1P	Russia	P
+RY1Y	Russia	P
+RY1Z	Russia	P
+RY4H	Russia	P
+RY4I	Russia	P
+RY4W	Russia	P
+RY8F	Russia	P
+RY8G	Russia	P
+RY8X	Russia	P
+RY9F	Russia	P
+RY9G	Russia	P
+RY9X	Russia	P
+RZ1I	Russia	P
+RZ1N	Russia	P
+RZ1O	Russia	P
+RZ1P	Russia	P
+RZ1Y	Russia	P
+RZ1Z	Russia	P
+RZ4H	Russia	P
+RZ4I	Russia	P
+RZ4W	Russia	P
+RZ8F	Russia	P
+RZ8G	Russia	P
+RZ8X	Russia	P
+RZ9F	Russia	P
+RZ9G	Russia	P
+RZ9X	Russia	P
+U1I	Russia	P
+U1N	Russia	P
+U1O	Russia	P
+U1P	Russia	P
+U1Y	Russia	P
+U1Z	Russia	P
+U4H	Russia	P
+U4I	Russia	P
+U4W	Russia	P
+U8F	Russia	P
+U8G	Russia	P
+U8X	Russia	P
+U9F	Russia	P
+U9G	Russia	P
+U9X	Russia	P
+UA1I	Russia	P
+UA1N	Russia	P
+UA1O	Russia	P
+UA1P	Russia	P
+UA1Y	Russia	P
+UA1Z	Russia	P
+UA4H	Russia	P
+UA4I	Russia	P
+UA4W	Russia	P
+UA8F	Russia	P
+UA8G	Russia	P
+UA8X	Russia	P
+UA9F	Russia	P
+UA9G	Russia	P
+UA9X	Russia	P
+UB1I	Russia	P
+UB1N	Russia	P
+UB1O	Russia	P
+UB1P	Russia	P
+UB1Y	Russia	P
+UB1Z	Russia	P
+UB4H	Russia	P
+UB4I	Russia	P
+UB4W	Russia	P
+UB8F	Russia	P
+UB8G	Russia	P
+UB8X	Russia	P
+UB9F	Russia	P
+UB9G	Russia	P
+UB9X	Russia	P
+UC1I	Russia	P
+UC1N	Russia	P
+UC1O	Russia	P
+UC1P	Russia	P
+UC1Y	Russia	P
+UC1Z	Russia	P
+UC4H	Russia	P
+UC4I	Russia	P
+UC4W	Russia	P
+UC8F	Russia	P
+UC8G	Russia	P
+UC8X	Russia	P
+UC9F	Russia	P
+UC9G	Russia	P
+UC9X	Russia	P
+UD1I	Russia	P
+UD1N	Russia	P
+UD1O	Russia	P
+UD1P	Russia	P
+UD1Y	Russia	P
+UD1Z	Russia	P
+UD4H	Russia	P
+UD4I	Russia	P
+UD4W	Russia	P
+UD8F	Russia	P
+UD8G	Russia	P
+UD8X	Russia	P
+UD9F	Russia	P
+UD9G	Russia	P
+UD9X	Russia	P
+UE1I	Russia	P
+UE1N	Russia	P
+UE1O	Russia	P
+UE1P	Russia	P
+UE1Y	Russia	P
+UE1Z	Russia	P
+UE4H	Russia	P
+UE4I	Russia	P
+UE4W	Russia	P
+UE8F	Russia	P
+UE8G	Russia	P
+UE8X	Russia	P
+UE9F	Russia	P
+UE9G	Russia	P
+UE9X	Russia	P
+UF1I	Russia	P
+UF1N	Russia	P
+UF1O	Russia	P
+UF1P	Russia	P
+UF1Y	Russia	P
+UF1Z	Russia	P
+UF4H	Russia	P
+UF4I	Russia	P
+UF4W	Russia	P
+UF8F	Russia	P
+UF8G	Russia	P
+UF8X	Russia	P
+UF9F	Russia	P
+UF9G	Russia	P
+UF9X	Russia	P
+UG1I	Russia	P
+UG1N	Russia	P
+UG1O	Russia	P
+UG1P	Russia	P
+UG1Y	Russia	P
+UG1Z	Russia	P
+UG4H	Russia	P
+UG4I	Russia	P
+UG4W	Russia	P
+UG8F	Russia	P
+UG8G	Russia	P
+UG8X	Russia	P
+UG9F	Russia	P
+UG9G	Russia	P
+UG9X	Russia	P
+UH1I	Russia	P
+UH1N	Russia	P
+UH1O	Russia	P
+UH1P	Russia	P
+UH1Y	Russia	P
+UH1Z	Russia	P
+UH4H	Russia	P
+UH4I	Russia	P
+UH4W	Russia	P
+UH8F	Russia	P
+UH8G	Russia	P
+UH8X	Russia	P
+UH9F	Russia	P
+UH9G	Russia	P
+UH9X	Russia	P
+UI1I	Russia	P
+UI1N	Russia	P
+UI1O	Russia	P
+UI1P	Russia	P
+UI1Y	Russia	P
+UI1Z	Russia	P
+UI4H	Russia	P
+UI4I	Russia	P
+UI4W	Russia	P
+UI8F	Russia	P
+UI8G	Russia	P
+UI8X	Russia	P
+UI9F	Russia	P
+UI9G	Russia	P
+UI9X	Russia	P
+UA	Russia	P
+R9OAR/1	Russia	E
+RI0SP	Russia	E
+R036DX	Russia	E
+R036Z	Russia	E
+R0XAJ/1	Russia	E
+R1AT	Russia	E
+R1CAA	Russia	E
+R330G	Russia	E
+R330P	Russia	E
+R330RG	Russia	E
+R330RP	Russia	E
+R330RSF	Russia	E
+R330SF	Russia	E
+R4HAT	Russia	E
+R4HC	Russia	E
+R4HCE	Russia	E
+R4HCZ	Russia	E
+R4HD	Russia	E
+R4HDC	Russia	E
+R4HDR	Russia	E
+R4HL	Russia	E
+R4IC	Russia	E
+R4ID	Russia	E
+R4II	Russia	E
+R4IK	Russia	E
+R4IM	Russia	E
+R4IN	Russia	E
+R4IO	Russia	E
+R4IT	Russia	E
+R4PH	Russia	E
+R4PJ/P	Russia	E
+R4RB	Russia	E
+R4RM	Russia	E
+R4WAN/P	Russia	E
+R80SAA	Russia	E
+R85TOO	Russia	E
+R85ZKP	Russia	E
+R8QBH/1	Russia	E
+R8XF/P	Russia	E
+R9GM/6	Russia	E
+R9JQ/6	Russia	E
+RA3X/1	Russia	E
+RA4HL	Russia	E
+RA4NCC	Russia	E
+RA9FRD/3	Russia	E
+RC4HT	Russia	E
+RC4I	Russia	E
+RJ4I	Russia	E
+RK4HM	Russia	E
+RL1I/4	Russia	E
+RM4I	Russia	E
+RN2F/3	Russia	E
+RN4HFJ	Russia	E
+RN4HIF	Russia	E
+RT4Q	Russia	E
+RU1AC	Russia	E
+RU4HD	Russia	E
+RU4HP	Russia	E
+RU4I	Russia	E
+RW4HM	Russia	E
+RW4HTK	Russia	E
+RW4HW	Russia	E
+RW4HZ	Russia	E
+RW8T/1	Russia	E
+RZ4PXP	Russia	E
+UA1A	Russia	E
+UA1F	Russia	E
+UA4H	Russia	E
+UA4HBM	Russia	E
+UA4HGL	Russia	E
+UA4HIP	Russia	E
+UA4HRZ	Russia	E
+UA4HY	Russia	E
+UA4NF	Russia	E
+UA4PN	Russia	E
+UA4PRU	Russia	E
+UA4Q	Russia	E
+UA4RX/1	Russia	E
+UA9XL/P	Russia	E
+UC4I	Russia	E
+UE0DX	Russia	E
+UG4I	Russia	E
+UG4P	Russia	E
+UI4I	Russia	E
+R2F	Kaliningrad	P
+R2K	Kaliningrad	P
+RA2	Kaliningrad	P
+RC2F	Kaliningrad	P
+RC2K	Kaliningrad	P
+RD2F	Kaliningrad	P
+RD2K	Kaliningrad	P
+RE2F	Kaliningrad	P
+RE2K	Kaliningrad	P
+RF2F	Kaliningrad	P
+RF2K	Kaliningrad	P
+RG2F	Kaliningrad	P
+RG2K	Kaliningrad	P
+RJ2F	Kaliningrad	P
+RJ2K	Kaliningrad	P
+RK2F	Kaliningrad	P
+RK2K	Kaliningrad	P
+RL2F	Kaliningrad	P
+RL2K	Kaliningrad	P
+RM2F	Kaliningrad	P
+RM2K	Kaliningrad	P
+RN2F	Kaliningrad	P
+RN2K	Kaliningrad	P
+RO2F	Kaliningrad	P
+RO2K	Kaliningrad	P
+RQ2F	Kaliningrad	P
+RQ2K	Kaliningrad	P
+RT2F	Kaliningrad	P
+RT2K	Kaliningrad	P
+RU2F	Kaliningrad	P
+RU2K	Kaliningrad	P
+RV2F	Kaliningrad	P
+RV2K	Kaliningrad	P
+RW2F	Kaliningrad	P
+RW2K	Kaliningrad	P
+RX2F	Kaliningrad	P
+RX2K	Kaliningrad	P
+RY2F	Kaliningrad	P
+RY2K	Kaliningrad	P
+RZ2F	Kaliningrad	P
+RZ2K	Kaliningrad	P
+U2F	Kaliningrad	P
+U2K	Kaliningrad	P
+UA2	Kaliningrad	P
+UB2	Kaliningrad	P
+UC2	Kaliningrad	P
+UD2	Kaliningrad	P
+UE2	Kaliningrad	P
+UF2	Kaliningrad	P
+UG2	Kaliningrad	P
+UH2	Kaliningrad	P
+UI2	Kaliningrad	P
+R2MWO	Kaliningrad	E
+R330BF	Kaliningrad	E
+R330RBF	Kaliningrad	E
+RA/EU1FY	Kaliningrad	E
+R0	Asiatic Russia	P
+R8	Asiatic Russia	P
+R9	Asiatic Russia	P
+RA0	Asiatic Russia	P
+RA8	Asiatic Russia	P
+RA9	Asiatic Russia	P
+RC0	Asiatic Russia	P
+RC8	Asiatic Russia	P
+RC9	Asiatic Russia	P
+RD0	Asiatic Russia	P
+RD8	Asiatic Russia	P
+RD9	Asiatic Russia	P
+RE0	Asiatic Russia	P
+RE8	Asiatic Russia	P
+RE9	Asiatic Russia	P
+RF0	Asiatic Russia	P
+RF8	Asiatic Russia	P
+RF9	Asiatic Russia	P
+RG0	Asiatic Russia	P
+RG8	Asiatic Russia	P
+RG9	Asiatic Russia	P
+RI0	Asiatic Russia	P
+RI8	Asiatic Russia	P
+RI9	Asiatic Russia	P
+RJ0	Asiatic Russia	P
+RJ8	Asiatic Russia	P
+RJ9	Asiatic Russia	P
+RK0	Asiatic Russia	P
+RK8	Asiatic Russia	P
+RK9	Asiatic Russia	P
+RL0	Asiatic Russia	P
+RL8	Asiatic Russia	P
+RL9	Asiatic Russia	P
+RM0	Asiatic Russia	P
+RM8	Asiatic Russia	P
+RM9	Asiatic Russia	P
+RN0	Asiatic Russia	P
+RN8	Asiatic Russia	P
+RN9	Asiatic Russia	P
+RO0	Asiatic Russia	P
+RO8	Asiatic Russia	P
+RO9	Asiatic Russia	P
+RQ0	Asiatic Russia	P
+RQ8	Asiatic Russia	P
+RQ9	Asiatic Russia	P
+RT0	Asiatic Russia	P
+RT8	Asiatic Russia	P
+RT9	Asiatic Russia	P
+RU0	Asiatic Russia	P
+RU8	Asiatic Russia	P
+RU9	Asiatic Russia	P
+RV0	Asiatic Russia	P
+RV8	Asiatic Russia	P
+RV9	Asiatic Russia	P
+RW0	Asiatic Russia	P
+RW8	Asiatic Russia	P
+RW9	Asiatic Russia	P
+RX0	Asiatic Russia	P
+RX8	Asiatic Russia	P
+RX9	Asiatic Russia	P
+RY0	Asiatic Russia	P
+RY8	Asiatic Russia	P
+RY9	Asiatic Russia	P
+RZ0	Asiatic Russia	P
+RZ8	Asiatic Russia	P
+RZ9	Asiatic Russia	P
+U0	Asiatic Russia	P
+U8	Asiatic Russia	P
+U9	Asiatic Russia	P
+UA0	Asiatic Russia	P
+UA8	Asiatic Russia	P
+UA9	Asiatic Russia	P
+UB0	Asiatic Russia	P
+UB8	Asiatic Russia	P
+UB9	Asiatic Russia	P
+UC0	Asiatic Russia	P
+UC8	Asiatic Russia	P
+UC9	Asiatic Russia	P
+UD0	Asiatic Russia	P
+UD8	Asiatic Russia	P
+UD9	Asiatic Russia	P
+UE0	Asiatic Russia	P
+UE8	Asiatic Russia	P
+UE9	Asiatic Russia	P
+UF0	Asiatic Russia	P
+UF8	Asiatic Russia	P
+UF9	Asiatic Russia	P
+UG0	Asiatic Russia	P
+UG8	Asiatic Russia	P
+UG9	Asiatic Russia	P
+UH0	Asiatic Russia	P
+UH8	Asiatic Russia	P
+UH9	Asiatic Russia	P
+UI0	Asiatic Russia	P
+UI8	Asiatic Russia	P
+UI9	Asiatic Russia	P
+R0T	Asiatic Russia	P
+R8H	Asiatic Russia	P
+R8I	Asiatic Russia	P
+R8O	Asiatic Russia	P
+R8P	Asiatic Russia	P
+R8S	Asiatic Russia	P
+R8T	Asiatic Russia	P
+R8U	Asiatic Russia	P
+R8V	Asiatic Russia	P
+R8W	Asiatic Russia	P
+R8Y	Asiatic Russia	P
+R8Z	Asiatic Russia	P
+R9I	Asiatic Russia	P
+R9M	Asiatic Russia	P
+R9P	Asiatic Russia	P
+R9S	Asiatic Russia	P
+R9T	Asiatic Russia	P
+R9V	Asiatic Russia	P
+R9W	Asiatic Russia	P
+RA0T	Asiatic Russia	P
+RA8H	Asiatic Russia	P
+RA8I	Asiatic Russia	P
+RA8O	Asiatic Russia	P
+RA8P	Asiatic Russia	P
+RA8S	Asiatic Russia	P
+RA8T	Asiatic Russia	P
+RA8U	Asiatic Russia	P
+RA8V	Asiatic Russia	P
+RA8W	Asiatic Russia	P
+RA8Y	Asiatic Russia	P
+RA8Z	Asiatic Russia	P
+RA9I	Asiatic Russia	P
+RA9M	Asiatic Russia	P
+RA9P	Asiatic Russia	P
+RA9S	Asiatic Russia	P
+RA9T	Asiatic Russia	P
+RA9V	Asiatic Russia	P
+RA9W	Asiatic Russia	P
+RC0T	Asiatic Russia	P
+RC8H	Asiatic Russia	P
+RC8I	Asiatic Russia	P
+RC8O	Asiatic Russia	P
+RC8P	Asiatic Russia	P
+RC8S	Asiatic Russia	P
+RC8T	Asiatic Russia	P
+RC8U	Asiatic Russia	P
+RC8V	Asiatic Russia	P
+RC8W	Asiatic Russia	P
+RC8Y	Asiatic Russia	P
+RC8Z	Asiatic Russia	P
+RC9I	Asiatic Russia	P
+RC9M	Asiatic Russia	P
+RC9P	Asiatic Russia	P
+RC9S	Asiatic Russia	P
+RC9T	Asiatic Russia	P
+RC9V	Asiatic Russia	P
+RC9W	Asiatic Russia	P
+RD0T	Asiatic Russia	P
+RD8H	Asiatic Russia	P
+RD8I	Asiatic Russia	P
+RD8O	Asiatic Russia	P
+RD8P	Asiatic Russia	P
+RD8S	Asiatic Russia	P
+RD8T	Asiatic Russia	P
+RD8U	Asiatic Russia	P
+RD8V	Asiatic Russia	P
+RD8W	Asiatic Russia	P
+RD8Y	Asiatic Russia	P
+RD8Z	Asiatic Russia	P
+RD9I	Asiatic Russia	P
+RD9M	Asiatic Russia	P
+RD9P	Asiatic Russia	P
+RD9S	Asiatic Russia	P
+RD9T	Asiatic Russia	P
+RD9V	Asiatic Russia	P
+RD9W	Asiatic Russia	P
+RE0T	Asiatic Russia	P
+RE8H	Asiatic Russia	P
+RE8I	Asiatic Russia	P
+RE8O	Asiatic Russia	P
+RE8P	Asiatic Russia	P
+RE8S	Asiatic Russia	P
+RE8T	Asiatic Russia	P
+RE8U	Asiatic Russia	P
+RE8V	Asiatic Russia	P
+RE8W	Asiatic Russia	P
+RE8Y	Asiatic Russia	P
+RE8Z	Asiatic Russia	P
+RE9I	Asiatic Russia	P
+RE9M	Asiatic Russia	P
+RE9P	Asiatic Russia	P
+RE9S	Asiatic Russia	P
+RE9T	Asiatic Russia	P
+RE9V	Asiatic Russia	P
+RE9W	Asiatic Russia	P
+RF0T	Asiatic Russia	P
+RF8H	Asiatic Russia	P
+RF8I	Asiatic Russia	P
+RF8O	Asiatic Russia	P
+RF8P	Asiatic Russia	P
+RF8S	Asiatic Russia	P
+RF8T	Asiatic Russia	P
+RF8U	Asiatic Russia	P
+RF8V	Asiatic Russia	P
+RF8W	Asiatic Russia	P
+RF8Y	Asiatic Russia	P
+RF8Z	Asiatic Russia	P
+RF9I	Asiatic Russia	P
+RF9M	Asiatic Russia	P
+RF9P	Asiatic Russia	P
+RF9S	Asiatic Russia	P
+RF9T	Asiatic Russia	P
+RF9V	Asiatic Russia	P
+RF9W	Asiatic Russia	P
+RG0T	Asiatic Russia	P
+RG8H	Asiatic Russia	P
+RG8I	Asiatic Russia	P
+RG8O	Asiatic Russia	P
+RG8P	Asiatic Russia	P
+RG8S	Asiatic Russia	P
+RG8T	Asiatic Russia	P
+RG8U	Asiatic Russia	P
+RG8V	Asiatic Russia	P
+RG8W	Asiatic Russia	P
+RG8Y	Asiatic Russia	P
+RG8Z	Asiatic Russia	P
+RG9I	Asiatic Russia	P
+RG9M	Asiatic Russia	P
+RG9P	Asiatic Russia	P
+RG9S	Asiatic Russia	P
+RG9T	Asiatic Russia	P
+RG9V	Asiatic Russia	P
+RG9W	Asiatic Russia	P
+RJ0T	Asiatic Russia	P
+RJ8H	Asiatic Russia	P
+RJ8I	Asiatic Russia	P
+RJ8O	Asiatic Russia	P
+RJ8P	Asiatic Russia	P
+RJ8S	Asiatic Russia	P
+RJ8T	Asiatic Russia	P
+RJ8U	Asiatic Russia	P
+RJ8V	Asiatic Russia	P
+RJ8W	Asiatic Russia	P
+RJ8Y	Asiatic Russia	P
+RJ8Z	Asiatic Russia	P
+RJ9I	Asiatic Russia	P
+RJ9M	Asiatic Russia	P
+RJ9P	Asiatic Russia	P
+RJ9S	Asiatic Russia	P
+RJ9T	Asiatic Russia	P
+RJ9V	Asiatic Russia	P
+RJ9W	Asiatic Russia	P
+RK0T	Asiatic Russia	P
+RK8H	Asiatic Russia	P
+RK8I	Asiatic Russia	P
+RK8O	Asiatic Russia	P
+RK8P	Asiatic Russia	P
+RK8S	Asiatic Russia	P
+RK8T	Asiatic Russia	P
+RK8U	Asiatic Russia	P
+RK8V	Asiatic Russia	P
+RK8W	Asiatic Russia	P
+RK8Y	Asiatic Russia	P
+RK8Z	Asiatic Russia	P
+RK9I	Asiatic Russia	P
+RK9M	Asiatic Russia	P
+RK9P	Asiatic Russia	P
+RK9S	Asiatic Russia	P
+RK9T	Asiatic Russia	P
+RK9V	Asiatic Russia	P
+RK9W	Asiatic Russia	P
+RL0T	Asiatic Russia	P
+RL8H	Asiatic Russia	P
+RL8I	Asiatic Russia	P
+RL8O	Asiatic Russia	P
+RL8P	Asiatic Russia	P
+RL8S	Asiatic Russia	P
+RL8T	Asiatic Russia	P
+RL8U	Asiatic Russia	P
+RL8V	Asiatic Russia	P
+RL8W	Asiatic Russia	P
+RL8Y	Asiatic Russia	P
+RL8Z	Asiatic Russia	P
+RL9I	Asiatic Russia	P
+RL9M	Asiatic Russia	P
+RL9P	Asiatic Russia	P
+RL9S	Asiatic Russia	P
+RL9T	Asiatic Russia	P
+RL9V	Asiatic Russia	P
+RL9W	Asiatic Russia	P
+RM0T	Asiatic Russia	P
+RM8H	Asiatic Russia	P
+RM8I	Asiatic Russia	P
+RM8O	Asiatic Russia	P
+RM8P	Asiatic Russia	P
+RM8S	Asiatic Russia	P
+RM8T	Asiatic Russia	P
+RM8U	Asiatic Russia	P
+RM8V	Asiatic Russia	P
+RM8W	Asiatic Russia	P
+RM8Y	Asiatic Russia	P
+RM8Z	Asiatic Russia	P
+RM9I	Asiatic Russia	P
+RM9M	Asiatic Russia	P
+RM9P	Asiatic Russia	P
+RM9S	Asiatic Russia	P
+RM9T	Asiatic Russia	P
+RM9V	Asiatic Russia	P
+RM9W	Asiatic Russia	P
+RN0T	Asiatic Russia	P
+RN8H	Asiatic Russia	P
+RN8I	Asiatic Russia	P
+RN8O	Asiatic Russia	P
+RN8P	Asiatic Russia	P
+RN8S	Asiatic Russia	P
+RN8T	Asiatic Russia	P
+RN8U	Asiatic Russia	P
+RN8V	Asiatic Russia	P
+RN8W	Asiatic Russia	P
+RN8Y	Asiatic Russia	P
+RN8Z	Asiatic Russia	P
+RN9I	Asiatic Russia	P
+RN9M	Asiatic Russia	P
+RN9P	Asiatic Russia	P
+RN9S	Asiatic Russia	P
+RN9T	Asiatic Russia	P
+RN9V	Asiatic Russia	P
+RN9W	Asiatic Russia	P
+RO0T	Asiatic Russia	P
+RO8H	Asiatic Russia	P
+RO8I	Asiatic Russia	P
+RO8O	Asiatic Russia	P
+RO8P	Asiatic Russia	P
+RO8S	Asiatic Russia	P
+RO8T	Asiatic Russia	P
+RO8U	Asiatic Russia	P
+RO8V	Asiatic Russia	P
+RO8W	Asiatic Russia	P
+RO8Y	Asiatic Russia	P
+RO8Z	Asiatic Russia	P
+RO9I	Asiatic Russia	P
+RO9M	Asiatic Russia	P
+RO9P	Asiatic Russia	P
+RO9S	Asiatic Russia	P
+RO9T	Asiatic Russia	P
+RO9V	Asiatic Russia	P
+RO9W	Asiatic Russia	P
+RQ0T	Asiatic Russia	P
+RQ8H	Asiatic Russia	P
+RQ8I	Asiatic Russia	P
+RQ8O	Asiatic Russia	P
+RQ8P	Asiatic Russia	P
+RQ8S	Asiatic Russia	P
+RQ8T	Asiatic Russia	P
+RQ8U	Asiatic Russia	P
+RQ8V	Asiatic Russia	P
+RQ8W	Asiatic Russia	P
+RQ8Y	Asiatic Russia	P
+RQ8Z	Asiatic Russia	P
+RQ9I	Asiatic Russia	P
+RQ9M	Asiatic Russia	P
+RQ9P	Asiatic Russia	P
+RQ9S	Asiatic Russia	P
+RQ9T	Asiatic Russia	P
+RQ9V	Asiatic Russia	P
+RQ9W	Asiatic Russia	P
+RT0T	Asiatic Russia	P
+RT8H	Asiatic Russia	P
+RT8I	Asiatic Russia	P
+RT8O	Asiatic Russia	P
+RT8P	Asiatic Russia	P
+RT8S	Asiatic Russia	P
+RT8T	Asiatic Russia	P
+RT8U	Asiatic Russia	P
+RT8V	Asiatic Russia	P
+RT8W	Asiatic Russia	P
+RT8Y	Asiatic Russia	P
+RT8Z	Asiatic Russia	P
+RT9I	Asiatic Russia	P
+RT9M	Asiatic Russia	P
+RT9P	Asiatic Russia	P
+RT9S	Asiatic Russia	P
+RT9T	Asiatic Russia	P
+RT9V	Asiatic Russia	P
+RT9W	Asiatic Russia	P
+RU0T	Asiatic Russia	P
+RU8H	Asiatic Russia	P
+RU8I	Asiatic Russia	P
+RU8O	Asiatic Russia	P
+RU8P	Asiatic Russia	P
+RU8S	Asiatic Russia	P
+RU8T	Asiatic Russia	P
+RU8U	Asiatic Russia	P
+RU8V	Asiatic Russia	P
+RU8W	Asiatic Russia	P
+RU8Y	Asiatic Russia	P
+RU8Z	Asiatic Russia	P
+RU9I	Asiatic Russia	P
+RU9M	Asiatic Russia	P
+RU9P	Asiatic Russia	P
+RU9S	Asiatic Russia	P
+RU9T	Asiatic Russia	P
+RU9V	Asiatic Russia	P
+RU9W	Asiatic Russia	P
+RV0T	Asiatic Russia	P
+RV8H	Asiatic Russia	P
+RV8I	Asiatic Russia	P
+RV8O	Asiatic Russia	P
+RV8P	Asiatic Russia	P
+RV8S	Asiatic Russia	P
+RV8T	Asiatic Russia	P
+RV8U	Asiatic Russia	P
+RV8V	Asiatic Russia	P
+RV8W	Asiatic Russia	P
+RV8Y	Asiatic Russia	P
+RV8Z	Asiatic Russia	P
+RV9I	Asiatic Russia	P
+RV9M	Asiatic Russia	P
+RV9P	Asiatic Russia	P
+RV9S	Asiatic Russia	P
+RV9T	Asiatic Russia	P
+RV9V	Asiatic Russia	P
+RV9W	Asiatic Russia	P
+RW0T	Asiatic Russia	P
+RW8H	Asiatic Russia	P
+RW8I	Asiatic Russia	P
+RW8O	Asiatic Russia	P
+RW8P	Asiatic Russia	P
+RW8S	Asiatic Russia	P
+RW8T	Asiatic Russia	P
+RW8U	Asiatic Russia	P
+RW8V	Asiatic Russia	P
+RW8W	Asiatic Russia	P
+RW8Y	Asiatic Russia	P
+RW8Z	Asiatic Russia	P
+RW9I	Asiatic Russia	P
+RW9M	Asiatic Russia	P
+RW9P	Asiatic Russia	P
+RW9S	Asiatic Russia	P
+RW9T	Asiatic Russia	P
+RW9V	Asiatic Russia	P
+RW9W	Asiatic Russia	P
+RX0T	Asiatic Russia	P
+RX8H	Asiatic Russia	P
+RX8I	Asiatic Russia	P
+RX8O	Asiatic Russia	P
+RX8P	Asiatic Russia	P
+RX8S	Asiatic Russia	P
+RX8T	Asiatic Russia	P
+RX8U	Asiatic Russia	P
+RX8V	Asiatic Russia	P
+RX8W	Asiatic Russia	P
+RX8Y	Asiatic Russia	P
+RX8Z	Asiatic Russia	P
+RX9I	Asiatic Russia	P
+RX9M	Asiatic Russia	P
+RX9P	Asiatic Russia	P
+RX9S	Asiatic Russia	P
+RX9T	Asiatic Russia	P
+RX9V	Asiatic Russia	P
+RX9W	Asiatic Russia	P
+RY0T	Asiatic Russia	P
+RY8H	Asiatic Russia	P
+RY8I	Asiatic Russia	P
+RY8O	Asiatic Russia	P
+RY8P	Asiatic Russia	P
+RY8S	Asiatic Russia	P
+RY8T	Asiatic Russia	P
+RY8U	Asiatic Russia	P
+RY8V	Asiatic Russia	P
+RY8W	Asiatic Russia	P
+RY8Y	Asiatic Russia	P
+RY8Z	Asiatic Russia	P
+RY9I	Asiatic Russia	P
+RY9M	Asiatic Russia	P
+RY9P	Asiatic Russia	P
+RY9S	Asiatic Russia	P
+RY9T	Asiatic Russia	P
+RY9V	Asiatic Russia	P
+RY9W	Asiatic Russia	P
+RZ0T	Asiatic Russia	P
+RZ8H	Asiatic Russia	P
+RZ8I	Asiatic Russia	P
+RZ8O	Asiatic Russia	P
+RZ8P	Asiatic Russia	P
+RZ8S	Asiatic Russia	P
+RZ8T	Asiatic Russia	P
+RZ8U	Asiatic Russia	P
+RZ8V	Asiatic Russia	P
+RZ8W	Asiatic Russia	P
+RZ8Y	Asiatic Russia	P
+RZ8Z	Asiatic Russia	P
+RZ9I	Asiatic Russia	P
+RZ9M	Asiatic Russia	P
+RZ9P	Asiatic Russia	P
+RZ9S	Asiatic Russia	P
+RZ9T	Asiatic Russia	P
+RZ9V	Asiatic Russia	P
+RZ9W	Asiatic Russia	P
+U0T	Asiatic Russia	P
+U8H	Asiatic Russia	P
+U8I	Asiatic Russia	P
+U8O	Asiatic Russia	P
+U8P	Asiatic Russia	P
+U8S	Asiatic Russia	P
+U8T	Asiatic Russia	P
+U8U	Asiatic Russia	P
+U8V	Asiatic Russia	P
+U8W	Asiatic Russia	P
+U8Y	Asiatic Russia	P
+U8Z	Asiatic Russia	P
+U9I	Asiatic Russia	P
+U9M	Asiatic Russia	P
+U9P	Asiatic Russia	P
+U9S	Asiatic Russia	P
+U9T	Asiatic Russia	P
+U9V	Asiatic Russia	P
+U9W	Asiatic Russia	P
+UA0T	Asiatic Russia	P
+UA8H	Asiatic Russia	P
+UA8I	Asiatic Russia	P
+UA8O	Asiatic Russia	P
+UA8P	Asiatic Russia	P
+UA8S	Asiatic Russia	P
+UA8T	Asiatic Russia	P
+UA8U	Asiatic Russia	P
+UA8V	Asiatic Russia	P
+UA8W	Asiatic Russia	P
+UA8Y	Asiatic Russia	P
+UA8Z	Asiatic Russia	P
+UA9I	Asiatic Russia	P
+UA9M	Asiatic Russia	P
+UA9P	Asiatic Russia	P
+UA9S	Asiatic Russia	P
+UA9T	Asiatic Russia	P
+UA9V	Asiatic Russia	P
+UA9W	Asiatic Russia	P
+UB0T	Asiatic Russia	P
+UB8H	Asiatic Russia	P
+UB8I	Asiatic Russia	P
+UB8O	Asiatic Russia	P
+UB8P	Asiatic Russia	P
+UB8S	Asiatic Russia	P
+UB8T	Asiatic Russia	P
+UB8U	Asiatic Russia	P
+UB8V	Asiatic Russia	P
+UB8W	Asiatic Russia	P
+UB8Y	Asiatic Russia	P
+UB8Z	Asiatic Russia	P
+UB9I	Asiatic Russia	P
+UB9M	Asiatic Russia	P
+UB9P	Asiatic Russia	P
+UB9S	Asiatic Russia	P
+UB9T	Asiatic Russia	P
+UB9V	Asiatic Russia	P
+UB9W	Asiatic Russia	P
+UC0T	Asiatic Russia	P
+UC8H	Asiatic Russia	P
+UC8I	Asiatic Russia	P
+UC8O	Asiatic Russia	P
+UC8P	Asiatic Russia	P
+UC8S	Asiatic Russia	P
+UC8T	Asiatic Russia	P
+UC8U	Asiatic Russia	P
+UC8V	Asiatic Russia	P
+UC8W	Asiatic Russia	P
+UC8Y	Asiatic Russia	P
+UC8Z	Asiatic Russia	P
+UC9I	Asiatic Russia	P
+UC9M	Asiatic Russia	P
+UC9P	Asiatic Russia	P
+UC9S	Asiatic Russia	P
+UC9T	Asiatic Russia	P
+UC9V	Asiatic Russia	P
+UC9W	Asiatic Russia	P
+UD0T	Asiatic Russia	P
+UD8H	Asiatic Russia	P
+UD8I	Asiatic Russia	P
+UD8O	Asiatic Russia	P
+UD8P	Asiatic Russia	P
+UD8S	Asiatic Russia	P
+UD8T	Asiatic Russia	P
+UD8U	Asiatic Russia	P
+UD8V	Asiatic Russia	P
+UD8W	Asiatic Russia	P
+UD8Y	Asiatic Russia	P
+UD8Z	Asiatic Russia	P
+UD9I	Asiatic Russia	P
+UD9M	Asiatic Russia	P
+UD9P	Asiatic Russia	P
+UD9S	Asiatic Russia	P
+UD9T	Asiatic Russia	P
+UD9V	Asiatic Russia	P
+UD9W	Asiatic Russia	P
+UE0T	Asiatic Russia	P
+UE8H	Asiatic Russia	P
+UE8I	Asiatic Russia	P
+UE8O	Asiatic Russia	P
+UE8P	Asiatic Russia	P
+UE8S	Asiatic Russia	P
+UE8T	Asiatic Russia	P
+UE8U	Asiatic Russia	P
+UE8V	Asiatic Russia	P
+UE8W	Asiatic Russia	P
+UE8Y	Asiatic Russia	P
+UE8Z	Asiatic Russia	P
+UE9I	Asiatic Russia	P
+UE9M	Asiatic Russia	P
+UE9P	Asiatic Russia	P
+UE9S	Asiatic Russia	P
+UE9T	Asiatic Russia	P
+UE9V	Asiatic Russia	P
+UE9W	Asiatic Russia	P
+UF0T	Asiatic Russia	P
+UF8H	Asiatic Russia	P
+UF8I	Asiatic Russia	P
+UF8O	Asiatic Russia	P
+UF8P	Asiatic Russia	P
+UF8S	Asiatic Russia	P
+UF8T	Asiatic Russia	P
+UF8U	Asiatic Russia	P
+UF8V	Asiatic Russia	P
+UF8W	Asiatic Russia	P
+UF8Y	Asiatic Russia	P
+UF8Z	Asiatic Russia	P
+UF9I	Asiatic Russia	P
+UF9M	Asiatic Russia	P
+UF9P	Asiatic Russia	P
+UF9S	Asiatic Russia	P
+UF9T	Asiatic Russia	P
+UF9V	Asiatic Russia	P
+UF9W	Asiatic Russia	P
+UG0T	Asiatic Russia	P
+UG8H	Asiatic Russia	P
+UG8I	Asiatic Russia	P
+UG8O	Asiatic Russia	P
+UG8P	Asiatic Russia	P
+UG8S	Asiatic Russia	P
+UG8T	Asiatic Russia	P
+UG8U	Asiatic Russia	P
+UG8V	Asiatic Russia	P
+UG8W	Asiatic Russia	P
+UG8Y	Asiatic Russia	P
+UG8Z	Asiatic Russia	P
+UG9I	Asiatic Russia	P
+UG9M	Asiatic Russia	P
+UG9P	Asiatic Russia	P
+UG9S	Asiatic Russia	P
+UG9T	Asiatic Russia	P
+UG9V	Asiatic Russia	P
+UG9W	Asiatic Russia	P
+UH0T	Asiatic Russia	P
+UH8H	Asiatic Russia	P
+UH8I	Asiatic Russia	P
+UH8O	Asiatic Russia	P
+UH8P	Asiatic Russia	P
+UH8S	Asiatic Russia	P
+UH8T	Asiatic Russia	P
+UH8U	Asiatic Russia	P
+UH8V	Asiatic Russia	P
+UH8W	Asiatic Russia	P
+UH8Y	Asiatic Russia	P
+UH8Z	Asiatic Russia	P
+UH9I	Asiatic Russia	P
+UH9M	Asiatic Russia	P
+UH9P	Asiatic Russia	P
+UH9S	Asiatic Russia	P
+UH9T	Asiatic Russia	P
+UH9V	Asiatic Russia	P
+UH9W	Asiatic Russia	P
+UI0T	Asiatic Russia	P
+UI8H	Asiatic Russia	P
+UI8I	Asiatic Russia	P
+UI8O	Asiatic Russia	P
+UI8P	Asiatic Russia	P
+UI8S	Asiatic Russia	P
+UI8T	Asiatic Russia	P
+UI8U	Asiatic Russia	P
+UI8V	Asiatic Russia	P
+UI8W	Asiatic Russia	P
+UI8Y	Asiatic Russia	P
+UI8Z	Asiatic Russia	P
+UI9I	Asiatic Russia	P
+UI9M	Asiatic Russia	P
+UI9P	Asiatic Russia	P
+UI9S	Asiatic Russia	P
+UI9T	Asiatic Russia	P
+UI9V	Asiatic Russia	P
+UI9W	Asiatic Russia	P
+R0KA/9	Asiatic Russia	E
+R330RTF	Asiatic Russia	E
+R330TF	Asiatic Russia	E
+R3CI/0	Asiatic Russia	E
+R7HJ/0	Asiatic Russia	E
+R9CS/P	Asiatic Russia	E
+R9LY/P	Asiatic Russia	E
+R9MA	Asiatic Russia	E
+RA0QK/8	Asiatic Russia	E
+RA8AL/9	Asiatic Russia	E
+RA9J	Asiatic Russia	E
+RA9JM	Asiatic Russia	E
+RG0C/P	Asiatic Russia	E
+RK4PA/9	Asiatic Russia	E
+RT9J	Asiatic Russia	E
+RU9MV/0	Asiatic Russia	E
+RV3DSA/0	Asiatic Russia	E
+RV7B/9	Asiatic Russia	E
+RW9AV	Asiatic Russia	E
+RW9C	Asiatic Russia	E
+RX9CC	Asiatic Russia	E
+UA0KBG	Asiatic Russia	E
+UA9JNT	Asiatic Russia	E
+UA9JTJ/4	Asiatic Russia	E
+UA9MW	Asiatic Russia	E
+UD6AOP/0	Asiatic Russia	E
+UJ	Uzbekistan	P
+UK	Uzbekistan	P
+UL	Uzbekistan	P
+UM	Uzbekistan	P
+UN	Kazakhstan	P
+UO	Kazakhstan	P
+UP	Kazakhstan	P
+UQ	Kazakhstan	P
+UN0F	Kazakhstan	P
+UN0G	Kazakhstan	P
+UN0J	Kazakhstan	P
+UN0Q	Kazakhstan	P
+UN1F	Kazakhstan	P
+UN1G	Kazakhstan	P
+UN1J	Kazakhstan	P
+UN1Q	Kazakhstan	P
+UN2F	Kazakhstan	P
+UN2G	Kazakhstan	P
+UN2J	Kazakhstan	P
+UN2Q	Kazakhstan	P
+UN3F	Kazakhstan	P
+UN3G	Kazakhstan	P
+UN3J	Kazakhstan	P
+UN3Q	Kazakhstan	P
+UN4F	Kazakhstan	P
+UN4G	Kazakhstan	P
+UN4J	Kazakhstan	P
+UN4Q	Kazakhstan	P
+UN5F	Kazakhstan	P
+UN5G	Kazakhstan	P
+UN5J	Kazakhstan	P
+UN5Q	Kazakhstan	P
+UN6F	Kazakhstan	P
+UN6G	Kazakhstan	P
+UN6J	Kazakhstan	P
+UN6Q	Kazakhstan	P
+UN7F	Kazakhstan	P
+UN7G	Kazakhstan	P
+UN7J	Kazakhstan	P
+UN7Q	Kazakhstan	P
+UN8F	Kazakhstan	P
+UN8G	Kazakhstan	P
+UN8J	Kazakhstan	P
+UN8Q	Kazakhstan	P
+UN9F	Kazakhstan	P
+UN9G	Kazakhstan	P
+UN9J	Kazakhstan	P
+UN9Q	Kazakhstan	P
+UO0F	Kazakhstan	P
+UO0G	Kazakhstan	P
+UO0J	Kazakhstan	P
+UO0Q	Kazakhstan	P
+UO1F	Kazakhstan	P
+UO1G	Kazakhstan	P
+UO1J	Kazakhstan	P
+UO1Q	Kazakhstan	P
+UO2F	Kazakhstan	P
+UO2G	Kazakhstan	P
+UO2J	Kazakhstan	P
+UO2Q	Kazakhstan	P
+UO3F	Kazakhstan	P
+UO3G	Kazakhstan	P
+UO3J	Kazakhstan	P
+UO3Q	Kazakhstan	P
+UO4F	Kazakhstan	P
+UO4G	Kazakhstan	P
+UO4J	Kazakhstan	P
+UO4Q	Kazakhstan	P
+UO5F	Kazakhstan	P
+UO5G	Kazakhstan	P
+UO5J	Kazakhstan	P
+UO5Q	Kazakhstan	P
+UO6F	Kazakhstan	P
+UO6G	Kazakhstan	P
+UO6J	Kazakhstan	P
+UO6Q	Kazakhstan	P
+UO7F	Kazakhstan	P
+UO7G	Kazakhstan	P
+UO7J	Kazakhstan	P
+UO7Q	Kazakhstan	P
+UO8F	Kazakhstan	P
+UO8G	Kazakhstan	P
+UO8J	Kazakhstan	P
+UO8Q	Kazakhstan	P
+UO9F	Kazakhstan	P
+UO9G	Kazakhstan	P
+UO9J	Kazakhstan	P
+UO9Q	Kazakhstan	P
+UP0F	Kazakhstan	P
+UP0G	Kazakhstan	P
+UP0J	Kazakhstan	P
+UP0Q	Kazakhstan	P
+UP1F	Kazakhstan	P
+UP1G	Kazakhstan	P
+UP1J	Kazakhstan	P
+UP1Q	Kazakhstan	P
+UP2F	Kazakhstan	P
+UP2G	Kazakhstan	P
+UP2J	Kazakhstan	P
+UP2Q	Kazakhstan	P
+UP3F	Kazakhstan	P
+UP3G	Kazakhstan	P
+UP3J	Kazakhstan	P
+UP3Q	Kazakhstan	P
+UP4F	Kazakhstan	P
+UP4G	Kazakhstan	P
+UP4J	Kazakhstan	P
+UP4Q	Kazakhstan	P
+UP5F	Kazakhstan	P
+UP5G	Kazakhstan	P
+UP5J	Kazakhstan	P
+UP5Q	Kazakhstan	P
+UP6F	Kazakhstan	P
+UP6G	Kazakhstan	P
+UP6J	Kazakhstan	P
+UP6Q	Kazakhstan	P
+UP7F	Kazakhstan	P
+UP7G	Kazakhstan	P
+UP7J	Kazakhstan	P
+UP7Q	Kazakhstan	P
+UP8F	Kazakhstan	P
+UP8G	Kazakhstan	P
+UP8J	Kazakhstan	P
+UP8Q	Kazakhstan	P
+UP9F	Kazakhstan	P
+UP9G	Kazakhstan	P
+UP9J	Kazakhstan	P
+UP9Q	Kazakhstan	P
+UQ0F	Kazakhstan	P
+UQ0G	Kazakhstan	P
+UQ0J	Kazakhstan	P
+UQ0Q	Kazakhstan	P
+UQ1F	Kazakhstan	P
+UQ1G	Kazakhstan	P
+UQ1J	Kazakhstan	P
+UQ1Q	Kazakhstan	P
+UQ2F	Kazakhstan	P
+UQ2G	Kazakhstan	P
+UQ2J	Kazakhstan	P
+UQ2Q	Kazakhstan	P
+UQ3F	Kazakhstan	P
+UQ3G	Kazakhstan	P
+UQ3J	Kazakhstan	P
+UQ3Q	Kazakhstan	P
+UQ4F	Kazakhstan	P
+UQ4G	Kazakhstan	P
+UQ4J	Kazakhstan	P
+UQ4Q	Kazakhstan	P
+UQ5F	Kazakhstan	P
+UQ5G	Kazakhstan	P
+UQ5J	Kazakhstan	P
+UQ5Q	Kazakhstan	P
+UQ6F	Kazakhstan	P
+UQ6G	Kazakhstan	P
+UQ6J	Kazakhstan	P
+UQ6Q	Kazakhstan	P
+UQ7F	Kazakhstan	P
+UQ7G	Kazakhstan	P
+UQ7J	Kazakhstan	P
+UQ7Q	Kazakhstan	P
+UQ8F	Kazakhstan	P
+UQ8G	Kazakhstan	P
+UQ8J	Kazakhstan	P
+UQ8Q	Kazakhstan	P
+UQ9F	Kazakhstan	P
+UQ9G	Kazakhstan	P
+UQ9J	Kazakhstan	P
+UQ9Q	Kazakhstan	P
+EM	Ukraine	P
+EN	Ukraine	P
+EO	Ukraine	P
+U5	Ukraine	P
+UR	Ukraine	P
+US	Ukraine	P
+UT	Ukraine	P
+UU	Ukraine	P
+UV	Ukraine	P
+UW	Ukraine	P
+UX	Ukraine	P
+UY	Ukraine	P
+UZ	Ukraine	P
+V2	Antigua and Barbuda	P
+V3	Belize	P
+V4	Saint Kitts and Nevis	P
+V5	Namibia	P
+V6	Federated States of Micronesia	P
+V7	Marshall Islands	P
+V8	Brunei	P
+CF	Canada	P
+CG	Canada	P
+CJ	Canada	P
+CK	Canada	P
+VA	Canada	P
+VB	Canada	P
+VC	Canada	P
+VE	Canada	P
+VG	Canada	P
+VX	Canada	P
+VY9	Canada	P
+XL	Canada	P
+XM	Canada	P
+CF2	Canada	P
+CG2	Canada	P
+CH1	Canada	P
+CH2	Canada	P
+CI0	Canada	P
+CI1	Canada	P
+CI2	Canada	P
+CJ2	Canada	P
+CK2	Canada	P
+CY1	Canada	P
+CY2	Canada	P
+CZ0	Canada	P
+CZ1	Canada	P
+CZ2	Canada	P
+VA2	Canada	P
+VB2	Canada	P
+VC2	Canada	P
+VD1	Canada	P
+VD2	Canada	P
+VE2	Canada	P
+VF1	Canada	P
+VF2	Canada	P
+VG2	Canada	P
+VO1	Canada	P
+VO2	Canada	P
+VX2	Canada	P
+VY0	Canada	P
+VY1	Canada	P
+VY2	Canada	P
+XJ1	Canada	P
+XJ2	Canada	P
+XK0	Canada	P
+XK1	Canada	P
+XK2	Canada	P
+XL2	Canada	P
+XM2	Canada	P
+XN1	Canada	P
+XN2	Canada	P
+XO0	Canada	P
+XO1	Canada	P
+XO2	Canada	P
+VER20261126	Canada	E
+VA2VVV	Canada	E
+VA2WMA	Canada	E
+VE2CSI	Canada	E
+VE2EKA	Canada	E
+VE2FK	Canada	E
+VE2IDX	Canada	E
+VE2IM	Canada	E
+VE2PID/3	Canada	E
+VE2TKH	Canada	E
+VE2ZL	Canada	E
+VE3RIA/9	Canada	E
+VE6FXL/1	Canada	E
+VY0ERC	Canada	E
+VY0PW	Canada	E
+AX	Australia	P
+VI	Australia	P
+VJ	Australia	P
+VK	Australia	P
+VL	Australia	P
+AX4	Australia	P
+VI4	Australia	P
+VJ4	Australia	P
+VK4	Australia	P
+VL4	Australia	P
+VK2BYF/P	Australia	E
+VK6NX/3	Australia	E
+VK6TX	Australia	E
+VK0H	Heard Island	P
+VK0EK	Heard Island	E
+VK0M	Macquarie Island	P
+VK0MQ	Macquarie Island	E
+AX9C	Cocos (Keeling) Islands	P
+AX9Y	Cocos (Keeling) Islands	P
+VI9C	Cocos (Keeling) Islands	P
+VI9Y	Cocos (Keeling) Islands	P
+VK9C	Cocos (Keeling) Islands	P
+VK9FC	Cocos (Keeling) Islands	P
+VK9KC	Cocos (Keeling) Islands	P
+VK9Y	Cocos (Keeling) Islands	P
+VK9ZY	Cocos (Keeling) Islands	P
+VZ9Y	Cocos (Keeling) Islands	P
+VK9BSA	Cocos (Keeling) Islands	E
+VK9DEE	Cocos (Keeling) Islands	E
+VK9DS	Cocos (Keeling) Islands	E
+VK9FISH	Cocos (Keeling) Islands	E
+VK9FL	Lord Howe Island	P
+VK9L	Lord Howe Island	P
+AX9M	Mellish Reef	P
+VI9M	Mellish Reef	P
+VK9M	Mellish Reef	P
+VZ9M	Mellish Reef	P
+AX9	Norfolk Island	P
+VI9	Norfolk Island	P
+VK9	Norfolk Island	P
+VK9N	Norfolk Island	P
+AX9W	Willis Island	P
+AX9Z	Willis Island	P
+VI9W	Willis Island	P
+VI9Z	Willis Island	P
+VK9FW	Willis Island	P
+VK9W	Willis Island	P
+VK9Z	Willis Island	P
+VZ9W	Willis Island	P
+AX9X	Christmas Island	P
+VI9X	Christmas Island	P
+VK9FX	Christmas Island	P
+VK9KX	Christmas Island	P
+VK9X	Christmas Island	P
+VZ9X	Christmas Island	P
+VK9AFP	Christmas Island	E
+VP2E	Anguilla	P
+VP2M	Montserrat	P
+VP2V	British Virgin Islands	P
+VP5	Turks and Caicos Islands	P
+VQ5	Turks and Caicos Islands	P
+VP6	Pitcairn Islands	P
+VP6/D	Pitcairn Islands	P
+VP6A	Pitcairn Islands	E
+VP8	Falkland Islands	P
+VP0G	South Georgia and the Islands	P
+VP8/G	South Georgia and the Islands	P
+XR9	South Georgia and the Islands	P
+VP8/H	South Georgia and the Islands	P
+HF0PAS	South Georgia and the Islands	E
+VP8/O	South Georgia and the Islands	P
+LU1DMZ/Z	South Georgia and the Islands	E
+LU1ZA	South Georgia and the Islands	E
+VP0S	South Georgia and the Islands	P
+VP8/S	South Georgia and the Islands	P
+VP9	Bermuda	P
+VQ9	British Indian Ocean Territory	P
+VR	Hong Kong S.A.R.	P
+8T	India	P
+8U	India	P
+8V	India	P
+8W	India	P
+8X	India	P
+8Y	India	P
+AT	India	P
+AU	India	P
+AV	India	P
+AW	India	P
+VT	India	P
+VU	India	P
+VV	India	P
+VW	India	P
+VU4	Andaman & Nicobar Is.	P
+VU7	Lakshadweep Islands	P
+4A	Mexico	P
+4B	Mexico	P
+4C	Mexico	P
+6D	Mexico	P
+6E	Mexico	P
+6F	Mexico	P
+6G	Mexico	P
+6H	Mexico	P
+6I	Mexico	P
+6J	Mexico	P
+XA	Mexico	P
+XB	Mexico	P
+XC	Mexico	P
+XD	Mexico	P
+XE	Mexico	P
+XF	Mexico	P
+XG	Mexico	P
+XH	Mexico	P
+XI	Mexico	P
+4A4	Revillagigedo	P
+4B4	Revillagigedo	P
+4C4	Revillagigedo	P
+6D4	Revillagigedo	P
+6E4	Revillagigedo	P
+6F4	Revillagigedo	P
+6G4	Revillagigedo	P
+6H4	Revillagigedo	P
+6I4	Revillagigedo	P
+6J4	Revillagigedo	P
+XA4	Revillagigedo	P
+XB4	Revillagigedo	P
+XC4	Revillagigedo	P
+XD4	Revillagigedo	P
+XE4	Revillagigedo	P
+XF4	Revillagigedo	P
+XG4	Revillagigedo	P
+XH4	Revillagigedo	P
+XI4	Revillagigedo	P
+XT	Burkina Faso	P
+XU	Cambodia	P
+XW	Laos	P
+XX9	Macao	P
+XY	Myanmar	P
+XZ	Myanmar	P
+T6	Afghanistan	P
+YA	Afghanistan	P
+7A	Indonesia	P
+7B	Indonesia	P
+7C	Indonesia	P
+7D	Indonesia	P
+7E	Indonesia	P
+7F	Indonesia	P
+7G	Indonesia	P
+7H	Indonesia	P
+7I	Indonesia	P
+8A	Indonesia	P
+8B	Indonesia	P
+8C	Indonesia	P
+8D	Indonesia	P
+8E	Indonesia	P
+8F	Indonesia	P
+8G	Indonesia	P
+8H	Indonesia	P
+8I	Indonesia	P
+PK	Indonesia	P
+PL	Indonesia	P
+PM	Indonesia	P
+PN	Indonesia	P
+PO	Indonesia	P
+YB	Indonesia	P
+YC	Indonesia	P
+YD	Indonesia	P
+YE	Indonesia	P
+YF	Indonesia	P
+YG	Indonesia	P
+YH	Indonesia	P
+YB9UA	Indonesia	E
+YB9VED	Indonesia	E
+YB9WIC	Indonesia	E
+YB9XFU	Indonesia	E
+YB9YBB	Indonesia	E
+YB9YSS	Indonesia	E
+YC9RHV	Indonesia	E
+YC9RRB	Indonesia	E
+YC9RRR	Indonesia	E
+YC9UAB	Indonesia	E
+YD9RRL	Indonesia	E
+YD9UW	Indonesia	E
+YD9VE	Indonesia	E
+YE9XAC	Indonesia	E
+YE9XAJ	Indonesia	E
+YE9XAO	Indonesia	E
+YF9RBJ	Indonesia	E
+YF9UBD	Indonesia	E
+HN	Iraq	P
+YI	Iraq	P
+YJ	Vanuatu	P
+6C	Syria	P
+YK	Syria	P
+YL	Latvia	P
+H6	Nicaragua	P
+H7	Nicaragua	P
+HT	Nicaragua	P
+YN	Nicaragua	P
+YO	Romania	P
+YP	Romania	P
+YQ	Romania	P
+YR	Romania	P
+HU	El Salvador	P
+YS	El Salvador	P
+YT	Republic of Serbia	P
+YU	Republic of Serbia	P
+4M	Venezuela	P
+YV	Venezuela	P
+YW	Venezuela	P
+YX	Venezuela	P
+YY	Venezuela	P
+4M0	Aves Island	P
+YV0	Aves Island	P
+YW0	Aves Island	P
+YX0	Aves Island	P
+YY0	Aves Island	P
+Z2	Zimbabwe	P
+Z3	North Macedonia	P
+Z6	Republic of Kosovo	P
+Z8	South Sudan	P
+ZA	Albania	P
+ZB	Gibraltar	P
+ZG	Gibraltar	P
+ZC4	UK Base Areas on Cyprus	P
+ZD7	Saint Helena	P
+ZD8	Ascension Island	P
+ZD9	Tristan da Cunha & Gough	P
+ZF	Cayman Islands	P
+ZK3	Tokelau Islands	P
+ZK	New Zealand	P
+ZL	New Zealand	P
+ZL50	New Zealand	P
+ZM	New Zealand	P
+ZL1RPC/F	New Zealand	E
+ZL7	Chatham Islands	P
+ZM7	Chatham Islands	P
+ZL8	Kermadec Islands	P
+ZM8	Kermadec Islands	P
+ZL9	N.Z. Subantarctic Is.	P
+ZP	Paraguay	P
+H5	South Africa	P
+S4	South Africa	P
+S8	South Africa	P
+V9	South Africa	P
+ZR	South Africa	P
+ZS	South Africa	P
+ZT	South Africa	P
+ZU	South Africa	P
+ZR8	Pr. Edward & Marion Is.	P
+ZS8	Pr. Edward & Marion Is.	P
+ZT8	Pr. Edward & Marion Is.	P
+ZU8	Pr. Edward & Marion Is.	P

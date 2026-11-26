@@ -18,6 +18,7 @@ namespace {
 QVector<DxccEntity> entities;
 QHash<QString, DxccLabel> byName;
 QHash<QString, QString> prefixCountry;
+QHash<QString, QString> exactCall;
 QHash<QString, QPair<float, float>> prefixPoint;
 
 bool readU32(const uchar *&p, const uchar *end, quint32 &value)
@@ -59,11 +60,12 @@ bool pointInRing(const GeoRing &ring, double lat, double lon)
 
 } // namespace
 
-bool loadDxcc(const QByteArray &outlines, const QByteArray &names)
+bool loadDxcc(const QByteArray &outlines, const QByteArray &names, const QByteArray &prefixes)
 {
     entities.clear();
     byName.clear();
     prefixCountry.clear();
+    exactCall.clear();
     prefixPoint.clear();
     const QString text = QString::fromUtf8(names);
     const QStringList lines = text.split(QLatin1Char('\n'));
@@ -131,6 +133,31 @@ bool loadDxcc(const QByteArray &outlines, const QByteArray &names)
             entities.append(std::move(entity));
         }
     }
+    const QString prefixText = QString::fromUtf8(prefixes);
+    const QStringList prefixLines = prefixText.split(QLatin1Char('\n'));
+    struct Alias {
+        QString prefix;
+        QString country;
+    };
+    QVector<Alias> aliases;
+    for (const QString &line : prefixLines) {
+        if (line.isEmpty() || line.startsWith(QLatin1Char('#')))
+            continue;
+        const QStringList parts = line.split(QLatin1Char('\t'));
+        if (parts.size() < 3)
+            continue;
+        const QString key = parts.at(0).trimmed().toUpper();
+        const QString country = parts.at(1);
+        const QString kind = parts.at(2).trimmed().toUpper();
+        if (key.isEmpty() || country.isEmpty())
+            continue;
+        if (kind == QLatin1String("E"))
+            exactCall.insert(key, country);
+        else
+            aliases.append(Alias{key, country});
+    }
+    for (const Alias &alias : aliases)
+        prefixCountry.insert(alias.prefix, alias.country);
     return true;
 }
 
@@ -165,7 +192,19 @@ DxccLabel dxccForCountry(const QString &naturalEarthName)
 
 std::optional<DxccCall> dxccForCallsign(const QString &call)
 {
-    const QStringList pieces = call.toUpper().split(QLatin1Char('/'), Qt::SkipEmptyParts);
+    const QString full = call.trimmed().toUpper();
+    if (const auto exact = exactCall.constFind(full); exact != exactCall.constEnd()) {
+        DxccCall hit;
+        hit.prefix = full;
+        hit.country = exact.value();
+        if (const auto point = prefixPoint.constFind(full); point != prefixPoint.constEnd()) {
+            hit.havePoint = true;
+            hit.latitude = point->first;
+            hit.longitude = point->second;
+        }
+        return hit;
+    }
+    const QStringList pieces = full.split(QLatin1Char('/'), Qt::SkipEmptyParts);
     DxccCall best;
     int bestLen = 0;
     for (const QString &piece : pieces) {
@@ -174,7 +213,21 @@ std::optional<DxccCall> dxccForCallsign(const QString &call)
             if (ch.isLetterOrNumber())
                 token.append(ch);
         }
-        const int limit = std::min(4, int(token.size()));
+        if (const auto exact = exactCall.constFind(token); exact != exactCall.constEnd() && token.size() > bestLen) {
+            bestLen = token.size();
+            best.prefix = token;
+            best.country = exact.value();
+            best.havePoint = false;
+            best.latitude = 0;
+            best.longitude = 0;
+            if (const auto point = prefixPoint.constFind(token); point != prefixPoint.constEnd()) {
+                best.havePoint = true;
+                best.latitude = point->first;
+                best.longitude = point->second;
+            }
+            continue;
+        }
+        const int limit = std::min(8, int(token.size()));
         for (int len = limit; len >= 1; --len) {
             const QString prefix = token.left(len);
             if (!prefixCountry.contains(prefix) && !prefixPoint.contains(prefix))
@@ -193,6 +246,25 @@ std::optional<DxccCall> dxccForCallsign(const QString &call)
                 best.longitude = point->second;
             }
             break;
+        }
+    }
+    if (pieces.size() >= 2 && bestLen > 0) {
+        const QString indicator = pieces.last();
+        if (indicator.size() <= 3) {
+            const QString portable = best.prefix + QLatin1Char('/') + indicator;
+            if (const auto found = prefixCountry.constFind(portable); found != prefixCountry.constEnd()) {
+                best.prefix = portable;
+                best.country = found.value();
+                best.havePoint = false;
+                best.latitude = 0;
+                best.longitude = 0;
+                if (const auto point = prefixPoint.constFind(portable); point != prefixPoint.constEnd()) {
+                    best.havePoint = true;
+                    best.latitude = point->first;
+                    best.longitude = point->second;
+                }
+                bestLen = portable.size();
+            }
         }
     }
     if (bestLen == 0)

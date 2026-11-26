@@ -120,8 +120,13 @@ void MainWindow::loadMaps()
              && zipsFile.open(QIODevice::ReadOnly) && zips.load(zipsFile.readAll());
     QFile dxccFile(QStringLiteral(":/data/dxcc.bin"));
     QFile dxccNames(QStringLiteral(":/data/dxcc-names.tsv"));
-    if (dxccFile.open(QIODevice::ReadOnly) && dxccNames.open(QIODevice::ReadOnly))
-        loadDxcc(dxccFile.readAll(), dxccNames.readAll());
+    QFile dxccPrefixes(QStringLiteral(":/data/dxcc-prefixes.tsv"));
+    if (dxccFile.open(QIODevice::ReadOnly) && dxccNames.open(QIODevice::ReadOnly)) {
+        QByteArray prefixes;
+        if (dxccPrefixes.open(QIODevice::ReadOnly))
+            prefixes = dxccPrefixes.readAll();
+        loadDxcc(dxccFile.readAll(), dxccNames.readAll(), prefixes);
+    }
     if (mapsOk)
         globe->setLayers(&low, &high);
 }
