@@ -70,4 +70,5 @@ private:
     WsjtSource *wsjt = nullptr;
     N1mmSource *n1mm = nullptr;
     QString pendingCall;
+    qint64 findNoteUntilMs = 0;
 };

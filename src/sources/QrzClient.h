@@ -25,18 +25,28 @@ public:
     bool configured() const;
     void lookup(const QString &call);
 
+    // The next lookup fails immediately and does not open a socket.
+    static void failNextLookupForTests(bool on);
+
 signals:
     void located(const QString &call, const QString &grid, double latitude, double longitude, bool havePoint);
     void note(const QString &text);
+    void lookupFinished(bool ok);
 
 private:
     void login();
     void fetch(const QString &call);
+    void begin(const QUrl &url);
+    void dropInflight();
+    void fail(const QString &text);
     void finish(QNetworkReply *reply);
 
     QNetworkAccessManager *net = nullptr;
+    class QTimer *limit = nullptr;
+    QNetworkReply *inflight = nullptr;
     QString username;
     QString sessionKey;
     QString pendingCall;
     bool loggingIn = false;
+    bool sessionRetried = false;
 };

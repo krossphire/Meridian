@@ -11,18 +11,15 @@
 
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QTimer>
 #include <QUrlQuery>
 
 namespace {
 
 const QString kEndpoint = QStringLiteral("https://xmldata.qrz.com/xml/current/");
-
-QString safeError(const QString &error, const QString &password)
-{
-    if (!password.isEmpty() && error.contains(password))
-        return QStringLiteral("QRZ login failed.");
-    return error;
-}
+constexpr int kLookupTimeoutMs = 8000;
+bool failNextLookup = false;
 
 } // namespace
 
@@ -45,14 +42,31 @@ bool QrzClient::configured() const
     return !username.isEmpty() && !CredentialStore::load(username).isEmpty();
 }
 
+void QrzClient::failNextLookupForTests(bool on)
+{
+    failNextLookup = on;
+}
+
 void QrzClient::lookup(const QString &call)
 {
     const QString wanted = call.trimmed().toUpper();
-    if (wanted.isEmpty())
+    if (wanted.isEmpty()) {
+        emit lookupFinished(false);
         return;
+    }
     pendingCall = wanted;
-    if (username.isEmpty() || CredentialStore::load(username).isEmpty())
+    sessionRetried = false;
+    if (failNextLookup) {
+        failNextLookup = false;
+        fail(QStringLiteral("QRZ lookup failed"));
         return;
+    }
+    // One keychain read. The request itself stays asynchronous.
+    const QString password = CredentialStore::load(username);
+    if (username.isEmpty() || password.isEmpty()) {
+        fail(QStringLiteral("QRZ login needed"));
+        return;
+    }
     if (sessionKey.isEmpty())
         login();
     else
@@ -64,8 +78,10 @@ void QrzClient::login()
     if (loggingIn)
         return;
     QString password = CredentialStore::load(username);
-    if (username.isEmpty() || password.isEmpty())
+    if (username.isEmpty() || password.isEmpty()) {
+        fail(QStringLiteral("QRZ login needed"));
         return;
+    }
     loggingIn = true;
     QUrlQuery query;
     query.addQueryItem(QStringLiteral("username"), username);
@@ -74,8 +90,7 @@ void QrzClient::login()
     password.clear();
     QUrl url(kEndpoint);
     url.setQuery(query);
-    QNetworkReply *reply = net->get(QNetworkRequest(url));
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() { finish(reply); });
+    begin(url);
 }
 
 void QrzClient::fetch(const QString &call)
@@ -85,27 +100,74 @@ void QrzClient::fetch(const QString &call)
     query.addQueryItem(QStringLiteral("callsign"), call);
     QUrl url(kEndpoint);
     url.setQuery(query);
-    QNetworkReply *reply = net->get(QNetworkRequest(url));
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() { finish(reply); });
+    begin(url);
+}
+
+void QrzClient::begin(const QUrl &url)
+{
+    dropInflight();
+    inflight = net->get(QNetworkRequest(url));
+    if (!limit) {
+        limit = new QTimer(this);
+        limit->setSingleShot(true);
+        connect(limit, &QTimer::timeout, this, [this]() {
+            dropInflight();
+            loggingIn = false;
+            emit note(QStringLiteral("QRZ lookup failed"));
+            emit lookupFinished(false);
+        });
+    }
+    limit->start(kLookupTimeoutMs);
+    connect(inflight, &QNetworkReply::finished, this, [this]() {
+        if (inflight)
+            finish(inflight);
+    });
+}
+
+void QrzClient::dropInflight()
+{
+    if (limit)
+        limit->stop();
+    if (!inflight)
+        return;
+    QNetworkReply *reply = inflight;
+    inflight = nullptr;
+    reply->disconnect(this);
+    reply->abort();
+    reply->deleteLater();
+}
+
+void QrzClient::fail(const QString &text)
+{
+    loggingIn = false;
+    dropInflight();
+    emit note(text);
+    emit lookupFinished(false);
 }
 
 void QrzClient::finish(QNetworkReply *reply)
 {
+    if (reply != inflight)
+        return;
     const bool wasLogin = loggingIn;
     loggingIn = false;
+    inflight = nullptr;
+    if (limit)
+        limit->stop();
     const QByteArray body = reply->readAll();
     const bool transportFailed = reply->error() != QNetworkReply::NoError;
     reply->deleteLater();
     const QrzXml parsed = parseQrzXml(body);
     if (transportFailed || !parsed.error.isEmpty() || (wasLogin && parsed.sessionKey.isEmpty())) {
-        const QString reason = parsed.error.isEmpty() ? QStringLiteral("QRZ didn't answer.") : parsed.error;
-        if (reason.contains(QStringLiteral("Session"), Qt::CaseInsensitive) && !wasLogin) {
+        if (parsed.error.contains(QStringLiteral("Session"), Qt::CaseInsensitive) && !wasLogin && !sessionRetried) {
             sessionKey.clear();
+            sessionRetried = true;
             login();
             return;
         }
         sessionKey.clear();
-        emit note(safeError(reason, CredentialStore::load(username)));
+        emit note(QStringLiteral("QRZ lookup failed"));
+        emit lookupFinished(false);
         return;
     }
     if (wasLogin) {
@@ -117,4 +179,5 @@ void QrzClient::finish(QNetworkReply *reply)
     const bool havePoint = parsed.haveLatitude && parsed.haveLongitude;
     emit located(parsed.call.isEmpty() ? pendingCall : parsed.call, parsed.grid, parsed.latitude, parsed.longitude,
                  havePoint);
+    emit lookupFinished(true);
 }
