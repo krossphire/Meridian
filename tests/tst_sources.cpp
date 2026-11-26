@@ -12,6 +12,10 @@
 #include "sources/WsjtSource.h"
 #include "sources/WsjtStatus.h"
 
+#include <QHostAddress>
+#include <QSignalSpy>
+#include <QUdpSocket>
+
 #include <QDataStream>
 
 #include <QFile>
@@ -26,6 +30,7 @@ private slots:
     void qrzXmlUsesLatLonNotBearing();
     void passwordStaysOutOfIni();
     void wsjtStatusFixture();
+    void wsjtFakeDatagram();
     void n1mmFixtures();
 };
 
@@ -101,7 +106,9 @@ void TestSources::wsjtStatusFixture()
     QVERIFY(!wsjtListenAllowed(2237, QString()));
     QVERIFY(wsjtListenAllowed(2238, QString()));
     QVERIFY(wsjtListenAllowed(2237, QStringLiteral("239.255.0.1")));
+    QVERIFY(wsjtListenAllowed(2237, QStringLiteral("224.0.0.1")));
     QCOMPARE(AppConfig::defaults().wsjtPort, 0);
+    QCOMPARE(AppConfig::defaults().wsjtMulticast, QString());
 
     QByteArray datagram;
     QDataStream stream(&datagram, QIODevice::WriteOnly);
@@ -148,6 +155,53 @@ void TestSources::n1mmFixtures()
 
     const N1mmPacket grid4 = parseN1mmPacket(QByteArray("<lookupinfo><call>K1ABC</call><grid4>FN42</grid4></lookupinfo>"));
     QCOMPARE(grid4.grid, QStringLiteral("FN42"));
+}
+
+QByteArray wsjtStatusDatagram()
+{
+    QByteArray datagram;
+    QDataStream stream(&datagram, QIODevice::WriteOnly);
+    stream.setByteOrder(QDataStream::BigEndian);
+    stream << quint32(0xadbccbda) << quint32(3) << quint32(1);
+    stream << QByteArray("WSJT-X") << quint64(14074000) << QByteArray("FT8");
+    stream << QByteArray("C91RU") << QByteArray("-10") << QByteArray("FT8");
+    stream << true << false << false;
+    stream << quint32(1200) << quint32(1200);
+    stream << QByteArray("K5PO") << QByteArray("EM26") << QByteArray("KG54");
+    return datagram;
+}
+
+void TestSources::wsjtFakeDatagram()
+{
+    QUdpSocket holder;
+    QVERIFY(holder.bind(QHostAddress::AnyIPv4, 0,
+                        QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint));
+    const quint16 port = holder.localPort();
+    holder.close();
+
+    WsjtSource source;
+    QSignalSpy dx(&source, &WsjtSource::dxStation);
+    source.listen(int(port), QString());
+    QUdpSocket sender;
+    QCOMPARE(sender.writeDatagram(wsjtStatusDatagram(), QHostAddress::LocalHost, port), wsjtStatusDatagram().size());
+    QTRY_COMPARE_WITH_TIMEOUT(dx.size(), 1, 2000);
+    QCOMPARE(dx.at(0).at(0).toString(), QStringLiteral("C91RU"));
+    QCOMPARE(dx.at(0).at(1).toString(), QStringLiteral("KG54"));
+
+    QSignalSpy notes(&source, &WsjtSource::note);
+    dx.clear();
+    source.listen(int(port), QStringLiteral("224.0.0.1"));
+    QUdpSocket multi;
+    multi.setSocketOption(QAbstractSocket::MulticastTtlOption, 1);
+    const QByteArray packet = wsjtStatusDatagram();
+    multi.writeDatagram(packet, QHostAddress(QStringLiteral("224.0.0.1")), port);
+    QTRY_COMPARE_WITH_TIMEOUT(dx.size() + notes.size(), 1, 2000);
+    if (dx.size() == 1) {
+        QCOMPARE(dx.at(0).at(0).toString(), QStringLiteral("C91RU"));
+        QCOMPARE(notes.size(), 0);
+    } else {
+        QVERIFY(notes.at(0).at(0).toString().contains(QStringLiteral("multicast")));
+    }
 }
 
 QTEST_MAIN(TestSources)
