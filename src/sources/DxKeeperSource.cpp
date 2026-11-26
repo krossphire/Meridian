@@ -104,9 +104,9 @@ QString DxKeeperSource::requestItem(const wchar_t *name)
                                          nullptr);
     DdeFreeStringHandle(instance, item);
     if (!data) {
-        const UINT err = DdeGetLastError(instance);
-        if (err == DMLERR_NO_CONV || err == DMLERR_SERVER_DIED || err == DMLERR_NOTPROCESSED
-            || err == DMLERR_ADVACKTIMEOUT)
+        // A null reply means the conversation is gone. MinGW's ddeml.h does not
+        // name every DMLERR_* value, so any error reconnects on the next poll.
+        if (DdeGetLastError(instance) != DMLERR_NO_ERROR)
             itemFailed = true;
         return {};
     }
