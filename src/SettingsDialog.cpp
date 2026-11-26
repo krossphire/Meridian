@@ -674,10 +674,11 @@ void SettingsDialog::buildSources()
     layout->addWidget(clear, 0, Qt::AlignLeft);
     auto *wsjt = new QLabel(QStringLiteral(
         "WSJT-X and WSJT-Z send a Status packet with the DX call and grid. "
-        "Meridian does not listen on 2237, so it does not take the port WSJT-X uses itself. "
-        "In QLog, open Settings, Network, WSJT-X, turn on UDP forward, and send it to 127.0.0.1 and the port you type here. "
-        "Or set WSJT-X Reporting to a multicast group such as 239.255.0.1 and the same port, and type that group here. "
-        "Leave the port empty and nothing is bound."));
+        "Leave the port empty and nothing is bound. "
+        "Unicast 2237 belongs to WSJT-X, so Meridian will not take that port by itself. "
+        "WSJT-Z can send to multicast 224.0.0.1 port 2237. Type 224.0.0.1 and 2237 here; QLog joins the same group and keeps its listen port at 2237. "
+        "Meridian only reads those packets and never answers WSJT-Z. "
+        "Or turn on QLog UDP forward to 127.0.0.1 and another port, type that port here, and leave the group blank."));
     wsjt->setWordWrap(true);
     wsjt->setObjectName(QStringLiteral("hint"));
     wsjtPortEdit = new QLineEdit(draft.wsjtPort > 0 ? QString::number(draft.wsjtPort) : QString());
@@ -685,7 +686,7 @@ void SettingsDialog::buildSources()
     wsjtPortEdit->setPlaceholderText(QStringLiteral("QLog forward port"));
     wsjtGroupEdit = new QLineEdit(draft.wsjtMulticast);
     wsjtGroupEdit->setObjectName(QStringLiteral("wsjtMulticast"));
-    wsjtGroupEdit->setPlaceholderText(QStringLiteral("Multicast group, optional"));
+    wsjtGroupEdit->setPlaceholderText(QStringLiteral("224.0.0.1"));
     layout->addSpacing(18);
     layout->addWidget(wsjt);
     layout->addWidget(wsjtPortEdit);
