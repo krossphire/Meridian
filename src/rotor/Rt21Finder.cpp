@@ -11,6 +11,7 @@
 #include "TrafficLog.h"
 
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QElapsedTimer>
 #include <QEventLoop>
 #include <QHostAddress>
@@ -814,6 +815,15 @@ void FindScan::onReady()
 {
     if (!running_ || !port || gotHit)
         return;
+    // The firmware wait was added on top of the old heading probe. A port that
+    // keeps delivering bytes can starve the timeout, so the deadline is also
+    // checked here. The version query is not flushed: flush() blocks until the
+    // port accepts every byte, and a virtual COM port can sit there forever.
+    if (awaitingFirmware && firmwareAskedMs > 0
+        && QDateTime::currentMSecsSinceEpoch() - firmwareAskedMs >= std::max<qint64>(1, request.serialTimeoutMs)) {
+        onTimeout();
+        return;
+    }
     const QByteArray chunk = port->readAll();
     rx.append(chunk);
     framer.append(chunk);
@@ -833,10 +843,10 @@ void FindScan::onReady()
                 hit.label = foundRotorLabel(step.name, shown, step.baud, *heading);
                 pendingHit = hit;
                 awaitingFirmware = true;
+                firmwareAskedMs = QDateTime::currentMSecsSinceEpoch();
                 const QByteArray version = Rt21::queryVersion();
                 TrafficLog::instance().recordSession("FIND-TX", version);
                 port->write(version);
-                port->flush();
                 timer->start(std::max(1, request.serialTimeoutMs));
                 return;
             }
@@ -870,6 +880,7 @@ void FindScan::onTimeout()
             "FIND", awaitingFirmware ? QByteArray("no firmware ") + where : QByteArray("no reply ") + where);
     }
     awaitingFirmware = false;
+    firmwareAskedMs = 0;
     ++stepIndex;
     destroyPort();
     QTimer::singleShot(0, this, &FindScan::afterPortClosed);
