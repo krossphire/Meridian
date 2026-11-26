@@ -164,6 +164,7 @@ private:
     bool cancelled_ = false;
     bool gotHit = false;
     bool awaitingFirmware = false;
+    qint64 firmwareAskedMs = 0;
     FoundRotor pendingHit;
     class QSerialPort *port = nullptr;
     class QTimer *timer = nullptr;
