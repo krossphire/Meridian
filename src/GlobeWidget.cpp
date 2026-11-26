@@ -1292,6 +1292,33 @@ void GlobeWidget::paintScene(QPainter &painter)
     }
 
     if (lod >= 1 && !dxccEntities().isEmpty()) {
+        if (dxccPaths.size() != dxccEntities().size() || std::abs(dxccCacheLat - homeLat_) > 1e-8
+            || std::abs(dxccCacheLon - homeLon_) > 1e-8) {
+            dxccPaths.clear();
+            dxccCacheLat = homeLat_;
+            dxccCacheLon = homeLon_;
+            dxccPaths.reserve(dxccEntities().size());
+            for (const DxccEntity &entity : dxccEntities()) {
+                QPainterPath path;
+                path.setFillRule(Qt::OddEvenFill);
+                for (const GeoRing &ring : entity.rings) {
+                    bool started = false;
+                    for (const GeoPt &pt : ring.pts) {
+                        const UnitPoint at = projectAzimuthal(homeLat_, homeLon_, pt.lat, pt.lon);
+                        if (at.rho > 1.0) {
+                            started = false;
+                            continue;
+                        }
+                        if (!started)
+                            path.moveTo(at.x, at.y);
+                        else
+                            path.lineTo(at.x, at.y);
+                        started = true;
+                    }
+                }
+                dxccPaths.append(path);
+            }
+        }
         painter.save();
         painter.setClipPath(discClip);
         QTransform transform;
@@ -1300,26 +1327,8 @@ void GlobeWidget::paintScene(QPainter &painter)
         painter.setTransform(transform);
         painter.setBrush(Qt::NoBrush);
         painter.setPen(QPen(kBorder, 0));
-        for (const DxccEntity &entity : dxccEntities()) {
-            QPainterPath path;
-            path.setFillRule(Qt::OddEvenFill);
-            for (const GeoRing &ring : entity.rings) {
-                bool started = false;
-                for (const GeoPt &pt : ring.pts) {
-                    const UnitPoint at = projectAzimuthal(homeLat_, homeLon_, pt.lat, pt.lon);
-                    if (at.rho > 1.0) {
-                        started = false;
-                        continue;
-                    }
-                    if (!started)
-                        path.moveTo(at.x, at.y);
-                    else
-                        path.lineTo(at.x, at.y);
-                    started = true;
-                }
-            }
+        for (const QPainterPath &path : dxccPaths)
             painter.drawPath(path);
-        }
         painter.restore();
     }
 

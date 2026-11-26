@@ -12,7 +12,10 @@
 #include "SettingsDialog.h"
 #include "core/Coordinates.h"
 #include "map/Dxcc.h"
+#include "core/Bearing.h"
 #include "core/Gridsquare.h"
+
+#include <cmath>
 #include "rotor/Reconnect.h"
 #include "rotor/Rt21Driver.h"
 #include "rotor/TrafficLog.h"
@@ -210,12 +213,22 @@ void MainWindow::refreshQlog()
                         offerStation(call, grid);
                         return;
                     }
-                    if (!grid.isEmpty())
-                        offerStation(call, grid);
-                    else if (haveAzimuth)
-                        globe->setBeamOffer(call, azimuth);
-                    else
+                    // The grid is Meridian's bearing from the saved home.
+                    // QLog's azimuth is used only when that grid is missing.
+                    const QString usable = Gridsquare::normalize(grid);
+                    if (!usable.isEmpty()) {
+                        offerStation(call, usable);
+                    } else if (haveAzimuth && std::isfinite(azimuth)) {
+                        pendingCall = call.trimmed().toUpper();
+                        pendingGrid.clear();
+                        pendingLat = 0;
+                        pendingLon = 0;
+                        pendingPoint = false;
+                        pendingActive = true;
+                        globe->setBeamOffer(pendingCall, clampRt21Azimuth(azimuth));
+                    } else {
                         offerStation(call, QString());
+                    }
                 });
     }
     qlog->listen(config.qlogPort);

@@ -43,14 +43,16 @@ QrzClient::QrzClient(QObject *parent)
 void QrzClient::setUsername(const QString &name)
 {
     const QString next = name.trimmed();
-    if (next.compare(username, Qt::CaseInsensitive) != 0)
+    if (next.compare(username, Qt::CaseInsensitive) != 0) {
         sessionKey.clear();
+        noPassword = false;
+    }
     username = next;
 }
 
 bool QrzClient::configured() const
 {
-    return !username.isEmpty() && !CredentialStore::load(username).isEmpty();
+    return !username.isEmpty() && !noPassword;
 }
 
 void QrzClient::failNextLookupForTests(bool on)
@@ -102,12 +104,11 @@ void QrzClient::lookup(const QString &call)
         fail(QStringLiteral("QRZ lookup failed"));
         return;
     }
-    // One keychain read. The request itself stays asynchronous.
-    const QString password = CredentialStore::load(username);
-    if (username.isEmpty() || password.isEmpty()) {
+    if (username.isEmpty()) {
         fail(QStringLiteral("QRZ login needed"));
         return;
     }
+    // The keychain is read in login(), once, when a session is needed.
     if (sessionKey.isEmpty())
         login();
     else
@@ -130,9 +131,11 @@ void QrzClient::login()
         return;
     QString password = CredentialStore::load(username);
     if (username.isEmpty() || password.isEmpty()) {
+        noPassword = password.isEmpty();
         fail(QStringLiteral("QRZ login needed"));
         return;
     }
+    noPassword = false;
     loggingIn = true;
     QUrlQuery query;
     query.addQueryItem(QStringLiteral("username"), username);

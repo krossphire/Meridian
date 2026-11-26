@@ -65,6 +65,9 @@ jobs:
             "xray","yankee","zulu"
           )
           $label = "${{ github.event.inputs.test_label }}".Trim().ToLower()
+          # This review build is charlie. Clear the pin after the artifact exists
+          # so the next push takes the next unused NATO word.
+          if (-not $label) { $label = "charlie" }
           if (-not $label) {
             if ([string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
               throw "No test_label was given, and the workflow token is missing, so the next NATO word cannot be chosen."

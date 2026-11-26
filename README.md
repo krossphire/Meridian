@@ -24,7 +24,7 @@ Logs and setup backups use that same folder: `logs/` and `backups/`.
 
 ## First run
 
-The home location starts at grid **EM26**. No host, COM port, or TCP port is filled in. The status line says **Set up your RT-21 in settings**.
+The home field starts as grid **EM26**, and the page says that is the default: the center of that square. Bearings use the saved home. A 6-character grid, or latitude and longitude, is what a nearby station needs. When both latitude and longitude are filled in, those degrees are used and the 6-character square is only a label. No host, COM port, or TCP port is filled in. The status line says **Set up your RT-21 in settings**.
 
 **Find RT-21** checks USB and COM ports first, in numeric order (COM1, COM2, COM10), at 4800 and then 9600. It stops at the first port that answers. If none do, it scans the computer's local network. A hit is a button. The address is saved when that button is clicked. If a saved IP connection is down, Find saves the hit it confirmed and connects. If nothing answers, the line says **No RT-21 found.**
 
@@ -99,7 +99,7 @@ Ubuntu packages: `qt6-base-dev`, `qt6-serialport-dev`, `qt6-svg-dev`, `cmake`, `
 
 On Windows, install Qt 6 with MinGW or MSVC and add its `bin` directory to `PATH` before configuring. On macOS, the Qt online installer or `brew install qt` both work. Pass `-DCMAKE_PREFIX_PATH` to the Qt prefix if CMake does not find it. macOS builds, and it has not been tried on a Mac. The release workflow does not package it.
 
-Linux is what the tests run on. A tag `v*` (for example `v1.0.0`) builds a draft GitHub release whose asset is `Meridian-1.0.0-win64.zip`, plus a SHA-256 file for that zip. The release stays a draft until it is published by hand. The zip is `meridian.exe`, `meridian-mock.exe`, and the Qt files `windeployqt` copies. It does not contain `meridian.ini`.
+Tests run on Linux, and the Windows CI job runs the same suite with `QT_QPA_PLATFORM=offscreen`. A tag `v*` (for example `v1.0.0`) builds a draft GitHub release whose asset is `Meridian-1.0.0-win64.zip`, plus a SHA-256 file for that zip. The release stays a draft until it is published by hand. The zip is `meridian.exe`, `meridian-mock.exe`, and the Qt files `windeployqt` copies. It does not contain `meridian.ini`.
 
 `meridian-mock` is a stand-in controller for tests and for trying the window with no hardware. Its `--tcp` option defaults to port 6555. That is the mock's listen port, not a port Meridian fills in for a real rotor. `meridian --mock` starts the mock and points the session at it without rewriting saved settings.
 

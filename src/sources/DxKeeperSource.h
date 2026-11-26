@@ -16,6 +16,9 @@
 #include <QObject>
 #include <QString>
 
+class QThread;
+class QTimer;
+
 enum class DxKeeperAction { None, Offer, Clear };
 
 struct DxKeeperReading {
@@ -26,8 +29,6 @@ struct DxKeeperReading {
 
 DxKeeperReading interpretDxKeeper(const QString &previousCall, const QString &previousGrid, const QString &call,
                              const QString &grid);
-
-class QTimer;
 
 class DxKeeperSource : public QObject
 {
@@ -47,10 +48,12 @@ private:
     void disconnectServer();
 
     QTimer *timer = nullptr;
+    QThread *worker = nullptr;
     QString lastCall;
     QString lastGrid;
     bool enabled = false;
     bool connected = false;
+    bool itemFailed = false;
 #if defined(Q_OS_WIN)
     unsigned long instance = 0;
     void *conversation = nullptr;

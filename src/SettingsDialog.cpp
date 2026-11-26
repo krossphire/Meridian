@@ -821,9 +821,10 @@ void SettingsDialog::buildSources()
     auto *qlog = new QLabel(QStringLiteral(
         "QLog does not send the callsign under the cursor yet. "
         "contrib/qlog-currentcontact/ is a draft patch that adds a UDP notification, msgtype currentcontact, "
-        "with the callsign, grid, and short-path azimuth, when the New Contact callsign or grid changes. "
+        "with the callsign, grid, and QLog's own short-path azimuth, when the New Contact callsign or grid changes. "
         "Point that notification at 127.0.0.1 and the port you type here. The port stays empty until you do. "
-        "Meridian turns from your home when the message includes a grid."));
+        "When the message has a grid, Meridian computes the bearing from your home and ignores QLog's azimuth. "
+        "QLog's azimuth is used only when the grid is missing."));
     qlog->setWordWrap(true);
     qlog->setObjectName(QStringLiteral("hint"));
     qlogPortEdit = new QLineEdit(draft.qlogPort > 0 ? QString::number(draft.qlogPort) : QString());

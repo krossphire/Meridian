@@ -54,6 +54,7 @@ private:
     QString pendingCall;
     bool loggingIn = false;
     bool sessionRetried = false;
+    bool noPassword = false;
     bool scripted = false;
     bool scriptPoint = false;
     double scriptLat = 0;

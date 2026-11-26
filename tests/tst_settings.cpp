@@ -64,6 +64,7 @@ private slots:
     void findButtonDismisses();
     void longWayAroundKeepsTheBeam();
     void passiveLookupStaysQuiet();
+    void qlogGridBeatsAzimuth();
 #ifdef Q_OS_UNIX
     void liveSerialFindStopsAndResumesAfterTheProbe();
     void networkConnectionDefaultsOffAndBlocksTheModule();
@@ -1148,6 +1149,37 @@ void TestSettings::passiveLookupStaysQuiet()
     QrzClient::holdScriptedLookupForTests(false);
     CredentialStore::forget(QStringLiteral("K5PO"));
     CredentialStore::useMemoryForTests(false);
+}
+
+void TestSettings::qlogGridBeatsAzimuth()
+{
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+    AppConfig config = AppConfig::defaults();
+    config.homeText = QStringLiteral("EM26");
+    config.qlogPort = 23923;
+    MainWindow window(config, nullptr);
+    window.resize(900, 900);
+    window.show();
+    auto *globe = window.globeWidget();
+    QUdpSocket sender;
+    const QByteArray both = QByteArray(
+        R"({"msgtype":"currentcontact","data":{"callsign":"C91RU","grid":"KG54","azimuth":1.0}})");
+    QVERIFY(sender.writeDatagram(both, QHostAddress::LocalHost, 23923) > 0);
+    auto *beam = globe->findChild<QAbstractButton *>(QStringLiteral("beamButton"));
+    QTRY_VERIFY_WITH_TIMEOUT(beam && beam->isVisible() && beam->text().contains(QStringLiteral("92.4")), 2000);
+    QVERIFY(!beam->text().contains(QStringLiteral("1.0")));
+
+    const QByteArray onlyAzimuth = QByteArray(
+        R"({"msgtype":"currentcontact","data":{"callsign":"C91RU","grid":"","azimuth":45.0}})");
+    QVERIFY(sender.writeDatagram(onlyAzimuth, QHostAddress::LocalHost, 23923) > 0);
+    QTRY_VERIFY_WITH_TIMEOUT(beam->text().contains(QStringLiteral("45.0")), 2000);
+
+    const QByteArray bad = QByteArray(
+        R"({"msgtype":"currentcontact","data":{"callsign":"C91RU","grid":"nope","azimuth":9999}})");
+    QVERIFY(sender.writeDatagram(bad, QHostAddress::LocalHost, 23923) > 0);
+    QTRY_VERIFY_WITH_TIMEOUT(beam->text().contains(QStringLiteral("279.0")), 2000);
 }
 
 QTEST_MAIN(TestSettings)

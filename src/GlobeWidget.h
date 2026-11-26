@@ -16,6 +16,8 @@
 
 #include <QDateTime>
 #include <QImage>
+#include <QPainterPath>
+#include <QVector>
 #include <QWidget>
 
 #include <memory>
@@ -137,6 +139,9 @@ private:
     quint64 requestGen = 0;
     std::shared_ptr<const ProjectedLayer> lowProjected;
     std::shared_ptr<const ProjectedLayer> highProjected;
+    double dxccCacheLat = 999;
+    double dxccCacheLon = 999;
+    QVector<QPainterPath> dxccPaths;
 
     QThread *thread = nullptr;
     class GlobeMapWorker *worker = nullptr;
