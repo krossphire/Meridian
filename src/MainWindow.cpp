@@ -270,7 +270,32 @@ void MainWindow::offerStation(const QString &call, const QString &grid, double l
     double lon = longitude;
     if (!havePoint) {
         if (grid.isEmpty() || !Gridsquare::toLatLon(grid, lat, lon)) {
-            globe->clearBeamOffer();
+            bool local = false;
+            if (const auto place = dxccForCallsign(pendingCall)) {
+                if (place->havePoint) {
+                    lat = place->latitude;
+                    lon = place->longitude;
+                    local = true;
+                } else {
+                    for (const GeoCountry &country : high.countries) {
+                        if (country.name.compare(place->country, Qt::CaseInsensitive) != 0)
+                            continue;
+                        lat = country.labelLat;
+                        lon = country.labelLon;
+                        local = true;
+                        break;
+                    }
+                }
+            }
+            if (local) {
+                double bearing = 0;
+                if (Gridsquare::bearingTo(globe->homeLat(), globe->homeLon(), lat, lon, bearing))
+                    globe->setBeamOffer(pendingCall, bearing);
+                else
+                    local = false;
+            }
+            if (!local)
+                globe->clearBeamOffer();
             if (allowLookup && grid.isEmpty() && qrz) {
                 globe->setFindBusy(true);
                 qrz->lookup(pendingCall);

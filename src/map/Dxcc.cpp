@@ -7,14 +7,18 @@
 #include "Dxcc.h"
 
 #include <QHash>
+#include <QStringList>
 
 #include <cstring>
 #include <algorithm>
+#include <optional>
 
 namespace {
 
 QVector<DxccEntity> entities;
 QHash<QString, DxccLabel> byName;
+QHash<QString, QString> prefixCountry;
+QHash<QString, QPair<float, float>> prefixPoint;
 
 bool readU32(const uchar *&p, const uchar *end, quint32 &value)
 {
@@ -59,6 +63,8 @@ bool loadDxcc(const QByteArray &outlines, const QByteArray &names)
 {
     entities.clear();
     byName.clear();
+    prefixCountry.clear();
+    prefixPoint.clear();
     const QString text = QString::fromUtf8(names);
     const QStringList lines = text.split(QLatin1Char('\n'));
     for (const QString &line : lines) {
@@ -68,6 +74,9 @@ bool loadDxcc(const QByteArray &outlines, const QByteArray &names)
         if (parts.size() < 3)
             continue;
         byName.insert(parts.at(0), DxccLabel{parts.at(1), parts.at(2)});
+        const QString prefix = parts.at(2).trimmed().toUpper();
+        if (!prefix.isEmpty())
+            prefixCountry.insert(prefix, parts.at(0));
     }
     if (!outlines.startsWith("MRDX001"))
         return !byName.isEmpty();
@@ -113,8 +122,14 @@ bool loadDxcc(const QByteArray &outlines, const QByteArray &names)
             if (ring.pts.size() >= 3)
                 entity.rings.append(std::move(ring));
         }
-        if (!entity.rings.isEmpty())
+        if (!entity.rings.isEmpty()) {
+            if (!entity.prefix.isEmpty()) {
+                prefixPoint.insert(entity.prefix.toUpper(),
+                                   qMakePair((entity.minLat + entity.maxLat) / 2.f,
+                                             (entity.minLon + entity.maxLon) / 2.f));
+            }
             entities.append(std::move(entity));
+        }
     }
     return true;
 }
@@ -146,4 +161,38 @@ DxccLabel dxccForCountry(const QString &naturalEarthName)
     if (found == byName.constEnd())
         return {};
     return found.value();
+}
+
+std::optional<DxccCall> dxccForCallsign(const QString &call)
+{
+    const QStringList pieces = call.toUpper().split(QLatin1Char('/'), Qt::SkipEmptyParts);
+    DxccCall best;
+    int bestLen = 0;
+    for (const QString &piece : pieces) {
+        QString token;
+        for (const QChar ch : piece) {
+            if (ch.isLetterOrNumber())
+                token.append(ch);
+        }
+        const int limit = std::min(4, int(token.size()));
+        for (int len = limit; len >= 1; --len) {
+            const QString prefix = token.left(len);
+            if (!prefixCountry.contains(prefix) && !prefixPoint.contains(prefix))
+                continue;
+            if (len <= bestLen)
+                break;
+            bestLen = len;
+            best.prefix = prefix;
+            best.country = prefixCountry.value(prefix);
+            if (const auto point = prefixPoint.constFind(prefix); point != prefixPoint.constEnd()) {
+                best.havePoint = true;
+                best.latitude = point->first;
+                best.longitude = point->second;
+            }
+            break;
+        }
+    }
+    if (bestLen == 0)
+        return std::nullopt;
+    return best;
 }

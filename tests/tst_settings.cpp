@@ -18,6 +18,7 @@
 #include "sources/QrzClient.h"
 
 #include "GlobeWidget.h"
+#include "map/Dxcc.h"
 #include "StatusTone.h"
 #include "StatusTone.h"
 
@@ -806,6 +807,12 @@ void TestSettings::findReturnsToIdleWhenLookupFails()
     config.qrzUsername = QStringLiteral("K5PO");
     CredentialStore::store(QStringLiteral("K5PO"), QStringLiteral("s3cret-not-for-ini"));
 
+    QFile dxccNames(QString::fromLatin1(MERIDIAN_DATA_DIR) + QStringLiteral("/dxcc-names.tsv"));
+    QFile dxccBin(QString::fromLatin1(MERIDIAN_DATA_DIR) + QStringLiteral("/dxcc.bin"));
+    QVERIFY(dxccNames.open(QIODevice::ReadOnly));
+    QVERIFY(dxccBin.open(QIODevice::ReadOnly));
+    QVERIFY(loadDxcc(dxccBin.readAll(), dxccNames.readAll()));
+
     MainWindow window(config, nullptr);
     window.resize(900, 900);
     window.show();
@@ -819,7 +826,7 @@ void TestSettings::findReturnsToIdleWhenLookupFails()
     QVERIFY(find->isVisible());
     QCOMPARE(find->text(), QStringLiteral("Find >"));
     QVERIFY(find->isEnabled());
-    edit->setText(QStringLiteral("C91RU"));
+    edit->setText(QStringLiteral("KL7AA"));
     QTest::mouseClick(find, Qt::LeftButton);
 
     QCOMPARE(find->text(), QStringLiteral("Find >"));
@@ -827,13 +834,18 @@ void TestSettings::findReturnsToIdleWhenLookupFails()
     QCOMPARE(globe->statusText(), QStringLiteral("QRZ lookup failed"));
     QCOMPARE(globe->statusToneValue(), StatusTone::Busy);
     QCOMPARE(turns.size(), 0);
+    auto *beam = globe->findChild<QAbstractButton *>(QStringLiteral("beamButton"));
+    QVERIFY(beam);
+    QVERIFY(beam->isVisible());
+    QVERIFY(beam->text().startsWith(QStringLiteral("Beam toward:")));
+    QVERIFY(beam->text().contains(QStringLiteral("KL7AA")));
     QVERIFY(!window.driver() || window.driver()->link() == Rt21Driver::Link::Off);
     QVERIFY(!window.driver() || !window.driver()->target());
 
     QrzClient::failNextLookupForTests(false);
     CredentialStore::forget(QStringLiteral("K5PO"));
     globe->revealCallsign();
-    edit->setText(QStringLiteral("C91RU"));
+    edit->setText(QStringLiteral("KL7AA"));
     find = globe->findChild<QAbstractButton *>(QStringLiteral("findCall"));
     QTest::mouseClick(find, Qt::LeftButton);
     QCOMPARE(find->text(), QStringLiteral("Find >"));
