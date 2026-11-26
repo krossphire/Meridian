@@ -14,6 +14,7 @@
 #include "map/DayNight.h"
 
 #include <QAbstractButton>
+#include <QPushButton>
 #include <QComboBox>
 #include <QEnterEvent>
 #include <QFontDatabase>
@@ -551,6 +552,20 @@ GlobeWidget::GlobeWidget(QWidget *parent)
         "QLineEdit#callsignEdit { background: rgba(18,23,28,230); color: #f4f6f4;"
         " border: 1px solid rgba(255,191,0,120); border-radius: 8px; padding: 1px 8px; font-size: 12px; }"));
     connect(callEdit, &QLineEdit::returnPressed, this, [this]() { submitCallsign(); });
+    auto *find = new QPushButton(QStringLiteral("Find >"), this);
+    findCall = find;
+    find->setObjectName(QStringLiteral("findCall"));
+    find->setCursor(Qt::PointingHandCursor);
+    find->setFocusPolicy(Qt::NoFocus);
+    find->setStyleSheet(QStringLiteral(
+        "QPushButton#findCall { background: rgba(18,23,28,230); color: #f4f6f4;"
+        " border: none; border-radius: 8px; padding: 2px 8px; font-size: 12px; }"
+        "QPushButton#findCall:disabled { color: #e0b15c; }"));
+    find->hide();
+    connect(find, &QPushButton::clicked, this, [this]() {
+        if (!findBusy)
+            submitCallsign();
+    });
     for (int i = 0; i < kCompassCount; ++i) {
         const QString label = QString::fromLatin1(compassLabel(i));
         auto *pill = new CompassPill(label, this);
@@ -836,6 +851,16 @@ void GlobeWidget::revealCallsign(const QString &seed)
         callEdit->setCursorPosition(callEdit->text().size());
 }
 
+void GlobeWidget::setFindBusy(bool busy)
+{
+    findBusy = busy;
+    if (!findCall)
+        return;
+    findCall->setEnabled(!busy);
+    findCall->setText(busy ? QStringLiteral("Finding…") : QStringLiteral("Find >"));
+    placeCallsign();
+}
+
 void GlobeWidget::placeCallsign()
 {
     if (!callButton)
@@ -843,7 +868,7 @@ void GlobeWidget::placeCallsign()
     const bool room = std::min(width(), height()) >= 280;
     const bool editing = callEdit && callEdit->isVisible();
     const bool near = callHover;
-    callButton->setVisible(room && (editing || near));
+    callButton->setVisible(room && (editing || near) && !findBusy);
     if (!room) {
         if (callEdit)
             callEdit->hide();
@@ -874,11 +899,24 @@ void GlobeWidget::placeCallsign()
         editY = std::max(6, callButton->y() - 2);
     callEdit->setGeometry(editX, editY, editW, 24);
     callEdit->raise();
+    if (!findCall)
+        return;
+    const bool showFind = room && (editing || findBusy);
+    findCall->setVisible(showFind);
+    if (!showFind)
+        return;
+    const int findW = findCall->sizeHint().width();
+    int findX = editing ? callEdit->x() + editW + 6 : 10;
+    int findY = editing ? callEdit->y() : 10;
+    if (overlaps(findX, findY, findW, 24))
+        findY = std::max(6, findY - 4);
+    findCall->setGeometry(findX, findY, findW, 24);
+    findCall->raise();
 }
 
 void GlobeWidget::submitCallsign()
 {
-    if (!callEdit)
+    if (findBusy || !callEdit)
         return;
     const QString text = callEdit->text().trimmed().toUpper();
     callEdit->hide();
