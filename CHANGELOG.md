@@ -12,7 +12,17 @@ Settings are stored in `meridian.ini` next to the program. The Windows zip does 
 
 ### Test builds
 
-Windows test downloads are named `Meridian-1.0.0-<nato>-<shortsha>-win64`, starting at alpha. Each download is one zip whose top folder holds `meridian.exe` and the Qt DLLs. There is no zip inside the zip, and no `meridian.ini`. The version stays 1.0.0. There is no tag and no release. The letter advances on its own: after delta, the next push is echo.
+Windows test downloads through delta were named `Meridian-1.0.0-<nato>-<shortsha>-win64`. Each download is one zip whose top folder holds `meridian.exe` and the Qt DLLs. There is no zip inside the zip, and no `meridian.ini`.
+
+## 1.1.0
+
+The window title and the About box read 1.1.0.
+
+Callsign DXCC lookup uses the Big CTY prefix file, vendored as `third_party/cty/cty.dat` and loaded from `data/dxcc-prefixes.tsv`. That covers ordinary prefixes, exact-call overrides, and a short portable indicator. K5PO is the United States, KH6 is Hawaii, KL7 is Alaska, KP4 is Puerto Rico, VP8 is the Falkland Islands, and VP8/G is South Georgia. An exact call such as K6KO stays with its override.
+
+A saved latitude and longitude in `meridian.ini` round-trips and is used as degrees. A 4-character home grid is the center of that square. The same offline tests cover the `AP1` point-and-shoot string and a WSJT-X status datagram.
+
+The Windows test download is one zip named `Meridian-1.1.0-<sha>-win64`. The top folder holds `meridian.exe` and the Qt DLLs. There is no zip inside the zip, and no `meridian.ini`. There is no tag and no release.
 
 Setup reads the controller. On firmware 4.13.2, each Write button stores that one setting. Firmware 4.14 stays locked: on 4.14.g1 the screen saver and register writes hang serial until a power cycle. The network module can be read over USB or serial. The gateway can be written after that read. Other network settings stay read-only.
 
