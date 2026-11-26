@@ -185,6 +185,19 @@ void TestCore::gridBearing()
     QVERIFY(Gridsquare::bearingTo(QStringLiteral("EM26"), QStringLiteral("KG54"), bearing));
     QCOMPARE(QString::number(bearing, 'f', 1), QStringLiteral("92.4"));
     QVERIFY(!Gridsquare::bearingTo(QStringLiteral("EM26"), QStringLiteral("nope"), bearing));
+
+    // 6-character home near Bella Vista. Subsquares are centered, not cornered.
+    double lat = 0;
+    double lon = 0;
+    QVERIFY(Gridsquare::toLatLon(QStringLiteral("EM26ul"), lat, lon));
+    QCOMPARE(lat, 36.47916666666667);
+    QCOMPARE(lon, -94.29166666666667);
+    QVERIFY(Gridsquare::bearingTo(QStringLiteral("EM26ul"), QStringLiteral("EM26vm"), bearing));
+    QCOMPARE(QString::number(bearing, 'f', 1), QStringLiteral("58.1"));
+    QVERIFY(Gridsquare::bearingTo(QStringLiteral("EM26ul"), QStringLiteral("EM26uk"), bearing));
+    QCOMPARE(QString::number(bearing, 'f', 1), QStringLiteral("180.0"));
+    QVERIFY(Gridsquare::bearingTo(QStringLiteral("EM26ul"), QStringLiteral("KG54"), bearing));
+    QCOMPARE(QString::number(bearing, 'f', 1), QStringLiteral("92.8"));
     double same = -1;
     QVERIFY(Gridsquare::bearingTo(36.5, -95.0, 36.5, -95.0, same));
     QCOMPARE(same, 0.0);

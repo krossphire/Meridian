@@ -245,41 +245,51 @@ void MainWindow::offerStation(const QString &call, const QString &grid, double l
     double lat = latitude;
     double lon = longitude;
     if (!havePoint) {
-        if (grid.isEmpty() || !Gridsquare::toLatLon(grid, lat, lon)) {
-            bool local = false;
-            if (const auto place = dxccForCallsign(pendingCall)) {
-                if (place->havePoint) {
-                    lat = place->latitude;
-                    lon = place->longitude;
-                    local = true;
-                } else {
-                    for (const GeoCountry &country : high.countries) {
-                        if (country.name.compare(place->country, Qt::CaseInsensitive) != 0)
-                            continue;
-                        lat = country.labelLat;
-                        lon = country.labelLon;
-                        local = true;
-                        break;
-                    }
-                }
-            }
-            if (local) {
-                double bearing = 0;
-                if (Gridsquare::bearingTo(globe->homeLat(), globe->homeLon(), lat, lon, bearing))
-                    globe->setBeamOffer(pendingCall, bearing);
-                else
-                    local = false;
-            }
-            if (!local)
+        const QString fullGrid = Gridsquare::normalize(grid);
+        if (!fullGrid.isEmpty() && Gridsquare::toLatLon(fullGrid, lat, lon)) {
+            const QString note = fullGrid.size() <= 4 ? QStringLiteral("approx. — 4-character grid") : QString();
+            double bearing = 0;
+            if (!Gridsquare::bearingTo(globe->homeLat(), globe->homeLon(), lat, lon, bearing)) {
                 globe->clearBeamOffer();
-            if (allowLookup && grid.isEmpty() && qrz) {
-                globe->setFindBusy(true);
-                qrz->lookup(pendingCall);
-            } else if (globe)
                 globe->setFindBusy(false);
+                return;
+            }
+            globe->setFindBusy(false);
+            globe->setBeamOffer(pendingCall, bearing, note);
             return;
         }
-        havePoint = true;
+        bool local = false;
+        if (const auto place = dxccForCallsign(pendingCall)) {
+            if (place->havePoint) {
+                lat = place->latitude;
+                lon = place->longitude;
+                local = true;
+            } else {
+                for (const GeoCountry &country : high.countries) {
+                    if (country.name.compare(place->country, Qt::CaseInsensitive) != 0)
+                        continue;
+                    lat = country.labelLat;
+                    lon = country.labelLon;
+                    local = true;
+                    break;
+                }
+            }
+        }
+        if (local) {
+            double bearing = 0;
+            if (Gridsquare::bearingTo(globe->homeLat(), globe->homeLon(), lat, lon, bearing))
+                globe->setBeamOffer(pendingCall, bearing, QStringLiteral("approx. — country center"));
+            else
+                local = false;
+        }
+        if (!local)
+            globe->clearBeamOffer();
+        if (allowLookup && grid.isEmpty() && qrz) {
+            globe->setFindBusy(true);
+            qrz->lookup(pendingCall);
+        } else if (globe)
+            globe->setFindBusy(false);
+        return;
     }
     double bearing = 0;
     if (!Gridsquare::bearingTo(globe->homeLat(), globe->homeLon(), lat, lon, bearing)) {

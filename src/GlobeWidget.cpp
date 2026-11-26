@@ -21,6 +21,7 @@
 #include <QFontDatabase>
 #include <QFontMetrics>
 #include <QKeyEvent>
+#include <QLabel>
 #include <QLineEdit>
 #include <QRegularExpression>
 #include <QMouseEvent>
@@ -530,6 +531,11 @@ GlobeWidget::GlobeWidget(QWidget *parent)
     connect(gearButton, &QAbstractButton::clicked, this, [this]() { emit settingsRequested(); });
     auto *beamButton = new BeamButton(this);
     beam = beamButton;
+    beamNote = new QLabel(this);
+    beamNote->setObjectName(QStringLiteral("beamApprox"));
+    beamNote->setStyleSheet(QStringLiteral("color: #8ea099; font-size: 11px; background: transparent;"));
+    beamNote->setAttribute(Qt::WA_TransparentForMouseEvents);
+    beamNote->hide();
     connect(beamButton, &QAbstractButton::clicked, this, [this, beamButton]() {
         // Green is a status. A second click does not send another goto.
         if (beamButton->isBeaming())
@@ -765,13 +771,15 @@ void GlobeWidget::setLoggerBeamEnabled(bool on)
     update();
 }
 
-void GlobeWidget::setBeamOffer(const QString &call, double azimuth)
+void GlobeWidget::setBeamOffer(const QString &call, double azimuth, const QString &approxNote)
 {
     beamGap = -1;
     beamCall = call.trimmed().toUpper();
     beamAzimuth = azimuth;
     if (auto *button = static_cast<BeamButton *>(beam))
         button->setOffer(beamCall, beamAzimuth);
+    if (beamNote)
+        beamNote->setText(approxNote);
     placeBeam();
     update();
 }
@@ -809,6 +817,8 @@ void GlobeWidget::placeBeam()
     const bool show = loggerBeam && !beamCall.isEmpty() && width() >= 420;
     if (!show) {
         button->hide();
+        if (beamNote)
+            beamNote->hide();
         return;
     }
     const QSize hint = button->sizeHint();
@@ -830,11 +840,26 @@ void GlobeWidget::placeBeam()
     }
     if (overlaps(x, y) || x < 8 || y < 4) {
         button->hide();
+        if (beamNote)
+            beamNote->hide();
         return;
     }
     button->setGeometry(x, y, hint.width(), hint.height());
     button->show();
     button->raise();
+    if (!beamNote)
+        return;
+    if (beamNote->text().isEmpty()) {
+        beamNote->hide();
+        return;
+    }
+    beamNote->adjustSize();
+    const int noteW = std::max(beamNote->width(), hint.width());
+    int noteX = x + hint.width() - noteW;
+    if (noteX < 8)
+        noteX = 8;
+    beamNote->setGeometry(noteX, y + hint.height() + 2, noteW, beamNote->height());
+    beamNote->show();
 }
 
 void GlobeWidget::revealCallsign(const QString &seed)

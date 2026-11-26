@@ -27,6 +27,11 @@ public:
 
     // The next lookup fails immediately and does not open a socket.
     static void failNextLookupForTests(bool on);
+    // The next lookup reports this fix and does not open a socket.
+    // While held, the result waits for releaseScriptedLookupForTests().
+    static void scriptNextLookupForTests(double latitude, double longitude, const QString &grid, bool havePoint);
+    static void holdScriptedLookupForTests(bool on);
+    static void releaseScriptedLookupForTests();
 
 signals:
     void located(const QString &call, const QString &grid, double latitude, double longitude, bool havePoint);
@@ -49,4 +54,10 @@ private:
     QString pendingCall;
     bool loggingIn = false;
     bool sessionRetried = false;
+    bool scripted = false;
+    bool scriptPoint = false;
+    double scriptLat = 0;
+    double scriptLon = 0;
+    QString scriptGrid;
+    void deliverScripted();
 };
