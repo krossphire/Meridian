@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * Azimuthal equidistant globe. Coastlines and borders are Natural Earth
- * vectors projected once per home location (off the UI thread) and stroked
+ * vectors, and the DXCC split-entity outlines, projected once per home
+ * location (off the UI thread) and stroked
  * at device resolution. Heading, beam, and hover stay live on top of that cache.
  */
 
@@ -139,9 +140,7 @@ private:
     quint64 requestGen = 0;
     std::shared_ptr<const ProjectedLayer> lowProjected;
     std::shared_ptr<const ProjectedLayer> highProjected;
-    double dxccCacheLat = 999;
-    double dxccCacheLon = 999;
-    QVector<QPainterPath> dxccPaths;
+    std::shared_ptr<const QVector<QPainterPath>> dxccReady;
 
     QThread *thread = nullptr;
     class GlobeMapWorker *worker = nullptr;

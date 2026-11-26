@@ -69,9 +69,38 @@ struct Published {
     quint64 gen = 0;
     std::shared_ptr<ProjectedLayer> low;
     std::shared_ptr<ProjectedLayer> high;
+    std::shared_ptr<const QVector<QPainterPath>> dxcc;
     double lat = 999;
     double lon = 999;
 };
+
+QVector<QPainterPath> projectDxccOutlines(double lat, double lon)
+{
+    const QVector<DxccEntity> &entities = dxccEntities();
+    QVector<QPainterPath> paths;
+    paths.reserve(entities.size());
+    for (const DxccEntity &entity : entities) {
+        QPainterPath path;
+        path.setFillRule(Qt::OddEvenFill);
+        for (const GeoRing &ring : entity.rings) {
+            bool started = false;
+            for (const GeoPt &pt : ring.pts) {
+                const UnitPoint at = projectAzimuthal(lat, lon, pt.lat, pt.lon);
+                if (at.rho > 1.0) {
+                    started = false;
+                    continue;
+                }
+                if (!started)
+                    path.moveTo(at.x, at.y);
+                else
+                    path.lineTo(at.x, at.y);
+                started = true;
+            }
+        }
+        paths.append(path);
+    }
+    return paths;
+}
 
 class GearButton : public QAbstractButton
 {
@@ -488,6 +517,13 @@ public slots:
             projectedLat = lat;
             projectedLon = lon;
         }
+        const int dxccCount = dxccEntities().size();
+        if (!dxccProjected || dxccProjected->size() != dxccCount || std::abs(dxccLat - lat) > 1e-7
+            || std::abs(dxccLon - lon) > 1e-7) {
+            dxccProjected = std::make_shared<const QVector<QPainterPath>>(projectDxccOutlines(lat, lon));
+            dxccLat = lat;
+            dxccLon = lon;
+        }
         const ProjectedLayer &layer = lod == 0 ? projected->first : projected->second;
         MapFrames frames = renderProjected(layer, size, dpr, lod);
         {
@@ -501,8 +537,11 @@ public slots:
             if (!box->low || std::abs(box->lat - lat) > 1e-7 || std::abs(box->lon - lon) > 1e-7) {
                 box->low = std::make_shared<ProjectedLayer>(projected->first);
                 box->high = std::make_shared<ProjectedLayer>(projected->second);
+                box->dxcc = dxccProjected;
                 box->lat = lat;
                 box->lon = lon;
+            } else if (box->dxcc != dxccProjected) {
+                box->dxcc = dxccProjected;
             }
         }
         emit ready();
@@ -514,8 +553,11 @@ signals:
 private:
     std::shared_ptr<Published> box;
     std::shared_ptr<std::pair<ProjectedLayer, ProjectedLayer>> projected;
+    std::shared_ptr<const QVector<QPainterPath>> dxccProjected;
     double projectedLat = 999;
     double projectedLon = 999;
+    double dxccLat = 999;
+    double dxccLon = 999;
 };
 
 GlobeWidget::GlobeWidget(QWidget *parent)
@@ -625,6 +667,7 @@ GlobeWidget::GlobeWidget(QWidget *parent)
         quint64 gen = 0;
         std::shared_ptr<ProjectedLayer> lowMap;
         std::shared_ptr<ProjectedLayer> highMap;
+        std::shared_ptr<const QVector<QPainterPath>> dxccMap;
         {
             QMutexLocker lock(&box->mutex);
             image = box->image;
@@ -635,6 +678,7 @@ GlobeWidget::GlobeWidget(QWidget *parent)
             gen = box->gen;
             lowMap = box->low;
             highMap = box->high;
+            dxccMap = box->dxcc;
         }
         Published snap;
         snap.image = image;
@@ -657,6 +701,8 @@ GlobeWidget::GlobeWidget(QWidget *parent)
             lowProjected = snap.low;
         if (snap.high)
             highProjected = snap.high;
+        if (dxccMap)
+            dxccReady = dxccMap;
         update();
     });
     thread->start();
@@ -692,6 +738,7 @@ void GlobeWidget::setHome(double lat, double lon)
     homeLat_ = lat;
     homeLon_ = lon;
     haveHome = true;
+    dxccReady.reset();
     hoverIndex = -1;
     sunDirty = true;
     requestMap(true);
@@ -1291,34 +1338,7 @@ void GlobeWidget::paintScene(QPainter &painter)
         }
     }
 
-    if (lod >= 1 && !dxccEntities().isEmpty()) {
-        if (dxccPaths.size() != dxccEntities().size() || std::abs(dxccCacheLat - homeLat_) > 1e-8
-            || std::abs(dxccCacheLon - homeLon_) > 1e-8) {
-            dxccPaths.clear();
-            dxccCacheLat = homeLat_;
-            dxccCacheLon = homeLon_;
-            dxccPaths.reserve(dxccEntities().size());
-            for (const DxccEntity &entity : dxccEntities()) {
-                QPainterPath path;
-                path.setFillRule(Qt::OddEvenFill);
-                for (const GeoRing &ring : entity.rings) {
-                    bool started = false;
-                    for (const GeoPt &pt : ring.pts) {
-                        const UnitPoint at = projectAzimuthal(homeLat_, homeLon_, pt.lat, pt.lon);
-                        if (at.rho > 1.0) {
-                            started = false;
-                            continue;
-                        }
-                        if (!started)
-                            path.moveTo(at.x, at.y);
-                        else
-                            path.lineTo(at.x, at.y);
-                        started = true;
-                    }
-                }
-                dxccPaths.append(path);
-            }
-        }
+    if (lod >= 1 && dxccReady && !dxccReady->isEmpty()) {
         painter.save();
         painter.setClipPath(discClip);
         QTransform transform;
@@ -1327,7 +1347,7 @@ void GlobeWidget::paintScene(QPainter &painter)
         painter.setTransform(transform);
         painter.setBrush(Qt::NoBrush);
         painter.setPen(QPen(kBorder, 0));
-        for (const QPainterPath &path : dxccPaths)
+        for (const QPainterPath &path : *dxccReady)
             painter.drawPath(path);
         painter.restore();
     }
