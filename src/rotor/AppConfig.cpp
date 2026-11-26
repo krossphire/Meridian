@@ -74,9 +74,11 @@ AppConfig AppConfig::load(QSettings &settings)
     }
     settings.endArray();
     if (config.rotors.isEmpty()) {
+        const QString home = config.homeText;
         const QString homeLat = config.homeLatitude;
         const QString homeLon = config.homeLongitude;
         config = defaults();
+        config.homeText = home;
         config.homeLatitude = homeLat;
         config.homeLongitude = homeLon;
         config.trafficLog = traffic;

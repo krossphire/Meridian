@@ -712,7 +712,14 @@ void GlobeWidget::setHeading(std::optional<double> azimuth)
     heading = azimuth;
     if (auto *button = static_cast<BeamButton *>(beam); button && button->isBeaming() && heading) {
         const double gap = shortGap(*heading, beamAzimuth);
-        if (beamGap >= 0 && gap > beamGap + kBeamHoldDegrees)
+        // A limit stop can swing the long way. The gap to the target grows
+        // while the rotor is still doing the requested move, so that growth
+        // is not a manual override. Once the move has settled, a heading that
+        // is not the beam is.
+        const bool chasingBeam = link == Link::Moving && target && shortGap(*target, beamAzimuth) <= 0.2;
+        if (chasingBeam)
+            beamGap = gap;
+        else if (gap > kBeamHoldDegrees)
             clearBeamOffer();
         else
             beamGap = gap;
@@ -950,18 +957,18 @@ void GlobeWidget::placeCallsign()
         callButton->hide();
     else
         callButton->setGeometry(x, y, 22, 22);
-    if (!callEdit || !callEdit->isVisible())
-        return;
     const int editW = 148;
-    int editX = callButton->x() + 26;
-    int editY = callButton->y();
-    if (overlaps(editX, editY, editW, 24))
-        editY = std::max(6, callButton->y() - 2);
-    callEdit->setGeometry(editX, editY, editW, 24);
-    callEdit->raise();
+    if (callEdit && callEdit->isVisible()) {
+        int editX = callButton->x() + 26;
+        int editY = callButton->y();
+        if (overlaps(editX, editY, editW, 24))
+            editY = std::max(6, callButton->y() - 2);
+        callEdit->setGeometry(editX, editY, editW, 24);
+        callEdit->raise();
+    }
     if (!findCall)
         return;
-    const bool showFind = room && (editing || findBusy);
+    const bool showFind = editing || findBusy;
     findCall->setVisible(showFind);
     if (!showFind)
         return;
@@ -981,6 +988,7 @@ void GlobeWidget::submitCallsign()
     const QString text = callEdit->text().trimmed().toUpper();
     callEdit->hide();
     callEdit->clear();
+    placeCallsign();
     if (text.isEmpty()) {
         emit callsignSubmitted(QString(), QString());
         return;
@@ -1538,6 +1546,7 @@ void GlobeWidget::keyPressEvent(QKeyEvent *event)
     if (callEdit && callEdit->isVisible() && event->key() == Qt::Key_Escape) {
         callEdit->hide();
         callEdit->clear();
+        placeCallsign();
         return;
     }
     if (!editor->isVisible() && (event->key() == Qt::Key_Escape || event->key() == Qt::Key_Space)) {

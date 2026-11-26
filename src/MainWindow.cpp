@@ -59,7 +59,7 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
     });
     connect(globe, &GlobeWidget::settingsRequested, this, &MainWindow::openSettings);
     connect(globe, &GlobeWidget::callsignSubmitted, this, [this](const QString &call, const QString &grid) {
-        offerStation(call, grid);
+        offerStation(call, grid, 0, 0, false, true, true);
     });
     refreshQrz();
     refreshWsjt();
@@ -248,12 +248,14 @@ void MainWindow::refreshQrz()
                     offerStation(call.isEmpty() ? pendingCall : call, grid, latitude, longitude, havePoint, false);
                 });
         connect(qrz, &QrzClient::note, this, [this](const QString &text) {
-            if (!globe)
+            if (!globe || quietQrz)
                 return;
-            globe->setStatusLine(text, StatusTone::Busy);
+            const bool setup = text == QStringLiteral("QRZ login needed");
+            globe->setStatusLine(text, setup ? StatusTone::Busy : StatusTone::Failure);
             findNoteUntilMs = QDateTime::currentMSecsSinceEpoch() + 8000;
         });
         connect(qrz, &QrzClient::lookupFinished, this, [this](bool) {
+            quietQrz = false;
             if (globe)
                 globe->setFindBusy(false);
         });
@@ -262,7 +264,7 @@ void MainWindow::refreshQrz()
 }
 
 void MainWindow::offerStation(const QString &call, const QString &grid, double latitude, double longitude,
-                             bool havePoint, bool allowLookup)
+                             bool havePoint, bool allowLookup, bool manual)
 {
     if (!globe)
         return;
@@ -278,13 +280,26 @@ void MainWindow::offerStation(const QString &call, const QString &grid, double l
     pendingLon = longitude;
     pendingPoint = havePoint;
     pendingActive = true;
+    const bool gridMissing = Gridsquare::normalize(grid).isEmpty();
+    // A logger packet must not ask QRZ, or flash "QRZ login needed", unless a
+    // login is already saved. Typing Find > is the explicit request.
+    auto requestLookup = [&](bool quiet) {
+        if (!allowLookup || !qrz)
+            return;
+        if (!manual && !qrz->configured())
+            return;
+        if (quiet && !qrz->configured())
+            return;
+        quietQrz = quiet;
+        if (!quiet)
+            globe->setFindBusy(true);
+        qrz->lookup(pendingCall);
+    };
     if (!globe->hasHome()) {
         globe->showBeamNote(QStringLiteral("Set your grid in Settings"));
         globe->setFindBusy(false);
-        if (allowLookup && !havePoint && Gridsquare::normalize(grid).isEmpty() && qrz) {
-            globe->setFindBusy(true);
-            qrz->lookup(pendingCall);
-        }
+        if (!havePoint && gridMissing)
+            requestLookup(false);
         return;
     }
     double lat = latitude;
@@ -301,6 +316,11 @@ void MainWindow::offerStation(const QString &call, const QString &grid, double l
             }
             globe->setFindBusy(false);
             globe->setBeamOffer(pendingCall, bearing, note);
+            // A 4-character logger grid is shown at once, then replaced by QRZ
+            // coordinates when a login is saved. A miss leaves the grid beam
+            // and does not write a status line.
+            if (fullGrid.size() <= 4 && !manual)
+                requestLookup(true);
             return;
         }
         bool local = false;
@@ -329,10 +349,9 @@ void MainWindow::offerStation(const QString &call, const QString &grid, double l
         }
         if (!local)
             globe->clearBeamOffer();
-        if (allowLookup && grid.isEmpty() && qrz) {
-            globe->setFindBusy(true);
-            qrz->lookup(pendingCall);
-        } else if (globe)
+        if (gridMissing)
+            requestLookup(false);
+        else if (globe)
             globe->setFindBusy(false);
         return;
     }

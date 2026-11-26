@@ -13,8 +13,11 @@
 #include "map/Dxcc.h"
 #include "map/GeoMap.h"
 #include "core/Solar.h"
+#include "rotor/AppConfig.h"
 #include "rotor/Reconnect.h"
 #include "rotor/Rt21Protocol.h"
+
+#include <QSettings>
 
 #include <QDateTime>
 #include <QFile>
@@ -236,6 +239,19 @@ void TestCore::preciseHomeBearing()
     QVERIFY(Gridsquare::bearingTo(minutes->latitude, minutes->longitude, targetLat, targetLon, fromMinutes));
     QCOMPARE(QString::number(fromMinutes, 'f', 1), QStringLiteral("180.0"));
 
+    const auto degrees = resolveHome(QString(), QStringLiteral("36.25°"), QStringLiteral("94°15'W"), nullptr, &error);
+    QVERIFY2(degrees.has_value(), qPrintable(error));
+    QVERIFY(std::abs(degrees->latitude - 36.25) < 1e-9);
+    QVERIFY(std::abs(degrees->longitude - (-94.25)) < 1e-9);
+
+    QSettings bare(QStringLiteral("meridian-empty-rotors.ini"), QSettings::IniFormat);
+    bare.clear();
+    bare.setValue(QStringLiteral("home/text"), QStringLiteral("FN31"));
+    bare.sync();
+    const AppConfig kept = AppConfig::load(bare);
+    QCOMPARE(kept.homeText, QStringLiteral("FN31"));
+    bare.clear();
+
     const auto overridden = resolveHome(QStringLiteral("EM26"), QStringLiteral("36.25"), QStringLiteral("-94.25"),
                                         nullptr, &error);
     QVERIFY2(overridden.has_value(), qPrintable(error));
@@ -366,6 +382,14 @@ void TestCore::dxccHover()
     const DxccLabel sardinia = dxccAt(40.1, 9.0);
     QCOMPARE(sardinia.prefix, QStringLiteral("IS0"));
     QVERIFY(!dxccEntities().isEmpty());
+
+    const auto hawaiiCall = dxccForCallsign(QStringLiteral("KH6ABC"));
+    const auto mixed = dxccForCallsign(QStringLiteral("K1ABC/KH6"));
+    QVERIFY(hawaiiCall && mixed);
+    QCOMPARE(mixed->prefix, QStringLiteral("KH6"));
+    QCOMPARE(mixed->havePoint, hawaiiCall->havePoint);
+    QCOMPARE(mixed->latitude, hawaiiCall->latitude);
+    QCOMPARE(mixed->longitude, hawaiiCall->longitude);
 }
 
 void TestCore::framing()

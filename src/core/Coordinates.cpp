@@ -303,30 +303,77 @@ bool parseAxis(const QString &textIn, bool latitude, double &out, QString *error
     QString text = textIn.trimmed().toUpper();
     if (text.isEmpty())
         return fail(latitude ? QStringLiteral("Enter a latitude.") : QStringLiteral("Enter a longitude."));
+    text.replace(QChar(0x00B0), QLatin1Char(' '));
+    text.replace(QChar(0x2032), QLatin1Char(' '));
+    text.replace(QChar(0x2033), QLatin1Char(' '));
+    text.replace(QLatin1Char('\''), QLatin1Char(' '));
+    text.replace(QLatin1Char('"'), QLatin1Char(' '));
+    const QStringList parts = text.split(QLatin1Char(' '), Qt::SkipEmptyParts);
     QChar hemi;
-    if (text.front() == QLatin1Char('N') || text.front() == QLatin1Char('S') || text.front() == QLatin1Char('E')
-        || text.front() == QLatin1Char('W')) {
-        hemi = text.front();
-        text = text.mid(1).trimmed();
-    } else if (text.back() == QLatin1Char('N') || text.back() == QLatin1Char('S') || text.back() == QLatin1Char('E')
-               || text.back() == QLatin1Char('W')) {
-        hemi = text.back();
-        text.chop(1);
-        text = text.trimmed();
+    QStringList numbers;
+    const auto takeHemi = [&](QChar mark) {
+        if (!hemi.isNull())
+            return fail(QStringLiteral("Use one hemisphere marker."));
+        hemi = mark;
+        return true;
+    };
+    for (QString part : parts) {
+        if (part == QLatin1String("N") || part == QLatin1String("S") || part == QLatin1String("E")
+            || part == QLatin1String("W")) {
+            if (!takeHemi(part.at(0)))
+                return false;
+            continue;
+        }
+        if (part.size() > 1
+            && (part.back() == QLatin1Char('N') || part.back() == QLatin1Char('S') || part.back() == QLatin1Char('E')
+                || part.back() == QLatin1Char('W'))) {
+            if (!takeHemi(part.back()))
+                return false;
+            part.chop(1);
+        } else if (part.size() > 1
+                   && (part.front() == QLatin1Char('N') || part.front() == QLatin1Char('S')
+                       || part.front() == QLatin1Char('E') || part.front() == QLatin1Char('W'))) {
+            if (!takeHemi(part.front()))
+                return false;
+            part = part.mid(1);
+        }
+        numbers.append(part);
     }
+    if (numbers.isEmpty() || numbers.size() > 3)
+        return fail(QStringLiteral("Couldn't parse that coordinate."));
     if (latitude && !hemi.isNull() && hemi != QLatin1Char('N') && hemi != QLatin1Char('S'))
         return fail(QStringLiteral("Latitude takes N or S."));
     if (!latitude && !hemi.isNull() && hemi != QLatin1Char('E') && hemi != QLatin1Char('W'))
         return fail(QStringLiteral("Longitude takes E or W."));
-    const bool negative = text.startsWith(QLatin1Char('-'));
-    if (text.startsWith(QLatin1Char('+')) || text.startsWith(QLatin1Char('-')))
-        text = text.mid(1).trimmed();
+    bool negative = false;
+    QString first = numbers.at(0);
+    if (first.startsWith(QLatin1Char('+')) || first.startsWith(QLatin1Char('-'))) {
+        negative = first.startsWith(QLatin1Char('-'));
+        first = first.mid(1);
+    }
     bool ok = false;
-    const double magnitude = text.toDouble(&ok);
-    if (!ok || text.isEmpty())
+    const double degrees = first.toDouble(&ok);
+    if (!ok || first.isEmpty() || degrees < 0.0)
         return fail(QStringLiteral("Couldn't parse that coordinate."));
+    if (numbers.size() > 1 && degrees != std::floor(degrees))
+        return fail(QStringLiteral("Couldn't parse that coordinate. Minutes and seconds must be under 60."));
+    double minutes = 0;
+    double seconds = 0;
+    if (numbers.size() >= 2) {
+        minutes = numbers.at(1).toDouble(&ok);
+        if (!ok)
+            return fail(QStringLiteral("Couldn't parse that coordinate."));
+    }
+    if (numbers.size() == 3) {
+        seconds = numbers.at(2).toDouble(&ok);
+        if (!ok)
+            return fail(QStringLiteral("Couldn't parse that coordinate."));
+    }
+    if (minutes < 0.0 || seconds < 0.0 || minutes >= 60.0 || seconds >= 60.0)
+        return fail(QStringLiteral("Couldn't parse that coordinate. Minutes and seconds must be under 60."));
     if (!hemi.isNull() && negative)
         return fail(QStringLiteral("Use a sign or a hemisphere, not both."));
+    const double magnitude = degrees + minutes / 60.0 + seconds / 3600.0;
     const double value = !hemi.isNull() ? ((hemi == QLatin1Char('S') || hemi == QLatin1Char('W')) ? -magnitude : magnitude)
                                          : (negative ? -magnitude : magnitude);
     if (latitude && std::abs(value) > 90.0)

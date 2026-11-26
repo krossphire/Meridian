@@ -184,6 +184,9 @@ std::optional<DxccCall> dxccForCallsign(const QString &call)
             bestLen = len;
             best.prefix = prefix;
             best.country = prefixCountry.value(prefix);
+            best.havePoint = false;
+            best.latitude = 0;
+            best.longitude = 0;
             if (const auto point = prefixPoint.constFind(prefix); point != prefixPoint.constEnd()) {
                 best.havePoint = true;
                 best.latitude = point->first;

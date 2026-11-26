@@ -52,7 +52,7 @@ private:
     void adopt(Rt21Driver *driver);
     void refreshStatus();
     void offerStation(const QString &call, const QString &grid, double latitude = 0, double longitude = 0,
-                      bool havePoint = false, bool allowLookup = true);
+                      bool havePoint = false, bool allowLookup = true, bool manual = false);
     void refreshQrz();
     void refreshWsjt();
     void refreshN1mm();
@@ -81,5 +81,6 @@ private:
     double pendingLon = 0;
     bool pendingPoint = false;
     bool pendingActive = false;
+    bool quietQrz = false;
     qint64 findNoteUntilMs = 0;
 };

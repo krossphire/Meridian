@@ -38,7 +38,6 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QFrame>
 #include <QScrollArea>
@@ -373,7 +372,7 @@ void SettingsDialog::setStatus(const QString &text)
 void SettingsDialog::noteSettingsWrite(bool ok)
 {
     if (!ok)
-        setStatus(QStringLiteral("Couldn't write meridian.ini."), StatusTone::Busy);
+        setStatus(QStringLiteral("Couldn't write meridian.ini."), StatusTone::Failure);
 }
 
 void SettingsDialog::setStatus(const QString &text, StatusTone tone)
@@ -464,8 +463,7 @@ bool SettingsDialog::commitDraft(bool interactive)
     const QString place = homeEdit ? homeEdit->text().trimmed() : QString();
     if (latText.isEmpty() != lonText.isEmpty()) {
         if (interactive) {
-            QMessageBox::warning(this, QStringLiteral("Location"),
-                                 QStringLiteral("Enter both latitude and longitude, or leave both blank."));
+            setStatus(QStringLiteral("Enter both latitude and longitude, or leave both blank."));
             tabs->setCurrentIndex(0);
             committing = false;
             return false;
@@ -473,7 +471,7 @@ bool SettingsDialog::commitDraft(bool interactive)
     } else if (!latText.isEmpty()) {
         if (!resolveHome(place, latText, lonText, zips, &error)) {
             if (interactive) {
-                QMessageBox::warning(this, QStringLiteral("Location"), error);
+                setStatus(error);
                 tabs->setCurrentIndex(0);
                 committing = false;
                 return false;
@@ -501,7 +499,7 @@ bool SettingsDialog::commitDraft(bool interactive)
             draft.homeLongitude.clear();
         }
     } else if (interactive) {
-        QMessageBox::warning(this, QStringLiteral("Location"), error);
+        setStatus(error);
         tabs->setCurrentIndex(0);
         committing = false;
         return false;
@@ -538,7 +536,7 @@ bool SettingsDialog::commitDraft(bool interactive)
     if (qrzPassEdit && !qrzPassEdit->text().isEmpty()) {
         if (!CredentialStore::store(draft.qrzUsername, qrzPassEdit->text()))
             setStatus(QStringLiteral("Couldn't save the QRZ password. It was not written to meridian.ini."),
-                      StatusTone::Busy);
+                      StatusTone::Failure);
         else
             qrzPassEdit->clear();
         qrzPassStored = !draft.qrzUsername.isEmpty() && !CredentialStore::load(draft.qrzUsername).isEmpty();
@@ -689,7 +687,21 @@ void SettingsDialog::buildStation()
     layout->addWidget(sunBox);
     layout->addLayout(idleRow);
     layout->addStretch();
-    connect(homeEdit, &QLineEdit::textChanged, this, [this]() { refreshLocation(); });
+    connect(homeEdit, &QLineEdit::textChanged, this, [this]() {
+        // A newly typed grid or ZIP replaces a lat/long that was left in the boxes.
+        QString error;
+        if (homeLatEdit && homeLonEdit) {
+            if (const auto loc = resolveLocation(homeEdit->text(), zips, &error)) {
+                if (loc->source != ResolvedLocation::Source::Coordinates) {
+                    const QSignalBlocker blockLat(homeLatEdit);
+                    const QSignalBlocker blockLon(homeLonEdit);
+                    homeLatEdit->clear();
+                    homeLonEdit->clear();
+                }
+            }
+        }
+        refreshLocation();
+    });
     connect(homeLatEdit, &QLineEdit::textChanged, this, [this]() { refreshLocation(); });
     connect(homeLonEdit, &QLineEdit::textChanged, this, [this]() { refreshLocation(); });
     tabs->addTab(page, QStringLiteral("Station"));
