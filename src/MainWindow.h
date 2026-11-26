@@ -73,4 +73,5 @@ private:
     N1mmSource *n1mm = nullptr;
     DxKeeperSource *dxKeeper = nullptr;
     QString pendingCall;
+    qint64 findNoteUntilMs = 0;
 };
