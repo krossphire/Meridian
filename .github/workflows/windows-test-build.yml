@@ -46,6 +46,8 @@ jobs:
       - name: Stage and deploy
         id: package
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $cmakeText = Get-Content -Raw CMakeLists.txt
           if ($cmakeText -notmatch 'project\(Meridian VERSION ([0-9][^\s\)]*)') {
@@ -64,29 +66,30 @@ jobs:
           )
           $label = "${{ github.event.inputs.test_label }}".Trim().ToLower()
           if (-not $label) {
-            $used = @{}
-            try {
-              $headers = @{
-                Authorization = "Bearer $env:GITHUB_TOKEN"
-                Accept = "application/vnd.github+json"
-                "X-GitHub-Api-Version" = "2022-11-28"
-              }
-              $page = 1
-              do {
-                $arts = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/${{ github.repository }}/actions/artifacts?per_page=100&page=$page"
-                foreach ($artifact in @($arts.artifacts)) {
-                  if ($artifact.name -match '^Meridian-1\.0\.0-([a-z]+)-[0-9a-f]{7}-win64$') {
-                    $used[$Matches[1]] = $true
-                  }
-                }
-                $page++
-              } while (@($arts.artifacts).Count -eq 100 -and $page -le 5)
-            } catch {
-              Write-Host "Could not list artifacts: $($_.Exception.Message)"
+            if ([string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
+              throw "No test_label was given, and the workflow token is missing, so the next NATO word cannot be chosen."
             }
+            $used = @{}
+            $headers = @{
+              Authorization = "Bearer $env:GH_TOKEN"
+              Accept = "application/vnd.github+json"
+              "X-GitHub-Api-Version" = "2022-11-28"
+              "User-Agent" = "meridian-test-build"
+            }
+            $page = 1
+            do {
+              $arts = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/${{ github.repository }}/actions/artifacts?per_page=100&page=$page"
+              foreach ($artifact in @($arts.artifacts)) {
+                if ($artifact.name -match '^Meridian-1\.0\.0-([a-z]+)-[0-9a-f]{7}-win64$') {
+                  $used[$Matches[1]] = $true
+                }
+              }
+              $page++
+            } while (@($arts.artifacts).Count -eq 100 -and $page -le 5)
             foreach ($word in $nato) {
               if (-not $used.ContainsKey($word)) { $label = $word; break }
             }
+            Write-Host "Used words: $($used.Keys -join ', ')"
           }
           if ($nato -notcontains $label) {
             throw "test_label must be a NATO word (alpha, bravo, charlie, ...). Got '$label'."
