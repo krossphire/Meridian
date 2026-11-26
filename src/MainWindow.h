@@ -64,4 +64,5 @@ private:
     QTimer *statusTimer = nullptr;
     QrzClient *qrz = nullptr;
     QString pendingCall;
+    qint64 findNoteUntilMs = 0;
 };
