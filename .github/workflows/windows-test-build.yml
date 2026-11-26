@@ -1,15 +1,29 @@
-# Portable Windows test zip for the current stack. Not a release.
+# Portable Windows test build for the current stack. Not a release.
 # Triggered by a push of this branch, or by hand. It does not tag, and it
 # does not publish a GitHub release. It also does not launch Meridian, so
 # no rotator command is sent.
+#
+# The download is one zip. Its name is Meridian-1.0.0-<nato>-<shortsha>-win64.
+# The first word is alpha, then bravo, charlie, and so on. Pass test_label
+# when starting the workflow by hand. A push with no label takes the next
+# word that is not already used by an artifact of this shape.
 
 name: Windows test build
 
 on:
   workflow_dispatch:
+    inputs:
+      test_label:
+        description: "NATO word: alpha, bravo, charlie, delta, ..."
+        required: false
+        type: string
   push:
     branches:
       - cursor/qlog-currentcontact-859c
+
+permissions:
+  contents: read
+  actions: read
 
 jobs:
   windows:
@@ -29,7 +43,7 @@ jobs:
         run: |
           cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++
           cmake --build build --parallel
-      - name: Stage, deploy, and zip
+      - name: Stage and deploy
         id: package
         shell: pwsh
         run: |
@@ -42,88 +56,100 @@ jobs:
             throw "Refusing to package: CMake version is $version, expected 1.0.0."
           }
           $short = "${{ github.sha }}".Substring(0, 7)
+          $nato = @(
+            "alpha","bravo","charlie","delta","echo","foxtrot","golf","hotel",
+            "india","juliett","kilo","lima","mike","november","oscar","papa",
+            "quebec","romeo","sierra","tango","uniform","victor","whiskey",
+            "xray","yankee","zulu"
+          )
+          $label = "${{ github.event.inputs.test_label }}".Trim().ToLower()
+          if (-not $label) {
+            $used = @{}
+            try {
+              $headers = @{
+                Authorization = "Bearer $env:GITHUB_TOKEN"
+                Accept = "application/vnd.github+json"
+                "X-GitHub-Api-Version" = "2022-11-28"
+              }
+              $page = 1
+              do {
+                $arts = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/${{ github.repository }}/actions/artifacts?per_page=100&page=$page"
+                foreach ($artifact in @($arts.artifacts)) {
+                  if ($artifact.name -match '^Meridian-1\.0\.0-([a-z]+)-[0-9a-f]{7}-win64$') {
+                    $used[$Matches[1]] = $true
+                  }
+                }
+                $page++
+              } while (@($arts.artifacts).Count -eq 100 -and $page -le 5)
+            } catch {
+              Write-Host "Could not list artifacts: $($_.Exception.Message)"
+            }
+            foreach ($word in $nato) {
+              if (-not $used.ContainsKey($word)) { $label = $word; break }
+            }
+          }
+          if ($nato -notcontains $label) {
+            throw "test_label must be a NATO word (alpha, bravo, charlie, ...). Got '$label'."
+          }
 
-          cmake --install build --config Release --prefix dist
+          $folderName = "Meridian-$version-$label-$short-win64"
+          $parent = Join-Path (Get-Location) "package"
+          $dest = Join-Path $parent $folderName
+          New-Item -ItemType Directory -Force $dest | Out-Null
+
+          cmake --install build --config Release --prefix $dest
           # Same plugin set as the release zip.
-          windeployqt --release --compiler-runtime --no-translations --no-system-d3d-compiler --no-opengl-sw --skip-plugin-types generic --exclude-plugins qgif,qico,qjpeg,qcertonlybackend dist/meridian.exe
-          [System.IO.File]::WriteAllText((Join-Path dist "qt.conf"), "[Paths]`nPrefix=.`nPlugins=.`n")
+          windeployqt --release --compiler-runtime --no-translations --no-system-d3d-compiler --no-opengl-sw --skip-plugin-types generic --exclude-plugins qgif,qico,qjpeg,qcertonlybackend (Join-Path $dest "meridian.exe")
+          [System.IO.File]::WriteAllText((Join-Path $dest "qt.conf"), "[Paths]`nPrefix=.`nPlugins=.`n")
 
           # Coastlines, DXCC outlines, the prefix table, and the licenses.
-          # These are also compiled into the exe. The loose copies are in the zip
-          # so the test build shows what it was built from. The full Big CTY
+          # These are also compiled into the exe. The loose copies travel with
+          # the test build so it shows what it was built from. The full Big CTY
           # prefix file is not vendored; dxcc-names.tsv is the derived table,
           # and LICENSE.CTY is its license.
-          New-Item -ItemType Directory -Force (Join-Path dist "data"), (Join-Path dist "licenses") | Out-Null
-          Copy-Item data/map110.bin, data/map50.bin, data/zcta.bin, data/dxcc.bin, data/dxcc-names.tsv (Join-Path dist "data")
-          Copy-Item LICENSE (Join-Path dist "licenses/GPL-3.0.txt")
-          Copy-Item third_party/cty/LICENSE.CTY (Join-Path dist "licenses/LICENSE.CTY")
-          Copy-Item third_party/inter/OFL.txt (Join-Path dist "licenses/OFL.txt")
+          New-Item -ItemType Directory -Force (Join-Path $dest "data"), (Join-Path $dest "licenses") | Out-Null
+          Copy-Item data/map110.bin, data/map50.bin, data/zcta.bin, data/dxcc.bin, data/dxcc-names.tsv (Join-Path $dest "data")
+          Copy-Item LICENSE (Join-Path $dest "licenses/GPL-3.0.txt")
+          Copy-Item third_party/cty/LICENSE.CTY (Join-Path $dest "licenses/LICENSE.CTY")
+          Copy-Item third_party/inter/OFL.txt (Join-Path $dest "licenses/OFL.txt")
 
           $checklist = @(
-            "Meridian $version test build $short"
+            "Meridian $version $label test build $short"
             ""
-            "Unzip this folder and run meridian.exe. Do not run meridian-mock.exe."
+            "Open this folder and run meridian.exe. Do not run meridian-mock.exe."
             "meridian.ini is created beside meridian.exe the first time settings are saved."
             "The only filled-in value is grid EM26. No COM port, host, or UDP port is filled in."
             "The password for QRZ is not in that file."
             ""
             "This exe is unsigned. Windows SmartScreen will warn. The Qt and MinGW DLLs in this folder are the runtime. There is no installer."
           ) -join "`n"
-          [System.IO.File]::WriteAllText((Join-Path dist "TEST-BUILD.txt"), $checklist + "`n")
+          [System.IO.File]::WriteAllText((Join-Path $dest "TEST-BUILD.txt"), $checklist + "`n")
 
-          Get-ChildItem -Path dist -Recurse -File -Include meridian.ini,*.bak | Remove-Item -Force
+          Get-ChildItem -Path $dest -Recurse -File -Include meridian.ini,*.bak | Remove-Item -Force
           foreach ($dirName in @("logs", "backups")) {
-            $dir = Join-Path dist $dirName
+            $dir = Join-Path $dest $dirName
             if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
           }
 
-          $zipName = "Meridian-$version-test-$short-win64.zip"
-          $zipPath = Join-Path (Get-Location) $zipName
-          if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
-          Add-Type -AssemblyName System.IO.Compression
-          Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $archive = [System.IO.Compression.ZipFile]::Open($zipPath, [System.IO.Compression.ZipArchiveMode]::Create)
-          try {
-            $root = (Resolve-Path dist).Path
-            Get-ChildItem -Path dist -Recurse -Directory | ForEach-Object {
-              $rel = $_.FullName.Substring($root.Length).TrimStart('\', '/') -replace '\\', '/'
-              if ($rel) { [void]$archive.CreateEntry("$rel/") }
-            }
-            Get-ChildItem -Path dist -Recurse -File | ForEach-Object {
-              $rel = $_.FullName.Substring($root.Length).TrimStart('\', '/') -replace '\\', '/'
-              [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
-                $archive, $_.FullName, $rel, [System.IO.Compression.CompressionLevel]::Optimal)
-            }
-          } finally {
-            $archive.Dispose()
-          }
-
-          $check = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
-          try {
-            $names = @($check.Entries | ForEach-Object { $_.FullName })
-          } finally {
-            $check.Dispose()
-          }
-          if ($names -notcontains "meridian.exe") { throw "Zip is missing meridian.exe." }
+          $exe = Join-Path $dest "meridian.exe"
+          if (-not (Test-Path $exe)) { throw "Package is missing meridian.exe." }
           foreach ($required in @(
             "data/dxcc.bin", "data/dxcc-names.tsv", "data/map50.bin", "data/map110.bin",
             "licenses/LICENSE.CTY", "licenses/GPL-3.0.txt", "licenses/OFL.txt", "qt.conf")) {
-            if ($names -notcontains $required) { throw "Zip is missing $required." }
+            if (-not (Test-Path (Join-Path $dest $required))) { throw "Package is missing $required." }
           }
-          $ini = @($names | Where-Object { $_.ToLower().EndsWith(".ini") })
-          if ($ini.Count -gt 0) { throw "Zip contains an ini file: $($ini -join ', ')" }
+          $ini = @(Get-ChildItem -Path $dest -Recurse -File -Filter *.ini)
+          if ($ini.Count -gt 0) { throw "Package contains an ini file: $($ini.Name -join ', ')" }
 
-          $bytes = (Get-Item $zipPath).Length
-          Write-Host "ZIP $zipName $bytes bytes"
-          Write-Host "TOP LEVEL:"
-          $names | Where-Object { ($_ -notmatch '/') -or ($_ -match '^[^/]+/$') } | Sort-Object | ForEach-Object { Write-Host $_ }
+          Write-Host "FOLDER $folderName label=$label"
+          Get-ChildItem -Path $dest | ForEach-Object { Write-Host $_.Name }
 
-          "zip=$zipName" >> $env:GITHUB_OUTPUT
+          "artifact=$folderName" >> $env:GITHUB_OUTPUT
+          "upload=package" >> $env:GITHUB_OUTPUT
           "shortsha=$short" >> $env:GITHUB_OUTPUT
-          "bytes=$bytes" >> $env:GITHUB_OUTPUT
+          "label=$label" >> $env:GITHUB_OUTPUT
       - uses: actions/upload-artifact@v4
         with:
-          name: Meridian-1.0.0-test-${{ steps.package.outputs.shortsha }}-win64
-          path: ${{ steps.package.outputs.zip }}
+          name: ${{ steps.package.outputs.artifact }}
+          path: ${{ steps.package.outputs.upload }}
           if-no-files-found: error
-          compression-level: 0
