@@ -90,6 +90,7 @@ bool Gridsquare::toLatLon(const QString &gridIn, double &lat, double &lon)
             lat += 1.25 / 60.0;
         }
     } else {
+        // Center of the 2° by 1° square. The value above this line is the southwest corner.
         lon += 1.0;
         lat += 0.5;
     }

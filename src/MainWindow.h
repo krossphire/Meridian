@@ -76,5 +76,10 @@ private:
     DxKeeperSource *dxKeeper = nullptr;
     QlogSource *qlog = nullptr;
     QString pendingCall;
+    QString pendingGrid;
+    double pendingLat = 0;
+    double pendingLon = 0;
+    bool pendingPoint = false;
+    bool pendingActive = false;
     qint64 findNoteUntilMs = 0;
 };

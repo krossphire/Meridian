@@ -35,6 +35,8 @@ private slots:
     void bearingDirections();
     void compassWrap();
     void gridBearing();
+    void preciseHomeBearing();
+    void homesChangeTheBearing();
     void azimuthClamp();
     void projectionRoundTrip();
     void countryHit();
@@ -186,7 +188,7 @@ void TestCore::gridBearing()
     QCOMPARE(QString::number(bearing, 'f', 1), QStringLiteral("92.4"));
     QVERIFY(!Gridsquare::bearingTo(QStringLiteral("EM26"), QStringLiteral("nope"), bearing));
 
-    // 6-character home near Bella Vista. Subsquares are centered, not cornered.
+    // A 6-character square is centered on its subsquare, not on a corner.
     double lat = 0;
     double lon = 0;
     QVERIFY(Gridsquare::toLatLon(QStringLiteral("EM26ul"), lat, lon));
@@ -201,6 +203,95 @@ void TestCore::gridBearing()
     double same = -1;
     QVERIFY(Gridsquare::bearingTo(36.5, -95.0, 36.5, -95.0, same));
     QCOMPARE(same, 0.0);
+}
+
+void TestCore::preciseHomeBearing()
+{
+    const double targetLat = 36.0;
+    const double targetLon = -94.25;
+    QString error;
+    const auto decimal = resolveLocation(QStringLiteral("36.25, -94.25"), nullptr, &error);
+    QVERIFY2(decimal.has_value(), qPrintable(error));
+    QCOMPARE(decimal->source, ResolvedLocation::Source::Coordinates);
+    QVERIFY(std::abs(decimal->latitude - 36.25) < 1e-9);
+    QVERIFY(std::abs(decimal->longitude - (-94.25)) < 1e-9);
+    QVERIFY(!decimal->grid.isEmpty());
+    double centerLat = 0;
+    double centerLon = 0;
+    QVERIFY(Gridsquare::toLatLon(decimal->grid, centerLat, centerLon));
+    QVERIFY(std::abs(centerLat - decimal->latitude) > 0.01 || std::abs(centerLon - decimal->longitude) > 0.01);
+
+    double rawBearing = 0;
+    double centerBearing = 0;
+    QVERIFY(Gridsquare::bearingTo(decimal->latitude, decimal->longitude, targetLat, targetLon, rawBearing));
+    QVERIFY(Gridsquare::bearingTo(centerLat, centerLon, targetLat, targetLon, centerBearing));
+    QCOMPARE(QString::number(rawBearing, 'f', 1), QStringLiteral("180.0"));
+    QCOMPARE(QString::number(centerBearing, 'f', 1), QStringLiteral("187.1"));
+
+    const auto minutes = resolveLocation(QStringLiteral("36 15 N 94 15 W"), nullptr, &error);
+    QVERIFY2(minutes.has_value(), qPrintable(error));
+    QVERIFY(std::abs(minutes->latitude - decimal->latitude) < 1e-9);
+    QVERIFY(std::abs(minutes->longitude - decimal->longitude) < 1e-9);
+    double fromMinutes = 0;
+    QVERIFY(Gridsquare::bearingTo(minutes->latitude, minutes->longitude, targetLat, targetLon, fromMinutes));
+    QCOMPARE(QString::number(fromMinutes, 'f', 1), QStringLiteral("180.0"));
+
+    const auto overridden = resolveHome(QStringLiteral("EM26"), QStringLiteral("36.25"), QStringLiteral("-94.25"),
+                                        nullptr, &error);
+    QVERIFY2(overridden.has_value(), qPrintable(error));
+    QVERIFY(std::abs(overridden->latitude - 36.25) < 1e-9);
+    QVERIFY(std::abs(overridden->longitude - (-94.25)) < 1e-9);
+    double fromFields = 0;
+    QVERIFY(Gridsquare::bearingTo(overridden->latitude, overridden->longitude, targetLat, targetLon, fromFields));
+    QCOMPARE(QString::number(fromFields, 'f', 1), QStringLiteral("180.0"));
+
+    double fourLat = 0;
+    double fourLon = 0;
+    QVERIFY(Gridsquare::toLatLon(QStringLiteral("EM26"), fourLat, fourLon));
+    QCOMPARE(fourLat, 36.5);
+    QCOMPARE(fourLon, -95.0);
+    const double stationLat = 36.0724337;
+    const double stationLon = -94.0893386;
+    double fromFour = 0;
+    double fromSix = 0;
+    double fromCorner = 0;
+    QVERIFY(Gridsquare::bearingTo(fourLat, fourLon, stationLat, stationLon, fromFour));
+    QVERIFY(Gridsquare::toLatLon(QStringLiteral("EM26vl"), centerLat, centerLon));
+    QVERIFY(Gridsquare::bearingTo(centerLat, centerLon, stationLat, stationLon, fromSix));
+    QVERIFY(Gridsquare::bearingTo(36.0, -96.0, stationLat, stationLon, fromCorner));
+    QCOMPARE(QString::number(fromFour, 'f', 1), QStringLiteral("119.9"));
+    QCOMPARE(QString::number(fromSix, 'f', 1), QStringLiteral("166.7"));
+    QVERIFY(QString::number(fromCorner, 'f', 1) != QString::number(fromFour, 'f', 1));
+
+    double wide = 0;
+    double tight = 0;
+    QVERIFY(Gridsquare::bearingTo(QStringLiteral("EM26"), QStringLiteral("PM95"), wide));
+    QVERIFY(Gridsquare::bearingTo(QStringLiteral("EM26ul"), QStringLiteral("PM95"), tight));
+    QVERIFY(std::abs(wide - tight) < 3.0);
+    QVERIFY(std::abs(wide - tight) > 0.1);
+}
+
+void TestCore::homesChangeTheBearing()
+{
+    const QString target = QStringLiteral("KG54");
+    const struct {
+        const char *home;
+        const char *bearing;
+    } rows[] = {
+        {"JO01", "152.8"},
+        {"PM95", "257.6"},
+        {"FN31", "101.5"},
+        {"QF56", "232.1"},
+    };
+    QString previous;
+    for (const auto &row : rows) {
+        double bearing = 0;
+        QVERIFY(Gridsquare::bearingTo(QString::fromLatin1(row.home), target, bearing));
+        const QString shown = QString::number(bearing, 'f', 1);
+        QCOMPARE(shown, QString::fromLatin1(row.bearing));
+        QVERIFY(shown != previous);
+        previous = shown;
+    }
 }
 
 void TestCore::azimuthClamp()

@@ -40,6 +40,8 @@ public:
 
     void setLayers(const GeoLayer *low, const GeoLayer *high);
     void setHome(double lat, double lon);
+    void clearHome();
+    bool hasHome() const { return haveHome; }
     void setHeading(std::optional<double> azimuth);
     void setTarget(std::optional<double> azimuth);
     void setLink(Link state, const QString &detail);
@@ -51,6 +53,7 @@ public:
     bool compassVisible() const { return compassOn; }
     void setLoggerBeamEnabled(bool on);
     void setBeamOffer(const QString &call, double azimuth, const QString &approxNote = QString());
+    void showBeamNote(const QString &text);
     void clearBeamOffer();
     void revealCallsign(const QString &seed = QString());
     void setFindBusy(bool busy);
@@ -110,9 +113,11 @@ private:
 
     const GeoLayer *low = nullptr;
     const GeoLayer *high = nullptr;
+    // Map camera until a home is saved. Bearings check hasHome() and do not use this pair.
     double homeLat_ = 36.5;
     double homeLon_ = -95.0;
     bool haveHome = false;
+    bool beamHasAzimuth = false;
     std::optional<double> heading;
     std::optional<double> target;
     Link link = Link::Off;

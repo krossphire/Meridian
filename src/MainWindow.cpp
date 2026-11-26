@@ -126,11 +126,13 @@ void MainWindow::loadMaps()
 void MainWindow::applyHome()
 {
     QString error;
-    auto location = resolveLocation(config.homeText, &zips, &error);
-    if (!location)
-        location = resolveLocation(QStringLiteral("EM26"), &zips, &error);
+    const auto location = resolveHome(config.homeText, config.homeLatitude, config.homeLongitude, &zips, &error);
     if (location)
         globe->setHome(location->latitude, location->longitude);
+    else
+        globe->clearHome();
+    if (pendingActive)
+        offerStation(pendingCall, pendingGrid, pendingLat, pendingLon, pendingPoint, false);
 }
 
 void MainWindow::connectActive()
@@ -204,9 +206,13 @@ void MainWindow::refreshQlog()
                         offerStation(QString(), QString());
                         return;
                     }
+                    if (!globe->hasHome()) {
+                        offerStation(call, grid);
+                        return;
+                    }
                     if (!grid.isEmpty())
                         offerStation(call, grid);
-                    else if (haveAzimuth && globe)
+                    else if (haveAzimuth)
                         globe->setBeamOffer(call, azimuth);
                     else
                         offerStation(call, QString());
@@ -262,10 +268,25 @@ void MainWindow::offerStation(const QString &call, const QString &grid, double l
         return;
     if (call.trimmed().isEmpty()) {
         pendingCall.clear();
+        pendingActive = false;
         globe->clearBeamOffer();
         return;
     }
     pendingCall = call.trimmed().toUpper();
+    pendingGrid = grid;
+    pendingLat = latitude;
+    pendingLon = longitude;
+    pendingPoint = havePoint;
+    pendingActive = true;
+    if (!globe->hasHome()) {
+        globe->showBeamNote(QStringLiteral("Set your grid in Settings"));
+        globe->setFindBusy(false);
+        if (allowLookup && !havePoint && Gridsquare::normalize(grid).isEmpty() && qrz) {
+            globe->setFindBusy(true);
+            qrz->lookup(pendingCall);
+        }
+        return;
+    }
     double lat = latitude;
     double lon = longitude;
     if (!havePoint) {
@@ -315,6 +336,7 @@ void MainWindow::offerStation(const QString &call, const QString &grid, double l
             globe->setFindBusy(false);
         return;
     }
+    // QRZ (and any other fix) already supplied degrees. Do not replace them with the grid center.
     double bearing = 0;
     if (!Gridsquare::bearingTo(globe->homeLat(), globe->homeLon(), lat, lon, bearing)) {
         globe->clearBeamOffer();

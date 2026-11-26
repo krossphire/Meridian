@@ -178,8 +178,11 @@ QString formatLatLon(double lat, double lon)
 
 QString ResolvedLocation::summary() const
 {
+    const QString coords = formatLatLon(latitude, longitude);
+    if (source == Source::Coordinates)
+        return coords;
     const QString shown = entered.isEmpty() ? grid : entered;
-    return formatLatLon(latitude, longitude) + QStringLiteral("  ·  ") + shown;
+    return coords + QStringLiteral("  ·  ") + shown;
 }
 
 QString ResolvedLocation::detail() const
@@ -190,7 +193,10 @@ QString ResolvedLocation::detail() const
     case Source::Zip:
         return QStringLiteral("US Census 2020 ZCTA centroid");
     case Source::Coordinates:
-        return QStringLiteral("Parsed coordinates");
+        if (grid.isEmpty())
+            return QStringLiteral("Bearings use these coordinates.");
+        return QStringLiteral("Bearings use these coordinates. %1 is the 6-character square for display only.")
+            .arg(grid);
     }
     return {};
 }
@@ -281,7 +287,81 @@ std::optional<ResolvedLocation> resolveLocation(const QString &textIn, const Zip
     ResolvedLocation loc;
     loc.latitude = lat;
     loc.longitude = lon;
+    // Display label only. Callers must not turn this grid back into a center.
     loc.grid = Gridsquare::fromLatLon(lat, lon);
     loc.source = ResolvedLocation::Source::Coordinates;
     return loc;
+}
+
+bool parseAxis(const QString &textIn, bool latitude, double &out, QString *error)
+{
+    const auto fail = [&](const QString &message) {
+        if (error)
+            *error = message;
+        return false;
+    };
+    QString text = textIn.trimmed().toUpper();
+    if (text.isEmpty())
+        return fail(latitude ? QStringLiteral("Enter a latitude.") : QStringLiteral("Enter a longitude."));
+    QChar hemi;
+    if (text.front() == QLatin1Char('N') || text.front() == QLatin1Char('S') || text.front() == QLatin1Char('E')
+        || text.front() == QLatin1Char('W')) {
+        hemi = text.front();
+        text = text.mid(1).trimmed();
+    } else if (text.back() == QLatin1Char('N') || text.back() == QLatin1Char('S') || text.back() == QLatin1Char('E')
+               || text.back() == QLatin1Char('W')) {
+        hemi = text.back();
+        text.chop(1);
+        text = text.trimmed();
+    }
+    if (latitude && !hemi.isNull() && hemi != QLatin1Char('N') && hemi != QLatin1Char('S'))
+        return fail(QStringLiteral("Latitude takes N or S."));
+    if (!latitude && !hemi.isNull() && hemi != QLatin1Char('E') && hemi != QLatin1Char('W'))
+        return fail(QStringLiteral("Longitude takes E or W."));
+    const bool negative = text.startsWith(QLatin1Char('-'));
+    if (text.startsWith(QLatin1Char('+')) || text.startsWith(QLatin1Char('-')))
+        text = text.mid(1).trimmed();
+    bool ok = false;
+    const double magnitude = text.toDouble(&ok);
+    if (!ok || text.isEmpty())
+        return fail(QStringLiteral("Couldn't parse that coordinate."));
+    if (!hemi.isNull() && negative)
+        return fail(QStringLiteral("Use a sign or a hemisphere, not both."));
+    const double value = !hemi.isNull() ? ((hemi == QLatin1Char('S') || hemi == QLatin1Char('W')) ? -magnitude : magnitude)
+                                         : (negative ? -magnitude : magnitude);
+    if (latitude && std::abs(value) > 90.0)
+        return fail(QStringLiteral("Latitude must be within 90°."));
+    if (!latitude && std::abs(value) > 180.0)
+        return fail(QStringLiteral("Longitude must be within 180°."));
+    out = value;
+    return true;
+}
+
+std::optional<ResolvedLocation> resolveHome(const QString &place, const QString &latitude, const QString &longitude,
+                                            const ZipDatabase *zips, QString *error)
+{
+    const auto fail = [&](const QString &message) -> std::optional<ResolvedLocation> {
+        if (error)
+            *error = message;
+        return std::nullopt;
+    };
+    const QString latText = latitude.trimmed();
+    const QString lonText = longitude.trimmed();
+    if (latText.isEmpty() != lonText.isEmpty())
+        return fail(QStringLiteral("Enter both latitude and longitude, or leave both blank."));
+    if (!latText.isEmpty()) {
+        double lat = 0;
+        double lon = 0;
+        if (!parseAxis(latText, true, lat, error) || !parseAxis(lonText, false, lon, error))
+            return std::nullopt;
+        ResolvedLocation loc;
+        loc.latitude = lat;
+        loc.longitude = lon;
+        loc.grid = Gridsquare::fromLatLon(lat, lon);
+        loc.source = ResolvedLocation::Source::Coordinates;
+        return loc;
+    }
+    if (place.trimmed().isEmpty())
+        return fail(QStringLiteral("Set your grid in Settings"));
+    return resolveLocation(place, zips, error);
 }

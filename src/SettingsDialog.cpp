@@ -459,15 +459,52 @@ bool SettingsDialog::commitDraft(bool interactive)
     if (rotorIndex >= 0)
         storeRotor(rotorIndex);
     QString error;
-    if (!resolveLocation(homeEdit->text(), zips, &error)) {
+    const QString latText = homeLatEdit ? homeLatEdit->text().trimmed() : QString();
+    const QString lonText = homeLonEdit ? homeLonEdit->text().trimmed() : QString();
+    const QString place = homeEdit ? homeEdit->text().trimmed() : QString();
+    if (latText.isEmpty() != lonText.isEmpty()) {
         if (interactive) {
-            QMessageBox::warning(this, QStringLiteral("Location"), error);
+            QMessageBox::warning(this, QStringLiteral("Location"),
+                                 QStringLiteral("Enter both latitude and longitude, or leave both blank."));
             tabs->setCurrentIndex(0);
             committing = false;
             return false;
         }
-    } else {
-        draft.homeText = homeEdit->text().trimmed();
+    } else if (!latText.isEmpty()) {
+        if (!resolveHome(place, latText, lonText, zips, &error)) {
+            if (interactive) {
+                QMessageBox::warning(this, QStringLiteral("Location"), error);
+                tabs->setCurrentIndex(0);
+                committing = false;
+                return false;
+            }
+        } else {
+            draft.homeLatitude = latText;
+            draft.homeLongitude = lonText;
+            draft.homeText = place;
+        }
+    } else if (place.isEmpty()) {
+        draft.homeText.clear();
+        draft.homeLatitude.clear();
+        draft.homeLongitude.clear();
+    } else if (const auto loc = resolveLocation(place, zips, &error)) {
+        draft.homeText = place;
+        if (loc->source == ResolvedLocation::Source::Coordinates) {
+            draft.homeLatitude = QString::number(loc->latitude, 'g', 12);
+            draft.homeLongitude = QString::number(loc->longitude, 'g', 12);
+            if (homeLatEdit)
+                homeLatEdit->setText(draft.homeLatitude);
+            if (homeLonEdit)
+                homeLonEdit->setText(draft.homeLongitude);
+        } else {
+            draft.homeLatitude.clear();
+            draft.homeLongitude.clear();
+        }
+    } else if (interactive) {
+        QMessageBox::warning(this, QStringLiteral("Location"), error);
+        tabs->setCurrentIndex(0);
+        committing = false;
+        return false;
     }
     if (trafficBox)
         draft.trafficLog = trafficBox->isChecked();
@@ -519,6 +556,10 @@ void SettingsDialog::setConfig(const AppConfig &config)
 {
     draft = config;
     homeEdit->setText(draft.homeText);
+    if (homeLatEdit)
+        homeLatEdit->setText(draft.homeLatitude);
+    if (homeLonEdit)
+        homeLonEdit->setText(draft.homeLongitude);
     if (trafficBox)
         trafficBox->setChecked(draft.trafficLog);
     if (sunBox)
@@ -571,14 +612,24 @@ void SettingsDialog::buildStation()
     auto *page = new QWidget;
     auto *layout = new QVBoxLayout(page);
     auto *intro = new QLabel(QStringLiteral(
-        "Grid square, US ZIP code, or coordinates. "
-        "A 6-character grid such as EM26ul is much closer than EM26, which is only the default and about a degree wide. "
-        "Decimal degrees, N/S/E/W, degrees-minutes-seconds, and degrees with decimal minutes all work."));
+        "Grid square or US ZIP code. EM26 in this field is the default, the center of that square, until you replace it. "
+        "Decimal degrees and degrees with minutes still work in this field."));
     intro->setWordWrap(true);
     intro->setObjectName(QStringLiteral("hint"));
     homeEdit = new QLineEdit(draft.homeText);
     homeEdit->setObjectName(QStringLiteral("homeEdit"));
-    homeEdit->setPlaceholderText(QStringLiteral("EM26ul   or   72714   or   36°28.2'N 94°13.8'W"));
+    homeEdit->setPlaceholderText(QStringLiteral("EM26ul   or   36.5 N 95.0 W"));
+    auto *precision = new QLabel(QStringLiteral(
+        "For accurate beam headings, enter your lat/long or at least a 6-character grid."));
+    precision->setObjectName(QStringLiteral("homePrecisionHint"));
+    precision->setWordWrap(true);
+    precision->setStyleSheet(QStringLiteral("color: %1;").arg(statusToneColor(StatusTone::Busy).name()));
+    homeLatEdit = new QLineEdit(draft.homeLatitude);
+    homeLatEdit->setObjectName(QStringLiteral("homeLatitude"));
+    homeLatEdit->setPlaceholderText(QStringLiteral("Latitude"));
+    homeLonEdit = new QLineEdit(draft.homeLongitude);
+    homeLonEdit->setObjectName(QStringLiteral("homeLongitude"));
+    homeLonEdit->setPlaceholderText(QStringLiteral("Longitude"));
     summary = new QLabel;
     summary->setObjectName(QStringLiteral("summaryLabel"));
     summary->setTextInteractionFlags(Qt::TextSelectableByMouse);
@@ -586,6 +637,9 @@ void SettingsDialog::buildStation()
     detail->setObjectName(QStringLiteral("detailLabel"));
     layout->addWidget(intro);
     layout->addWidget(homeEdit);
+    layout->addWidget(precision);
+    layout->addWidget(homeLatEdit);
+    layout->addWidget(homeLonEdit);
     layout->addWidget(summary);
     layout->addWidget(detail);
     trafficBox = new QCheckBox(QStringLiteral("Record rotor traffic"));
@@ -636,17 +690,27 @@ void SettingsDialog::buildStation()
     layout->addLayout(idleRow);
     layout->addStretch();
     connect(homeEdit, &QLineEdit::textChanged, this, [this]() { refreshLocation(); });
+    connect(homeLatEdit, &QLineEdit::textChanged, this, [this]() { refreshLocation(); });
+    connect(homeLonEdit, &QLineEdit::textChanged, this, [this]() { refreshLocation(); });
     tabs->addTab(page, QStringLiteral("Station"));
 }
 
 void SettingsDialog::refreshLocation()
 {
     QString error;
-    if (const auto loc = resolveLocation(homeEdit->text(), zips, &error)) {
+    const QString latText = homeLatEdit ? homeLatEdit->text() : QString();
+    const QString lonText = homeLonEdit ? homeLonEdit->text() : QString();
+    const QString place = homeEdit ? homeEdit->text() : QString();
+    const auto loc = resolveHome(place, latText, lonText, zips, &error);
+    if (loc) {
         summary->setText(loc->summary());
         detail->setText(loc->detail());
         summary->setStyleSheet(QStringLiteral("color: #d5e2db; font-size: 15px;"));
         detail->setStyleSheet(QStringLiteral("color: #8ea099;"));
+    } else if (place.trimmed().isEmpty() && latText.trimmed().isEmpty() && lonText.trimmed().isEmpty()) {
+        summary->setText(QStringLiteral("Set your grid in Settings"));
+        detail->clear();
+        summary->setStyleSheet(QStringLiteral("color: #8ea099; font-size: 15px;"));
     } else {
         summary->setText(error);
         detail->clear();

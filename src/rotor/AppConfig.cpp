@@ -49,6 +49,8 @@ AppConfig AppConfig::load(QSettings &settings)
     const int idle = std::clamp(settings.value(QStringLiteral("link/idlePoll"), 30).toInt(), 30, 60);
     const bool network = settings.value(QStringLiteral("link/networkConnection"), false).toBool();
     config.homeText = settings.value(QStringLiteral("home/text"), QStringLiteral("EM26")).toString();
+    config.homeLatitude = settings.value(QStringLiteral("home/latitude")).toString().trimmed();
+    config.homeLongitude = settings.value(QStringLiteral("home/longitude")).toString().trimmed();
     const int count = settings.beginReadArray(QStringLiteral("rotors"));
     for (int i = 0; i < count; ++i) {
         settings.setArrayIndex(i);
@@ -72,7 +74,11 @@ AppConfig AppConfig::load(QSettings &settings)
     }
     settings.endArray();
     if (config.rotors.isEmpty()) {
+        const QString homeLat = config.homeLatitude;
+        const QString homeLon = config.homeLongitude;
         config = defaults();
+        config.homeLatitude = homeLat;
+        config.homeLongitude = homeLon;
         config.trafficLog = traffic;
         config.showSun = sun;
         config.compassButtons = compass;
@@ -108,6 +114,8 @@ AppConfig AppConfig::load(QSettings &settings)
 void AppConfig::save(QSettings &settings) const
 {
     settings.setValue(QStringLiteral("home/text"), homeText);
+    settings.setValue(QStringLiteral("home/latitude"), homeLatitude.trimmed());
+    settings.setValue(QStringLiteral("home/longitude"), homeLongitude.trimmed());
     settings.beginWriteArray(QStringLiteral("rotors"), rotors.size());
     for (int i = 0; i < rotors.size(); ++i) {
         settings.setArrayIndex(i);

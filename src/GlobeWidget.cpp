@@ -697,6 +697,16 @@ void GlobeWidget::setHome(double lat, double lon)
     requestMap(true);
 }
 
+void GlobeWidget::clearHome()
+{
+    if (!haveHome)
+        return;
+    haveHome = false;
+    hoverIndex = -1;
+    sunDirty = true;
+    requestMap(true);
+}
+
 void GlobeWidget::setHeading(std::optional<double> azimuth)
 {
     heading = azimuth;
@@ -776,10 +786,24 @@ void GlobeWidget::setBeamOffer(const QString &call, double azimuth, const QStrin
     beamGap = -1;
     beamCall = call.trimmed().toUpper();
     beamAzimuth = azimuth;
+    beamHasAzimuth = !beamCall.isEmpty();
     if (auto *button = static_cast<BeamButton *>(beam))
         button->setOffer(beamCall, beamAzimuth);
     if (beamNote)
         beamNote->setText(approxNote);
+    placeBeam();
+    update();
+}
+
+void GlobeWidget::showBeamNote(const QString &text)
+{
+    beamGap = -1;
+    beamCall.clear();
+    beamHasAzimuth = false;
+    if (beam)
+        beam->hide();
+    if (beamNote)
+        beamNote->setText(text);
     placeBeam();
     update();
 }
@@ -814,11 +838,21 @@ void GlobeWidget::placeBeam()
     if (!beam)
         return;
     auto *button = static_cast<BeamButton *>(beam);
-    const bool show = loggerBeam && !beamCall.isEmpty() && width() >= 420;
+    const bool show = loggerBeam && beamHasAzimuth && !beamCall.isEmpty() && width() >= 420;
     if (!show) {
         button->hide();
-        if (beamNote)
-            beamNote->hide();
+        if (!loggerBeam || !beamNote || beamNote->text().isEmpty() || width() < 420) {
+            if (beamNote)
+                beamNote->hide();
+            return;
+        }
+        beamNote->adjustSize();
+        int noteX = width() - beamNote->width() - 10;
+        if (noteX < 8)
+            noteX = 8;
+        beamNote->setGeometry(noteX, 10, beamNote->width(), beamNote->height());
+        beamNote->show();
+        beamNote->raise();
         return;
     }
     const QSize hint = button->sizeHint();

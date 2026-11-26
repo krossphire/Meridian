@@ -24,7 +24,12 @@ struct RotorEndpoint {
 };
 
 struct AppConfig {
+    // Visible default until the operator replaces it. Bearings use it only while it is saved.
     QString homeText = QStringLiteral("EM26");
+    // Blank unless the operator entered coordinates. When both are set they win over homeText,
+    // and bearings use these degrees directly. A 6-character grid is display only.
+    QString homeLatitude;
+    QString homeLongitude;
     QVector<RotorEndpoint> rotors;
     int active = 0;
     bool trafficLog = true;

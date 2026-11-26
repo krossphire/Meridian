@@ -59,6 +59,7 @@ private slots:
     void sourcesAndQrzRoundTrip();
     void findReturnsToIdleWhenLookupFails();
     void qrzLatLonReplacesPrefixBearing();
+    void homeCoordinatesDriveTheBearing();
 #ifdef Q_OS_UNIX
     void liveSerialFindStopsAndResumesAfterTheProbe();
     void networkConnectionDefaultsOffAndBlocksTheModule();
@@ -912,6 +913,96 @@ void TestSettings::qrzLatLonReplacesPrefixBearing()
 
     QrzClient::holdScriptedLookupForTests(false);
     CredentialStore::useMemoryForTests(false);
+}
+
+void TestSettings::homeCoordinatesDriveTheBearing()
+{
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+
+    AppConfig config = AppConfig::defaults();
+    MainWindow window(config, nullptr);
+    window.resize(900, 900);
+    window.show();
+    SettingsDialog *dialog = window.settingsDialog();
+    auto *hint = dialog->findChild<QLabel *>(QStringLiteral("homePrecisionHint"));
+    auto *home = dialog->findChild<QLineEdit *>(QStringLiteral("homeEdit"));
+    auto *lat = dialog->findChild<QLineEdit *>(QStringLiteral("homeLatitude"));
+    auto *lon = dialog->findChild<QLineEdit *>(QStringLiteral("homeLongitude"));
+    auto *box = dialog->findChild<QDialogButtonBox *>();
+    QVERIFY(hint && home && lat && lon && box);
+    QCOMPARE(hint->text(), QStringLiteral(
+                              "For accurate beam headings, enter your lat/long or at least a 6-character grid."));
+    QVERIFY(hint->styleSheet().contains(statusToneColor(StatusTone::Busy).name(), Qt::CaseInsensitive));
+    QVERIFY(lat->text().isEmpty());
+    QVERIFY(lon->text().isEmpty());
+    QCOMPARE(home->text(), QStringLiteral("EM26"));
+
+    auto *save = box->button(QDialogButtonBox::Save);
+    QVERIFY(save);
+    home->setText(QStringLiteral("36.25 N 94.25 W"));
+    save->click();
+    QCOMPARE(window.globeWidget()->hasHome(), true);
+
+    QFile ini(UserFiles::settingsPath());
+    QVERIFY(ini.open(QIODevice::ReadOnly));
+    const QString saved = QString::fromUtf8(ini.readAll());
+    ini.close();
+    QVERIFY(saved.contains(QStringLiteral("36.25")));
+    QVERIFY(saved.contains(QStringLiteral("-94.25")));
+
+    auto *globe = window.globeWidget();
+    globe->revealCallsign();
+    auto *edit = globe->findChild<QLineEdit *>(QStringLiteral("callsignEdit"));
+    auto *find = globe->findChild<QAbstractButton *>(QStringLiteral("findCall"));
+    QVERIFY(edit && find);
+    QrzClient::scriptNextLookupForTests(36.0, -94.25, QStringLiteral("EM26"), true);
+    edit->setText(QStringLiteral("W1AW"));
+    QTest::mouseClick(find, Qt::LeftButton);
+    auto *beam = globe->findChild<QAbstractButton *>(QStringLiteral("beamButton"));
+    QVERIFY(beam && beam->isVisible());
+    QVERIFY(beam->text().contains(QStringLiteral("180.0")));
+    QVERIFY(!beam->text().contains(QStringLiteral("187.1")));
+
+    home->setText(QStringLiteral("EM26"));
+    lat->setText(QStringLiteral("36.25"));
+    lon->setText(QStringLiteral("-94.25"));
+    save->click();
+    globe->revealCallsign();
+    edit = globe->findChild<QLineEdit *>(QStringLiteral("callsignEdit"));
+    find = globe->findChild<QAbstractButton *>(QStringLiteral("findCall"));
+    QrzClient::scriptNextLookupForTests(36.0, -94.25, QStringLiteral("EM26"), true);
+    edit->setText(QStringLiteral("W1AW"));
+    QTest::mouseClick(find, Qt::LeftButton);
+    QVERIFY(beam->text().contains(QStringLiteral("180.0")));
+    QVERIFY(!beam->text().contains(QStringLiteral("110.6")));
+
+    lat->clear();
+    lon->clear();
+    home->setText(QStringLiteral("JO01"));
+    save->click();
+    globe->revealCallsign();
+    edit = globe->findChild<QLineEdit *>(QStringLiteral("callsignEdit"));
+    find = globe->findChild<QAbstractButton *>(QStringLiteral("findCall"));
+    edit->setText(QStringLiteral("T1ST KG54"));
+    QTest::mouseClick(find, Qt::LeftButton);
+    QVERIFY(beam->text().contains(QStringLiteral("152.8")));
+
+    home->setText(QStringLiteral("FN31"));
+    save->click();
+    QVERIFY(beam->text().contains(QStringLiteral("101.5")));
+    QVERIFY(!beam->text().contains(QStringLiteral("152.8")));
+
+    home->clear();
+    lat->clear();
+    lon->clear();
+    save->click();
+    auto *note = globe->findChild<QLabel *>(QStringLiteral("beamApprox"));
+    QVERIFY(note && note->isVisible());
+    QCOMPARE(note->text(), QStringLiteral("Set your grid in Settings"));
+    QVERIFY(!beam->isVisible());
+    QCOMPARE(globe->hasHome(), false);
 }
 
 QTEST_MAIN(TestSettings)

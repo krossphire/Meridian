@@ -102,6 +102,8 @@ private:
     QLabel *multiplier = nullptr;
     QLabel *magnetic = nullptr;
     QLineEdit *homeEdit = nullptr;
+    QLineEdit *homeLatEdit = nullptr;
+    QLineEdit *homeLonEdit = nullptr;
     QLabel *summary = nullptr;
     QLabel *detail = nullptr;
     class QCheckBox *trafficBox = nullptr;
