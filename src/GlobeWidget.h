@@ -22,6 +22,7 @@
 #include <optional>
 
 class QAbstractButton;
+class QLabel;
 class QLineEdit;
 class QComboBox;
 class QPainter;
@@ -49,7 +50,7 @@ public:
     void setCompassVisible(bool on);
     bool compassVisible() const { return compassOn; }
     void setLoggerBeamEnabled(bool on);
-    void setBeamOffer(const QString &call, double azimuth);
+    void setBeamOffer(const QString &call, double azimuth, const QString &approxNote = QString());
     void clearBeamOffer();
     void revealCallsign(const QString &seed = QString());
     void setFindBusy(bool busy);
@@ -144,6 +145,7 @@ private:
     double beamGap = -1;
     bool beamClick = false;
     QAbstractButton *beam = nullptr;
+    QLabel *beamNote = nullptr;
     QAbstractButton *callButton = nullptr;
     QAbstractButton *findCall = nullptr;
     QLineEdit *callEdit = nullptr;

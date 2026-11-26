@@ -60,6 +60,20 @@ void TestSources::qrzXmlUsesLatLonNotBearing()
     const QrzXml record = parseQrzXml(lookup);
     QCOMPARE(record.call, QStringLiteral("C91RU"));
     QCOMPARE(record.grid, QStringLiteral("KG54"));
+    const QByteArray nearby = R"(<?xml version="1.0" ?>
+<QRZDatabase version="1.34">
+  <Callsign>
+    <call>K5KAC</call>
+    <lat>36.430000</lat>
+    <lon>-94.270000</lon>
+    <grid>EM26ul</grid>
+  </Callsign>
+</QRZDatabase>)";
+    const QrzXml local = parseQrzXml(nearby);
+    QCOMPARE(local.grid, QStringLiteral("EM26UL"));
+    QVERIFY(local.haveLatitude && local.haveLongitude);
+    QCOMPARE(local.latitude, 36.43);
+    QCOMPARE(local.longitude, -94.27);
     QVERIFY(record.haveLatitude && record.haveLongitude);
     QVERIFY(!record.sawBearing);
     double fromGrid = 0;

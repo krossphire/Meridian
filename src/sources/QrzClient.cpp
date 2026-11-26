@@ -20,6 +20,17 @@ namespace {
 const QString kEndpoint = QStringLiteral("https://xmldata.qrz.com/xml/current/");
 constexpr int kLookupTimeoutMs = 8000;
 bool failNextLookup = false;
+bool holdScripted = false;
+QrzClient *scriptedOwner = nullptr;
+
+struct ScriptedFix {
+    bool armed = false;
+    double lat = 0;
+    double lon = 0;
+    QString grid;
+    bool havePoint = false;
+};
+ScriptedFix pendingScript;
 
 } // namespace
 
@@ -47,6 +58,24 @@ void QrzClient::failNextLookupForTests(bool on)
     failNextLookup = on;
 }
 
+void QrzClient::scriptNextLookupForTests(double latitude, double longitude, const QString &grid, bool havePoint)
+{
+    pendingScript = ScriptedFix{true, latitude, longitude, grid, havePoint};
+}
+
+void QrzClient::holdScriptedLookupForTests(bool on)
+{
+    holdScripted = on;
+}
+
+void QrzClient::releaseScriptedLookupForTests()
+{
+    QrzClient *client = scriptedOwner;
+    scriptedOwner = nullptr;
+    if (client)
+        client->deliverScripted();
+}
+
 void QrzClient::lookup(const QString &call)
 {
     const QString wanted = call.trimmed().toUpper();
@@ -56,6 +85,18 @@ void QrzClient::lookup(const QString &call)
     }
     pendingCall = wanted;
     sessionRetried = false;
+    if (pendingScript.armed) {
+        scriptLat = pendingScript.lat;
+        scriptLon = pendingScript.lon;
+        scriptGrid = pendingScript.grid;
+        scriptPoint = pendingScript.havePoint;
+        scripted = true;
+        pendingScript.armed = false;
+        scriptedOwner = this;
+        if (!holdScripted)
+            deliverScripted();
+        return;
+    }
     if (failNextLookup) {
         failNextLookup = false;
         fail(QStringLiteral("QRZ lookup failed"));
@@ -71,6 +112,16 @@ void QrzClient::lookup(const QString &call)
         login();
     else
         fetch(pendingCall);
+}
+
+void QrzClient::deliverScripted()
+{
+    if (!scripted)
+        return;
+    scripted = false;
+    scriptedOwner = nullptr;
+    emit located(pendingCall, scriptGrid, scriptLat, scriptLon, scriptPoint);
+    emit lookupFinished(true);
 }
 
 void QrzClient::login()

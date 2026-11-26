@@ -18,6 +18,7 @@
 #include "sources/QrzClient.h"
 
 #include "GlobeWidget.h"
+#include "core/Gridsquare.h"
 #include "map/Dxcc.h"
 #include "StatusTone.h"
 #include "StatusTone.h"
@@ -57,6 +58,7 @@ private slots:
     void qrzPasswordIsNotWrittenToIni();
     void sourcesAndQrzRoundTrip();
     void findReturnsToIdleWhenLookupFails();
+    void qrzLatLonReplacesPrefixBearing();
 #ifdef Q_OS_UNIX
     void liveSerialFindStopsAndResumesAfterTheProbe();
     void networkConnectionDefaultsOffAndBlocksTheModule();
@@ -854,6 +856,61 @@ void TestSettings::findReturnsToIdleWhenLookupFails()
     QCOMPARE(globe->statusToneValue(), StatusTone::Busy);
     QCOMPARE(turns.size(), 0);
 
+    CredentialStore::useMemoryForTests(false);
+}
+
+void TestSettings::qrzLatLonReplacesPrefixBearing()
+{
+    CredentialStore::useMemoryForTests(true);
+    CredentialStore::store(QStringLiteral("K5PO"), QStringLiteral("s3cret-not-for-ini"));
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+
+    QFile dxccNames(QString::fromLatin1(MERIDIAN_DATA_DIR) + QStringLiteral("/dxcc-names.tsv"));
+    QFile dxccBin(QString::fromLatin1(MERIDIAN_DATA_DIR) + QStringLiteral("/dxcc.bin"));
+    QVERIFY(dxccNames.open(QIODevice::ReadOnly));
+    QVERIFY(dxccBin.open(QIODevice::ReadOnly));
+    QVERIFY(loadDxcc(dxccBin.readAll(), dxccNames.readAll()));
+
+    AppConfig config = AppConfig::defaults();
+    config.qrzUsername = QStringLiteral("K5PO");
+    config.homeText = QStringLiteral("EM26ul");
+    QrzClient::holdScriptedLookupForTests(true);
+    QrzClient::scriptNextLookupForTests(36.43, -94.27, QStringLiteral("EM26ul"), true);
+
+    MainWindow window(config, nullptr);
+    window.resize(900, 900);
+    window.show();
+    auto *globe = window.findChild<GlobeWidget *>();
+    QVERIFY(globe);
+    QSignalSpy turns(globe, &GlobeWidget::bearingRequested);
+    globe->revealCallsign();
+    auto *edit = globe->findChild<QLineEdit *>(QStringLiteral("callsignEdit"));
+    auto *find = globe->findChild<QAbstractButton *>(QStringLiteral("findCall"));
+    QVERIFY(edit && find);
+    edit->setText(QStringLiteral("KL7AA"));
+    QTest::mouseClick(find, Qt::LeftButton);
+
+    auto *beam = globe->findChild<QAbstractButton *>(QStringLiteral("beamButton"));
+    auto *note = globe->findChild<QLabel *>(QStringLiteral("beamApprox"));
+    QVERIFY(beam && beam->isVisible());
+    QVERIFY(note && note->isVisible());
+    QCOMPARE(note->text(), QStringLiteral("approx. — country center"));
+    const QString coarse = beam->text();
+
+    QrzClient::releaseScriptedLookupForTests();
+    QVERIFY(beam->isVisible());
+    QVERIFY(beam->text() != coarse);
+    QVERIFY(beam->text().contains(QStringLiteral("KL7AA")));
+    double expect = 0;
+    QVERIFY(Gridsquare::bearingTo(globe->homeLat(), globe->homeLon(), 36.43, -94.27, expect));
+    QVERIFY(beam->text().contains(QString::number(expect, 'f', 1)));
+    QVERIFY(!note->isVisible());
+    QCOMPARE(turns.size(), 0);
+    QVERIFY(!window.driver() || window.driver()->link() == Rt21Driver::Link::Off);
+
+    QrzClient::holdScriptedLookupForTests(false);
     CredentialStore::useMemoryForTests(false);
 }
 

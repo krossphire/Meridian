@@ -572,12 +572,13 @@ void SettingsDialog::buildStation()
     auto *layout = new QVBoxLayout(page);
     auto *intro = new QLabel(QStringLiteral(
         "Grid square, US ZIP code, or coordinates. "
+        "A 6-character grid such as EM26ul is much closer than EM26, which is only the default and about a degree wide. "
         "Decimal degrees, N/S/E/W, degrees-minutes-seconds, and degrees with decimal minutes all work."));
     intro->setWordWrap(true);
     intro->setObjectName(QStringLiteral("hint"));
     homeEdit = new QLineEdit(draft.homeText);
     homeEdit->setObjectName(QStringLiteral("homeEdit"));
-    homeEdit->setPlaceholderText(QStringLiteral("EM26   or   72714   or   36°28.2'N 94°13.8'W"));
+    homeEdit->setPlaceholderText(QStringLiteral("EM26ul   or   72714   or   36°28.2'N 94°13.8'W"));
     summary = new QLabel;
     summary->setObjectName(QStringLiteral("summaryLabel"));
     summary->setTextInteractionFlags(Qt::TextSelectableByMouse);
