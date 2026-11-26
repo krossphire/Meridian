@@ -15,6 +15,7 @@
 #include "rotor/Rt21Driver.h"
 #include "rotor/UserFiles.h"
 #include "sources/CredentialStore.h"
+#include "sources/QrzClient.h"
 
 #include "GlobeWidget.h"
 #include "StatusTone.h"
@@ -54,6 +55,7 @@ private slots:
     void tcpConnectTurnsNetworkConnectionOn();
     void qrzPasswordIsNotWrittenToIni();
     void sourcesAndQrzRoundTrip();
+    void findReturnsToIdleWhenLookupFails();
 #ifdef Q_OS_UNIX
     void liveSerialFindStopsAndResumesAfterTheProbe();
     void networkConnectionDefaultsOffAndBlocksTheModule();
@@ -788,6 +790,57 @@ void TestSettings::sourcesAndQrzRoundTrip()
     QVERIFY(windowStatus->text().contains(QStringLiteral("Couldn't write meridian.ini.")));
     QVERIFY(windowStatus->styleSheet().contains(statusToneColor(StatusTone::Busy).name()));
     QFile::setPermissions(dir.path(), QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+
+    CredentialStore::useMemoryForTests(false);
+}
+
+void TestSettings::findReturnsToIdleWhenLookupFails()
+{
+    CredentialStore::useMemoryForTests(true);
+    QrzClient::failNextLookupForTests(true);
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+
+    AppConfig config = AppConfig::defaults();
+    config.qrzUsername = QStringLiteral("K5PO");
+    CredentialStore::store(QStringLiteral("K5PO"), QStringLiteral("s3cret-not-for-ini"));
+
+    MainWindow window(config, nullptr);
+    window.resize(900, 900);
+    window.show();
+    auto *globe = window.findChild<GlobeWidget *>();
+    QVERIFY(globe);
+    QSignalSpy turns(globe, &GlobeWidget::bearingRequested);
+    globe->revealCallsign();
+    auto *edit = globe->findChild<QLineEdit *>(QStringLiteral("callsignEdit"));
+    auto *find = globe->findChild<QAbstractButton *>(QStringLiteral("findCall"));
+    QVERIFY(edit && find);
+    QVERIFY(find->isVisible());
+    QCOMPARE(find->text(), QStringLiteral("Find >"));
+    QVERIFY(find->isEnabled());
+    edit->setText(QStringLiteral("C91RU"));
+    QTest::mouseClick(find, Qt::LeftButton);
+
+    QCOMPARE(find->text(), QStringLiteral("Find >"));
+    QVERIFY(find->isEnabled());
+    QCOMPARE(globe->statusText(), QStringLiteral("QRZ lookup failed"));
+    QCOMPARE(globe->statusToneValue(), StatusTone::Busy);
+    QCOMPARE(turns.size(), 0);
+    QVERIFY(!window.driver() || window.driver()->link() == Rt21Driver::Link::Off);
+    QVERIFY(!window.driver() || !window.driver()->target());
+
+    QrzClient::failNextLookupForTests(false);
+    CredentialStore::forget(QStringLiteral("K5PO"));
+    globe->revealCallsign();
+    edit->setText(QStringLiteral("C91RU"));
+    find = globe->findChild<QAbstractButton *>(QStringLiteral("findCall"));
+    QTest::mouseClick(find, Qt::LeftButton);
+    QCOMPARE(find->text(), QStringLiteral("Find >"));
+    QVERIFY(find->isEnabled());
+    QCOMPARE(globe->statusText(), QStringLiteral("QRZ login needed"));
+    QCOMPARE(globe->statusToneValue(), StatusTone::Busy);
+    QCOMPARE(turns.size(), 0);
 
     CredentialStore::useMemoryForTests(false);
 }

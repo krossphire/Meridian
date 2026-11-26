@@ -76,4 +76,5 @@ private:
     DxKeeperSource *dxKeeper = nullptr;
     QlogSource *qlog = nullptr;
     QString pendingCall;
+    qint64 findNoteUntilMs = 0;
 };
