@@ -36,6 +36,7 @@ struct AppConfig {
     bool showSun = true;
     bool compassButtons = true;
     bool loggerBeamButton = true;
+    bool showTargetBearingLine = true;
     QString qrzUsername;
     int wsjtPort = 0;
     QString wsjtMulticast;

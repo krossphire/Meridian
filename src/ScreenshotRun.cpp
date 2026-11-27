@@ -116,6 +116,8 @@ int runScreenshots(const QString &directory, qreal dpr)
     QApplication::processEvents();
     if (!window.grab().save(directory + QStringLiteral("/beam-button.png")))
         return 27;
+    if (!window.grab().save(directory + QStringLiteral("/target-line.png")))
+        return 29;
     window.globeWidget()->clearBeamOffer();
 
     window.globeWidget()->setShowSun(true);
@@ -196,9 +198,15 @@ int runScreenshots(const QString &directory, qreal dpr)
     if (!dialog->grab().save(directory + QStringLiteral("/settings.png")))
         return 11;
     dialog->showPage(3);
+    dialog->resize(760, 1280);
     QApplication::processEvents();
+    auto *qlogNote = dialog->findChild<QLabel *>(QStringLiteral("qlogPortNote"));
+    if (!qlogNote || !qlogNote->text().contains(QStringLiteral("127.0.0.1:5775")))
+        return 30;
     if (!dialog->grab().save(directory + QStringLiteral("/settings-sources.png")))
         return 28;
+    if (!dialog->grab().save(directory + QStringLiteral("/sources-qlog.png")))
+        return 31;
     dialog->showPage(0);
 
     dialog->showPage(2);

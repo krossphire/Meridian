@@ -88,6 +88,7 @@ MainWindow::MainWindow(AppConfig initial, QSettings *store, QWidget *parent)
     globe->setShowSun(config.showSun);
     globe->setCompassVisible(config.compassButtons);
     globe->setLoggerBeamEnabled(config.loggerBeamButton);
+    globe->setShowTargetLine(config.showTargetBearingLine);
     connectActive();
 
     statusTimer = new QTimer(this);
@@ -168,6 +169,7 @@ void MainWindow::applyConfig(const AppConfig &saved)
     globe->setShowSun(config.showSun);
     globe->setCompassVisible(config.compassButtons);
     globe->setLoggerBeamEnabled(config.loggerBeamButton);
+    globe->setShowTargetLine(config.showTargetBearingLine);
     refreshQrz();
     refreshWsjt();
     refreshN1mm();

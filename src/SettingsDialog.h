@@ -110,6 +110,7 @@ private:
     class QCheckBox *sunBox = nullptr;
     class QCheckBox *compassBox = nullptr;
     class QCheckBox *beamBox = nullptr;
+    class QCheckBox *targetLineBox = nullptr;
     QLineEdit *qrzUserEdit = nullptr;
     QLineEdit *qrzPassEdit = nullptr;
     bool qrzPassStored = false;

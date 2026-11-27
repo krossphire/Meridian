@@ -48,6 +48,20 @@ inline QColor onHeadingGreen()
     return QColor(125, 206, 160, 210);
 }
 
+// Light cyan shared by the Beam toward button and the target bearing line.
+// The line uses this color at about 60% opacity. This is not a status color.
+inline QColor targetBearingColor()
+{
+    return QColor(126, 214, 232);
+}
+
+inline QColor targetBearingLineColor()
+{
+    QColor color = targetBearingColor();
+    color.setAlpha(153);
+    return color;
+}
+
 inline QColor statusToneColor(StatusTone tone)
 {
     switch (tone) {

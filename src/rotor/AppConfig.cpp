@@ -28,6 +28,7 @@ AppConfig AppConfig::defaults()
     config.showSun = true;
     config.compassButtons = true;
     config.loggerBeamButton = true;
+    config.showTargetBearingLine = true;
     config.idlePollSeconds = 30;
     config.networkConnection = false;
     return config;
@@ -40,6 +41,7 @@ AppConfig AppConfig::load(QSettings &settings)
     const bool sun = settings.value(QStringLiteral("view/sun"), true).toBool();
     const bool compass = settings.value(QStringLiteral("ui/compassButtons"), true).toBool();
     const bool beam = settings.value(QStringLiteral("ui/loggerBeamButton"), true).toBool();
+    const bool targetLine = settings.value(QStringLiteral("ui/showTargetBearingLine"), true).toBool();
     const QString qrzUser = settings.value(QStringLiteral("qrz/username")).toString();
     const int wsjt = settings.value(QStringLiteral("sources/wsjtPort"), 0).toInt();
     const QString wsjtGroup = settings.value(QStringLiteral("sources/wsjtMulticast")).toString();
@@ -85,6 +87,7 @@ AppConfig AppConfig::load(QSettings &settings)
         config.showSun = sun;
         config.compassButtons = compass;
         config.loggerBeamButton = beam;
+        config.showTargetBearingLine = targetLine;
         config.qrzUsername = qrzUser;
         config.wsjtPort = wsjt > 0 && wsjt <= 65535 ? wsjt : 0;
         config.wsjtMulticast = wsjtGroup.trimmed();
@@ -99,6 +102,7 @@ AppConfig AppConfig::load(QSettings &settings)
     config.showSun = sun;
     config.compassButtons = compass;
     config.loggerBeamButton = beam;
+    config.showTargetBearingLine = targetLine;
     config.qrzUsername = qrzUser;
     config.wsjtPort = wsjt > 0 && wsjt <= 65535 ? wsjt : 0;
     config.wsjtMulticast = wsjtGroup.trimmed();
@@ -141,6 +145,7 @@ void AppConfig::save(QSettings &settings) const
     settings.setValue(QStringLiteral("view/sun"), showSun);
     settings.setValue(QStringLiteral("ui/compassButtons"), compassButtons);
     settings.setValue(QStringLiteral("ui/loggerBeamButton"), loggerBeamButton);
+    settings.setValue(QStringLiteral("ui/showTargetBearingLine"), showTargetBearingLine);
     settings.setValue(QStringLiteral("qrz/username"), qrzUsername.trimmed());
     settings.setValue(QStringLiteral("sources/wsjtPort"), wsjtPort > 0 ? wsjtPort : 0);
     settings.setValue(QStringLiteral("sources/wsjtMulticast"), wsjtMulticast.trimmed());

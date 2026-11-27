@@ -512,6 +512,8 @@ bool SettingsDialog::commitDraft(bool interactive)
         draft.compassButtons = compassBox->isChecked();
     if (beamBox)
         draft.loggerBeamButton = beamBox->isChecked();
+    if (targetLineBox)
+        draft.showTargetBearingLine = targetLineBox->isChecked();
     if (qrzUserEdit)
         draft.qrzUsername = qrzUserEdit->text().trimmed();
     if (wsjtPortEdit) {
@@ -566,6 +568,8 @@ void SettingsDialog::setConfig(const AppConfig &config)
         compassBox->setChecked(draft.compassButtons);
     if (beamBox)
         beamBox->setChecked(draft.loggerBeamButton);
+    if (targetLineBox)
+        targetLineBox->setChecked(draft.showTargetBearingLine);
     if (qrzUserEdit)
         qrzUserEdit->setText(draft.qrzUsername);
     if (wsjtPortEdit)
@@ -681,9 +685,13 @@ void SettingsDialog::buildStation()
     beamBox = new QCheckBox(QStringLiteral("Logger beam button"));
     beamBox->setChecked(draft.loggerBeamButton);
     beamBox->setObjectName(QStringLiteral("loggerBeamButton"));
+    targetLineBox = new QCheckBox(QStringLiteral("Show target bearing line"));
+    targetLineBox->setChecked(draft.showTargetBearingLine);
+    targetLineBox->setObjectName(QStringLiteral("showTargetBearingLine"));
     layout->addSpacing(8);
     layout->addWidget(compassBox);
     layout->addWidget(beamBox);
+    layout->addWidget(targetLineBox);
     layout->addWidget(sunBox);
     layout->addLayout(idleRow);
     layout->addStretch();
@@ -818,21 +826,22 @@ void SettingsDialog::buildSources()
     layout->addSpacing(18);
     layout->addWidget(keeper);
     layout->addWidget(dxKeeperBox);
-    auto *qlog = new QLabel(QStringLiteral(
-        "QLog does not send the callsign under the cursor yet. "
-        "contrib/qlog-currentcontact/ is a draft patch that adds a UDP notification, msgtype currentcontact, "
-        "with the callsign, grid, and QLog's own short-path azimuth, when the New Contact callsign or grid changes. "
-        "Point that notification at 127.0.0.1 and the port you type here. The port stays empty until you do. "
-        "When the message has a grid, Meridian computes the bearing from your home and ignores QLog's azimuth. "
-        "QLog's azimuth is used only when the grid is missing."));
-    qlog->setWordWrap(true);
-    qlog->setObjectName(QStringLiteral("hint"));
     qlogPortEdit = new QLineEdit(draft.qlogPort > 0 ? QString::number(draft.qlogPort) : QString());
     qlogPortEdit->setObjectName(QStringLiteral("qlogPort"));
     qlogPortEdit->setPlaceholderText(QStringLiteral("QLog current-contact port"));
+    auto *qlog = new QLabel(QStringLiteral(
+        "Needs a QLog build with the Current Contact notification (the patch in contrib/qlog-currentcontact). "
+        "In QLog: Settings > Network > Notifications > Current Contact, enter 127.0.0.1:<this port> "
+        "(for example 127.0.0.1:5775), and type the same port here. Leave it empty to turn it off. "
+        "This is separate from the WSJT-X 2237 feed; don't change that. "
+        "When the message has a grid, Meridian computes the bearing from your home. "
+        "QLog's azimuth is used only when the grid is missing."));
+    qlog->setWordWrap(true);
+    qlog->setObjectName(QStringLiteral("qlogPortNote"));
+    qlog->setStyleSheet(QStringLiteral("color: #8ea099;"));
     layout->addSpacing(18);
-    layout->addWidget(qlog);
     layout->addWidget(qlogPortEdit);
+    layout->addWidget(qlog);
     layout->addStretch();
     tabs->addTab(page, QStringLiteral("Sources"));
 }

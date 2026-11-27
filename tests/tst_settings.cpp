@@ -739,7 +739,14 @@ void TestSettings::sourcesAndQrzRoundTrip()
     auto *n1mmPort = dialog.findChild<QLineEdit *>(QStringLiteral("n1mmPort"));
     auto *dxKeeper = dialog.findChild<QCheckBox *>(QStringLiteral("dxKeeper"));
     auto *qlogPort = dialog.findChild<QLineEdit *>(QStringLiteral("qlogPort"));
-    QVERIFY(wsjtPort && wsjtGroup && n1mmPort && dxKeeper && qlogPort);
+    auto *qlogNote = dialog.findChild<QLabel *>(QStringLiteral("qlogPortNote"));
+    auto *targetLine = dialog.findChild<QCheckBox *>(QStringLiteral("showTargetBearingLine"));
+    QVERIFY(wsjtPort && wsjtGroup && n1mmPort && dxKeeper && qlogPort && qlogNote && targetLine);
+    QVERIFY(qlogPort->text().isEmpty());
+    QVERIFY(targetLine->isChecked());
+    QVERIFY(qlogNote->text().contains(QStringLiteral("127.0.0.1:5775")));
+    QVERIFY(qlogNote->text().contains(QStringLiteral("Current Contact")));
+    QVERIFY(qlogNote->text().contains(QStringLiteral("WSJT-X 2237")));
     wsjtPort->setText(QStringLiteral("2238"));
     wsjtGroup->setText(QStringLiteral("239.255.0.1"));
     n1mmPort->setText(QStringLiteral("12060"));

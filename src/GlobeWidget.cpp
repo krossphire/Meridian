@@ -239,9 +239,10 @@ protected:
         painter.setRenderHint(QPainter::Antialiasing, true);
         painter.setRenderHint(QPainter::TextAntialiasing, true);
         painter.setPen(Qt::NoPen);
-        painter.setBrush(beaming ? onHeadingGreen() : (underMouse() ? QColor(255, 204, 48) : kBeam));
+        const QColor offer = underMouse() ? QColor(168, 232, 244) : targetBearingColor();
+        painter.setBrush(beaming ? onHeadingGreen() : offer);
         painter.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 8, 8);
-        painter.setPen(beaming ? kOnHeadingInk : QColor(28, 22, 8));
+        painter.setPen(beaming ? kOnHeadingInk : QColor(16, 36, 40));
         painter.setFont(labelFont());
         painter.drawText(rect().adjusted(8, 2, -8, -2), Qt::AlignCenter, text());
     }
@@ -269,7 +270,7 @@ private:
     {
         const QString line = labelLines().join(QLatin1Char('\n'));
         setText(line);
-        setProperty("fill", beaming ? onHeadingGreen() : kBeam);
+        setProperty("fill", beaming ? onHeadingGreen() : targetBearingColor());
     }
 
     QString callsign;
@@ -833,6 +834,19 @@ void GlobeWidget::setLoggerBeamEnabled(bool on)
     loggerBeam = on;
     placeBeam();
     update();
+}
+
+void GlobeWidget::setShowTargetLine(bool on)
+{
+    if (showTargetLine == on)
+        return;
+    showTargetLine = on;
+    update();
+}
+
+bool GlobeWidget::targetBearingLineShown() const
+{
+    return showTargetLine && beamHasAzimuth && !beamCall.isEmpty();
 }
 
 void GlobeWidget::setBeamOffer(const QString &call, double azimuth, const QString &approxNote)
@@ -1402,6 +1416,13 @@ void GlobeWidget::paintScene(QPainter &painter)
         return QPointF(center.x() + std::sin(radians) * radius * rho,
                        center.y() - std::cos(radians) * radius * rho);
     };
+
+    if (targetBearingLineShown()) {
+        QPen dash(targetBearingLineColor(), std::max(1.8, beamWidth() * 0.85), Qt::CustomDashLine, Qt::RoundCap);
+        dash.setDashPattern({4.0, 3.0});
+        painter.setPen(dash);
+        painter.drawLine(pointOn(beamAzimuth, 0.0), pointOn(beamAzimuth, 1.0));
+    }
 
     if (target && (!heading || std::abs(std::remainder(*target - *heading, 360.0)) > 0.9)) {
         painter.setPen(QPen(QColor(255, 191, 0, 170), std::max(1.4, beamWidth() * 0.55), Qt::SolidLine, Qt::RoundCap));

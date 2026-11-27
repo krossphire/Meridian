@@ -46,6 +46,7 @@ private slots:
     void countryHit();
     void dxccHover();
     void homeCoordinatesRoundTrip();
+    void targetLineSettingRoundTrip();
     void framing();
     void strictSemicolonFrames();
     void commands();
@@ -445,6 +446,28 @@ void TestCore::homeCoordinatesRoundTrip()
     QVERIFY2(home.has_value(), qPrintable(error));
     QVERIFY(std::abs(home->latitude - 36.25) < 1e-9);
     QVERIFY(std::abs(home->longitude - (-94.25)) < 1e-9);
+}
+
+void TestCore::targetLineSettingRoundTrip()
+{
+    QCOMPARE(AppConfig::defaults().showTargetBearingLine, true);
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QSettings ini(dir.filePath(QStringLiteral("meridian.ini")), QSettings::IniFormat);
+    AppConfig config = AppConfig::defaults();
+    config.showTargetBearingLine = false;
+    config.save(ini);
+    ini.sync();
+    const AppConfig hidden = AppConfig::load(ini);
+    QCOMPARE(hidden.showTargetBearingLine, false);
+    QFile file(dir.filePath(QStringLiteral("meridian.ini")));
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QString body = QString::fromUtf8(file.readAll());
+    QVERIFY(body.contains(QStringLiteral("showTargetBearingLine=false")));
+    config.showTargetBearingLine = true;
+    config.save(ini);
+    ini.sync();
+    QCOMPARE(AppConfig::load(ini).showTargetBearingLine, true);
 }
 
 void TestCore::framing()

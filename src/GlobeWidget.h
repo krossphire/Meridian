@@ -55,6 +55,8 @@ public:
     void setCompassVisible(bool on);
     bool compassVisible() const { return compassOn; }
     void setLoggerBeamEnabled(bool on);
+    void setShowTargetLine(bool on);
+    bool targetBearingLineShown() const;
     void setBeamOffer(const QString &call, double azimuth, const QString &approxNote = QString());
     void showBeamNote(const QString &text);
     void clearBeamOffer();
@@ -149,6 +151,7 @@ private:
     bool showSun = true;
     bool compassOn = true;
     bool loggerBeam = true;
+    bool showTargetLine = true;
     QString beamCall;
     double beamAzimuth = 0;
     double beamGap = -1;
