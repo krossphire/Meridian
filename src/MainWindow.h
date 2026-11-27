@@ -16,6 +16,11 @@
 class GlobeWidget;
 class Rt21Driver;
 class SettingsDialog;
+class QrzClient;
+class WsjtSource;
+class N1mmSource;
+class DxKeeperSource;
+class QlogSource;
 class QSettings;
 class QTimer;
 
@@ -41,10 +46,18 @@ private:
     void connectActive();
     void openSettings();
     void applyConfig(const AppConfig &saved);
+    void persistConfig();
     void syncDrivers();
     void retireDriver(const QString &id);
     void adopt(Rt21Driver *driver);
     void refreshStatus();
+    void offerStation(const QString &call, const QString &grid, double latitude = 0, double longitude = 0,
+                      bool havePoint = false, bool allowLookup = true, bool manual = false);
+    void refreshQrz();
+    void refreshWsjt();
+    void refreshN1mm();
+    void refreshDxKeeper();
+    void refreshQlog();
 
     AppConfig config;
     QSettings *settings = nullptr;
@@ -57,4 +70,17 @@ private:
     Rt21Driver *link = nullptr;
     SettingsDialog *settingsUi = nullptr;
     QTimer *statusTimer = nullptr;
+    QrzClient *qrz = nullptr;
+    WsjtSource *wsjt = nullptr;
+    N1mmSource *n1mm = nullptr;
+    DxKeeperSource *dxKeeper = nullptr;
+    QlogSource *qlog = nullptr;
+    QString pendingCall;
+    QString pendingGrid;
+    double pendingLat = 0;
+    double pendingLon = 0;
+    bool pendingPoint = false;
+    bool pendingActive = false;
+    bool quietQrz = false;
+    qint64 findNoteUntilMs = 0;
 };

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include "AppIcon.h"
 #include "MainWindow.h"
 #include "mock/Rt21Simulator.h"
 #include "rotor/AppConfig.h"
@@ -14,8 +15,6 @@
 #include <QCommandLineParser>
 #include <QFont>
 #include <QFontDatabase>
-#include <QIcon>
-#include <QPainter>
 #include <QSettings>
 
 #include <memory>
@@ -23,23 +22,6 @@
 int runScreenshots(const QString &directory, qreal dpr);
 
 namespace {
-
-QIcon appIcon()
-{
-    QPixmap pixmap(128, 128);
-    pixmap.fill(Qt::transparent);
-    QPainter painter(&pixmap);
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setBrush(QColor(16, 22, 27));
-    painter.setPen(QPen(QColor(214, 222, 214), 4));
-    painter.drawEllipse(QRectF(8, 8, 112, 112));
-    painter.setPen(QPen(QColor(255, 191, 0), 6, Qt::SolidLine, Qt::RoundCap));
-    painter.drawLine(QPointF(64, 64), QPointF(96, 34));
-    painter.setBrush(QColor(255, 191, 0));
-    painter.setPen(Qt::NoPen);
-    painter.drawEllipse(QPointF(64, 64), 5, 5);
-    return QIcon(pixmap);
-}
 
 void installFonts()
 {
@@ -98,7 +80,7 @@ int main(int argc, char *argv[])
     QApplication::setOrganizationDomain(QStringLiteral("k5po.example"));
     QApplication::setApplicationName(QStringLiteral("Meridian"));
     QApplication::setApplicationVersion(QString::fromLatin1(MERIDIAN_VERSION));
-    QApplication::setWindowIcon(appIcon());
+    QApplication::setWindowIcon(meridianIcon());
     installFonts();
     installPalette(app);
     app.setStyle(QStringLiteral("Fusion"));

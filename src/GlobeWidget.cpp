@@ -7,17 +7,23 @@
 #include "GlobeWidget.h"
 
 #include "core/Bearing.h"
+#include "core/Compass.h"
+#include "core/Gridsquare.h"
 #include "core/Projection.h"
 #include "core/Solar.h"
 #include "map/DayNight.h"
+#include "map/Dxcc.h"
 
 #include <QAbstractButton>
+#include <QPushButton>
 #include <QComboBox>
 #include <QEnterEvent>
 #include <QFontDatabase>
 #include <QFontMetrics>
 #include <QKeyEvent>
+#include <QLabel>
 #include <QLineEdit>
+#include <QRegularExpression>
 #include <QMouseEvent>
 #include <QDateTime>
 #include <QPainter>
@@ -44,6 +50,13 @@ const QColor kHover(62, 96, 98);
 const QColor kCoast(214, 222, 214, 225);
 const QColor kBorder(168, 186, 178, 150);
 const QColor kBeam(255, 191, 0);
+const QColor kOnHeadingInk(10, 28, 20);
+constexpr double kBeamHoldDegrees = 2.0;
+
+double shortGap(double from, double to)
+{
+    return std::abs(std::remainder(from - to, 360.0));
+}
 const QColor kInk(244, 246, 244);
 
 struct Published {
@@ -56,9 +69,38 @@ struct Published {
     quint64 gen = 0;
     std::shared_ptr<ProjectedLayer> low;
     std::shared_ptr<ProjectedLayer> high;
+    std::shared_ptr<const QVector<QPainterPath>> dxcc;
     double lat = 999;
     double lon = 999;
 };
+
+QVector<QPainterPath> projectDxccOutlines(double lat, double lon)
+{
+    const QVector<DxccEntity> &entities = dxccEntities();
+    QVector<QPainterPath> paths;
+    paths.reserve(entities.size());
+    for (const DxccEntity &entity : entities) {
+        QPainterPath path;
+        path.setFillRule(Qt::OddEvenFill);
+        for (const GeoRing &ring : entity.rings) {
+            bool started = false;
+            for (const GeoPt &pt : ring.pts) {
+                const UnitPoint at = projectAzimuthal(lat, lon, pt.lat, pt.lon);
+                if (at.rho > 1.0) {
+                    started = false;
+                    continue;
+                }
+                if (!started)
+                    path.moveTo(at.x, at.y);
+                else
+                    path.lineTo(at.x, at.y);
+                started = true;
+            }
+        }
+        paths.append(path);
+    }
+    return paths;
+}
 
 class GearButton : public QAbstractButton
 {
@@ -94,6 +136,174 @@ protected:
 
 private:
     QSvgRenderer renderer;
+};
+
+class CompassPill : public QAbstractButton
+{
+public:
+    explicit CompassPill(const QString &label, QWidget *parent)
+        : QAbstractButton(parent)
+        , label(label)
+    {
+        setCursor(Qt::PointingHandCursor);
+        setFocusPolicy(Qt::NoFocus);
+        setText(label);
+    }
+
+    void setLit(bool on, bool turning)
+    {
+        if (lit == on && moving == turning)
+            return;
+        lit = on;
+        moving = turning;
+        update();
+    }
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setPen(Qt::NoPen);
+        if (lit)
+            painter.setBrush(moving ? QColor(224, 177, 92) : onHeadingGreen());
+        else
+            painter.setBrush(QColor(255, 255, 255, 16));
+        painter.drawRoundedRect(rect(), 10, 10);
+        QFont font(QStringLiteral("Inter"));
+        font.setPixelSize(11);
+        font.setWeight(QFont::Medium);
+        painter.setFont(font);
+        if (lit && moving)
+            painter.setPen(QColor(28, 22, 8));
+        else if (lit)
+            painter.setPen(kOnHeadingInk);
+        else
+            painter.setPen(QColor(142, 160, 153));
+        painter.drawText(rect(), Qt::AlignCenter, label);
+    }
+
+private:
+    QString label;
+    bool lit = false;
+    bool moving = false;
+};
+
+class BeamButton : public QAbstractButton
+{
+public:
+    explicit BeamButton(QWidget *parent)
+        : QAbstractButton(parent)
+    {
+        setObjectName(QStringLiteral("beamButton"));
+        setCursor(Qt::PointingHandCursor);
+        setFocusPolicy(Qt::NoFocus);
+        hide();
+    }
+
+    void setOffer(const QString &call, double azimuth)
+    {
+        callsign = call.trimmed().toUpper();
+        degrees = azimuth;
+        beaming = false;
+        publish();
+        updateGeometry();
+        update();
+    }
+
+    void setBeaming(bool on)
+    {
+        beaming = on;
+        publish();
+        updateGeometry();
+        update();
+    }
+
+    bool isBeaming() const { return beaming; }
+    double azimuth() const { return degrees; }
+
+    QSize sizeHint() const override
+    {
+        const QFontMetrics metrics(labelFont());
+        const QStringList lines = labelLines();
+        int width = 0;
+        for (const QString &line : lines)
+            width = std::max(width, metrics.horizontalAdvance(line));
+        return QSize(width + 18, metrics.height() * lines.size() + 10);
+    }
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setRenderHint(QPainter::TextAntialiasing, true);
+        painter.setPen(Qt::NoPen);
+        const QColor offer = underMouse() ? QColor(168, 232, 244) : targetBearingColor();
+        painter.setBrush(beaming ? onHeadingGreen() : offer);
+        painter.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 8, 8);
+        painter.setPen(beaming ? kOnHeadingInk : QColor(16, 36, 40));
+        painter.setFont(labelFont());
+        painter.drawText(rect().adjusted(8, 2, -8, -2), Qt::AlignCenter, text());
+    }
+
+private:
+    QFont labelFont() const
+    {
+        QFont font(QStringLiteral("Inter"));
+        font.setPixelSize(11);
+        font.setWeight(QFont::Medium);
+        return font;
+    }
+
+    QStringList labelLines() const
+    {
+        const QString call = callsign.isEmpty() ? QStringLiteral("—") : callsign;
+        if (beaming)
+            return {QStringLiteral("Beaming toward:"), call};
+        const QString heading = QString::number(degrees, 'f', 1);
+        return {QStringLiteral("Beam toward:"),
+                QStringLiteral("%1 at %2°?").arg(call, heading)};
+    }
+
+    void publish()
+    {
+        const QString line = labelLines().join(QLatin1Char('\n'));
+        setText(line);
+        setProperty("fill", beaming ? onHeadingGreen() : targetBearingColor());
+    }
+
+    QString callsign;
+    double degrees = 0;
+    bool beaming = false;
+};
+
+class CallButton : public QAbstractButton
+{
+public:
+    explicit CallButton(QWidget *parent)
+        : QAbstractButton(parent)
+    {
+        setObjectName(QStringLiteral("callsignButton"));
+        setCursor(Qt::PointingHandCursor);
+        setFocusPolicy(Qt::NoFocus);
+        setToolTip(QStringLiteral("Callsign"));
+        setFixedSize(22, 22);
+    }
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(underMouse() ? QColor(255, 255, 255, 36) : QColor(255, 255, 255, 18));
+        painter.drawRoundedRect(rect().adjusted(1, 1, -1, -1), 7, 7);
+        painter.setPen(QPen(QColor(186, 196, 190, underMouse() ? 230 : 150), 1.3, Qt::SolidLine, Qt::RoundCap));
+        painter.drawLine(QPointF(6, 11), QPointF(16, 11));
+        painter.drawLine(QPointF(6, 11), QPointF(6, 7));
+        painter.drawLine(QPointF(16, 11), QPointF(16, 15));
+    }
 };
 
 class StatusDot : public QWidget
@@ -308,6 +518,13 @@ public slots:
             projectedLat = lat;
             projectedLon = lon;
         }
+        const int dxccCount = dxccEntities().size();
+        if (!dxccProjected || dxccProjected->size() != dxccCount || std::abs(dxccLat - lat) > 1e-7
+            || std::abs(dxccLon - lon) > 1e-7) {
+            dxccProjected = std::make_shared<const QVector<QPainterPath>>(projectDxccOutlines(lat, lon));
+            dxccLat = lat;
+            dxccLon = lon;
+        }
         const ProjectedLayer &layer = lod == 0 ? projected->first : projected->second;
         MapFrames frames = renderProjected(layer, size, dpr, lod);
         {
@@ -321,8 +538,11 @@ public slots:
             if (!box->low || std::abs(box->lat - lat) > 1e-7 || std::abs(box->lon - lon) > 1e-7) {
                 box->low = std::make_shared<ProjectedLayer>(projected->first);
                 box->high = std::make_shared<ProjectedLayer>(projected->second);
+                box->dxcc = dxccProjected;
                 box->lat = lat;
                 box->lon = lon;
+            } else if (box->dxcc != dxccProjected) {
+                box->dxcc = dxccProjected;
             }
         }
         emit ready();
@@ -334,8 +554,11 @@ signals:
 private:
     std::shared_ptr<Published> box;
     std::shared_ptr<std::pair<ProjectedLayer, ProjectedLayer>> projected;
+    std::shared_ptr<const QVector<QPainterPath>> dxccProjected;
     double projectedLat = 999;
     double projectedLon = 999;
+    double dxccLat = 999;
+    double dxccLon = 999;
 };
 
 GlobeWidget::GlobeWidget(QWidget *parent)
@@ -349,6 +572,61 @@ GlobeWidget::GlobeWidget(QWidget *parent)
     auto *gearButton = new GearButton(this);
     gear = gearButton;
     connect(gearButton, &QAbstractButton::clicked, this, [this]() { emit settingsRequested(); });
+    auto *beamButton = new BeamButton(this);
+    beam = beamButton;
+    beamNote = new QLabel(this);
+    beamNote->setObjectName(QStringLiteral("beamApprox"));
+    beamNote->setStyleSheet(QStringLiteral("color: #8ea099; font-size: 11px; background: transparent;"));
+    beamNote->setAttribute(Qt::WA_TransparentForMouseEvents);
+    beamNote->hide();
+    connect(beamButton, &QAbstractButton::clicked, this, [this, beamButton]() {
+        // Green is a status. A second click does not send another goto.
+        if (beamButton->isBeaming())
+            return;
+        beamClick = true;
+        emit bearingRequested(clampRt21Azimuth(beamButton->azimuth()));
+        const bool started = beamClick && target && shortGap(*target, beamAzimuth) <= 0.2;
+        beamClick = false;
+        if (started)
+            beginBeaming();
+    });
+    auto *callMark = new CallButton(this);
+    callButton = callMark;
+    connect(callMark, &QAbstractButton::clicked, this, [this]() { revealCallsign(); });
+    callEdit = new QLineEdit(this);
+    callEdit->setObjectName(QStringLiteral("callsignEdit"));
+    callEdit->setPlaceholderText(QStringLiteral("Call"));
+    callEdit->setMaxLength(20);
+    callEdit->hide();
+    callEdit->setStyleSheet(QStringLiteral(
+        "QLineEdit#callsignEdit { background: rgba(18,23,28,230); color: #f4f6f4;"
+        " border: 1px solid rgba(255,191,0,120); border-radius: 8px; padding: 1px 8px; font-size: 12px; }"));
+    connect(callEdit, &QLineEdit::returnPressed, this, [this]() { submitCallsign(); });
+    auto *find = new QPushButton(QStringLiteral("Find >"), this);
+    findCall = find;
+    find->setObjectName(QStringLiteral("findCall"));
+    find->setCursor(Qt::PointingHandCursor);
+    find->setFocusPolicy(Qt::NoFocus);
+    find->setStyleSheet(QStringLiteral(
+        "QPushButton#findCall { background: rgba(18,23,28,230); color: #f4f6f4;"
+        " border: none; border-radius: 8px; padding: 2px 8px; font-size: 12px; }"
+        "QPushButton#findCall:disabled { color: #e0b15c; }"));
+    find->hide();
+    connect(find, &QPushButton::clicked, this, [this]() {
+        if (!findBusy)
+            submitCallsign();
+    });
+    for (int i = 0; i < kCompassCount; ++i) {
+        const QString label = QString::fromLatin1(compassLabel(i));
+        auto *pill = new CompassPill(label, this);
+        pill->setObjectName(QStringLiteral("compass") + label);
+        const double azimuth = i * 45.0;
+        connect(pill, &QAbstractButton::clicked, this, [this, azimuth]() {
+            abandonBeam();
+            emit bearingRequested(azimuth);
+        });
+        compassPills[i] = pill;
+    }
     dot = new StatusDot(this);
     rotors = new QComboBox(this);
     rotors->setObjectName(QStringLiteral("rotorPick"));
@@ -390,6 +668,7 @@ GlobeWidget::GlobeWidget(QWidget *parent)
         quint64 gen = 0;
         std::shared_ptr<ProjectedLayer> lowMap;
         std::shared_ptr<ProjectedLayer> highMap;
+        std::shared_ptr<const QVector<QPainterPath>> dxccMap;
         {
             QMutexLocker lock(&box->mutex);
             image = box->image;
@@ -400,6 +679,7 @@ GlobeWidget::GlobeWidget(QWidget *parent)
             gen = box->gen;
             lowMap = box->low;
             highMap = box->high;
+            dxccMap = box->dxcc;
         }
         Published snap;
         snap.image = image;
@@ -422,6 +702,8 @@ GlobeWidget::GlobeWidget(QWidget *parent)
             lowProjected = snap.low;
         if (snap.high)
             highProjected = snap.high;
+        if (dxccMap)
+            dxccReady = dxccMap;
         update();
     });
     thread->start();
@@ -457,6 +739,17 @@ void GlobeWidget::setHome(double lat, double lon)
     homeLat_ = lat;
     homeLon_ = lon;
     haveHome = true;
+    dxccReady.reset();
+    hoverIndex = -1;
+    sunDirty = true;
+    requestMap(true);
+}
+
+void GlobeWidget::clearHome()
+{
+    if (!haveHome)
+        return;
+    haveHome = false;
     hoverIndex = -1;
     sunDirty = true;
     requestMap(true);
@@ -465,12 +758,32 @@ void GlobeWidget::setHome(double lat, double lon)
 void GlobeWidget::setHeading(std::optional<double> azimuth)
 {
     heading = azimuth;
+    if (auto *button = static_cast<BeamButton *>(beam); button && button->isBeaming() && heading) {
+        const double gap = shortGap(*heading, beamAzimuth);
+        // A limit stop can swing the long way. The gap to the target grows
+        // while the rotor is still doing the requested move, so that growth
+        // is not a manual override. Once the move has settled, a heading that
+        // is not the beam is.
+        const bool chasingBeam = link == Link::Moving && target && shortGap(*target, beamAzimuth) <= 0.2;
+        if (chasingBeam)
+            beamGap = gap;
+        else if (gap > kBeamHoldDegrees)
+            clearBeamOffer();
+        else
+            beamGap = gap;
+    }
+    placeCompass();
     update();
 }
 
 void GlobeWidget::setTarget(std::optional<double> azimuth)
 {
     target = azimuth;
+    if (beamClick)
+        return;
+    if (auto *button = static_cast<BeamButton *>(beam); button && button->isBeaming() && target
+        && shortGap(*target, beamAzimuth) > 0.2)
+        clearBeamOffer();
     update();
 }
 
@@ -503,6 +816,253 @@ void GlobeWidget::setShowSun(bool show)
     showSun = show;
     sunDirty = true;
     update();
+}
+
+void GlobeWidget::setCompassVisible(bool on)
+{
+    if (compassOn == on)
+        return;
+    compassOn = on;
+    placeCompass();
+    update();
+}
+
+void GlobeWidget::setLoggerBeamEnabled(bool on)
+{
+    if (loggerBeam == on)
+        return;
+    loggerBeam = on;
+    placeBeam();
+    update();
+}
+
+void GlobeWidget::setShowTargetLine(bool on)
+{
+    if (showTargetLine == on)
+        return;
+    showTargetLine = on;
+    update();
+}
+
+bool GlobeWidget::targetBearingLineShown() const
+{
+    return showTargetLine && beamHasAzimuth && !beamCall.isEmpty();
+}
+
+void GlobeWidget::setBeamOffer(const QString &call, double azimuth, const QString &approxNote)
+{
+    beamGap = -1;
+    beamCall = call.trimmed().toUpper();
+    beamAzimuth = azimuth;
+    beamHasAzimuth = !beamCall.isEmpty();
+    if (auto *button = static_cast<BeamButton *>(beam))
+        button->setOffer(beamCall, beamAzimuth);
+    if (beamNote)
+        beamNote->setText(approxNote);
+    placeBeam();
+    update();
+}
+
+void GlobeWidget::showBeamNote(const QString &text)
+{
+    beamGap = -1;
+    beamCall.clear();
+    beamHasAzimuth = false;
+    if (beam)
+        beam->hide();
+    if (beamNote)
+        beamNote->setText(text);
+    placeBeam();
+    update();
+}
+
+void GlobeWidget::clearBeamOffer()
+{
+    setBeamOffer(QString(), 0);
+}
+
+void GlobeWidget::beginBeaming()
+{
+    auto *button = static_cast<BeamButton *>(beam);
+    if (!button)
+        return;
+    button->setBeaming(true);
+    // No baseline yet. The next heading sample sets it, so the start of the
+    // move is not mistaken for a turn away from the beam.
+    beamGap = heading ? shortGap(*heading, beamAzimuth) : -1;
+    placeBeam();
+}
+
+void GlobeWidget::abandonBeam()
+{
+    auto *button = static_cast<BeamButton *>(beam);
+    if (!button || !button->isBeaming())
+        return;
+    clearBeamOffer();
+}
+
+void GlobeWidget::placeBeam()
+{
+    if (!beam)
+        return;
+    auto *button = static_cast<BeamButton *>(beam);
+    const bool show = loggerBeam && beamHasAzimuth && !beamCall.isEmpty() && width() >= 420;
+    if (!show) {
+        button->hide();
+        if (!loggerBeam || !beamNote || beamNote->text().isEmpty() || width() < 420) {
+            if (beamNote)
+                beamNote->hide();
+            return;
+        }
+        beamNote->adjustSize();
+        int noteX = width() - beamNote->width() - 10;
+        if (noteX < 8)
+            noteX = 8;
+        beamNote->setGeometry(noteX, 10, beamNote->width(), beamNote->height());
+        beamNote->show();
+        beamNote->raise();
+        return;
+    }
+    const QSize hint = button->sizeHint();
+    const QRectF globe = disk();
+    const QPointF center = globe.center();
+    const double radius = globe.width() / 2.0;
+    int x = width() - hint.width() - 10;
+    int y = 10;
+    auto overlaps = [&](int left, int top) {
+        const double px = std::clamp(center.x(), double(left), double(left + hint.width()));
+        const double py = std::clamp(center.y(), double(top), double(top + hint.height()));
+        return std::hypot(px - center.x(), py - center.y()) < radius + 2.0;
+    };
+    for (int guard = 0; overlaps(x, y) && guard < 24; ++guard) {
+        if (x + hint.width() < width() - 4)
+            x += 6;
+        else
+            y -= 4;
+    }
+    if (overlaps(x, y) || x < 8 || y < 4) {
+        button->hide();
+        if (beamNote)
+            beamNote->hide();
+        return;
+    }
+    button->setGeometry(x, y, hint.width(), hint.height());
+    button->show();
+    button->raise();
+    if (!beamNote)
+        return;
+    if (beamNote->text().isEmpty()) {
+        beamNote->hide();
+        return;
+    }
+    beamNote->adjustSize();
+    const int noteW = std::max(beamNote->width(), hint.width());
+    int noteX = x + hint.width() - noteW;
+    if (noteX < 8)
+        noteX = 8;
+    beamNote->setGeometry(noteX, y + hint.height() + 2, noteW, beamNote->height());
+    beamNote->show();
+}
+
+void GlobeWidget::revealCallsign(const QString &seed)
+{
+    if (!callEdit)
+        return;
+    if (!seed.isEmpty())
+        callEdit->setText(seed);
+    callEdit->show();
+    placeCallsign();
+    callEdit->setFocus(Qt::OtherFocusReason);
+    if (seed.isEmpty())
+        callEdit->selectAll();
+    else
+        callEdit->setCursorPosition(callEdit->text().size());
+}
+
+void GlobeWidget::setFindBusy(bool busy)
+{
+    findBusy = busy;
+    if (!findCall)
+        return;
+    findCall->setEnabled(!busy);
+    findCall->setText(busy ? QStringLiteral("Finding…") : QStringLiteral("Find >"));
+    placeCallsign();
+}
+
+void GlobeWidget::placeCallsign()
+{
+    if (!callButton)
+        return;
+    const bool room = std::min(width(), height()) >= 280;
+    const bool editing = callEdit && callEdit->isVisible();
+    const bool near = callHover;
+    callButton->setVisible(room && (editing || near) && !findBusy);
+    if (!room) {
+        if (callEdit)
+            callEdit->hide();
+        return;
+    }
+    const QRectF globe = disk();
+    const QPointF center = globe.center();
+    const double radius = globe.width() / 2.0;
+    int x = 10;
+    int y = 10;
+    auto overlaps = [&](int left, int top, int w, int h) {
+        const double px = std::clamp(center.x(), double(left), double(left + w));
+        const double py = std::clamp(center.y(), double(top), double(top + h));
+        return std::hypot(px - center.x(), py - center.y()) < radius + 1.0;
+    };
+    for (int guard = 0; overlaps(x, y, 22, 22) && guard < 16; ++guard)
+        y -= 2;
+    if (overlaps(x, y, 22, 22))
+        callButton->hide();
+    else
+        callButton->setGeometry(x, y, 22, 22);
+    const int editW = 148;
+    if (callEdit && callEdit->isVisible()) {
+        int editX = callButton->x() + 26;
+        int editY = callButton->y();
+        if (overlaps(editX, editY, editW, 24))
+            editY = std::max(6, callButton->y() - 2);
+        callEdit->setGeometry(editX, editY, editW, 24);
+        callEdit->raise();
+    }
+    if (!findCall)
+        return;
+    const bool showFind = editing || findBusy;
+    findCall->setVisible(showFind);
+    if (!showFind)
+        return;
+    const int findW = findCall->sizeHint().width();
+    int findX = editing ? callEdit->x() + editW + 6 : 10;
+    int findY = editing ? callEdit->y() : 10;
+    if (overlaps(findX, findY, findW, 24))
+        findY = std::max(6, findY - 4);
+    findCall->setGeometry(findX, findY, findW, 24);
+    findCall->raise();
+}
+
+void GlobeWidget::submitCallsign()
+{
+    if (findBusy || !callEdit)
+        return;
+    const QString text = callEdit->text().trimmed().toUpper();
+    callEdit->hide();
+    callEdit->clear();
+    placeCallsign();
+    if (text.isEmpty()) {
+        emit callsignSubmitted(QString(), QString());
+        return;
+    }
+    const QStringList parts = text.split(QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
+    QString call = parts.value(0);
+    call.remove(QRegularExpression(QStringLiteral("[^A-Z0-9/]")));
+    QString grid;
+    if (parts.size() >= 2)
+        grid = Gridsquare::normalize(parts.at(1));
+    if (call.isEmpty())
+        return;
+    emit callsignSubmitted(call, grid);
 }
 
 void GlobeWidget::setSolarPreview(const QDateTime &utc)
@@ -611,6 +1171,13 @@ qreal GlobeWidget::beamWidth() const
     return 2.1;
 }
 
+int GlobeWidget::compassInset() const
+{
+    if (!compassOn || width() < 360)
+        return 0;
+    return 28;
+}
+
 QRectF GlobeWidget::disk() const
 {
     const qreal side = std::max(2.0, qMin(width(), height()) - 2.0);
@@ -686,6 +1253,9 @@ void GlobeWidget::placeChrome()
         editor->setFont(headingFont());
         editor->setGeometry(headingBounds().toAlignedRect().adjusted(-8, -2, 8, 2));
     }
+    placeBeam();
+    placeCallsign();
+    placeCompass();
 }
 
 void GlobeWidget::ensureSun()
@@ -765,7 +1335,7 @@ void GlobeWidget::paintScene(QPainter &painter)
                     break;
                 }
             }
-            if (country) {
+            if (country && hoverPrefix.isEmpty()) {
                 painter.save();
                 QPainterPath diskPath;
                 diskPath.addEllipse(globe);
@@ -778,26 +1348,47 @@ void GlobeWidget::paintScene(QPainter &painter)
                 painter.setBrush(kHover);
                 painter.drawPath(country->path);
                 painter.restore();
-
-                if (!hoverName.isEmpty()) {
-                    QFont font(QStringLiteral("Inter"));
-                    font.setPixelSize(qRound(std::clamp(radius * 0.045, 11.0, 16.0)));
-                    painter.setFont(font);
-                    const QFontMetrics metrics(font);
-                    const int textWidth = metrics.horizontalAdvance(hoverName);
-                    QRectF chip(hoverPos.x() + 14, hoverPos.y() - metrics.height() - 10, textWidth + 16,
-                                metrics.height() + 8);
-                    if (chip.right() > width() - 8)
-                        chip.moveLeft(hoverPos.x() - chip.width() - 14);
-                    if (chip.top() < 8)
-                        chip.moveTop(hoverPos.y() + 16);
-                    painter.setPen(Qt::NoPen);
-                    painter.setBrush(QColor(8, 12, 14, 185));
-                    painter.drawRoundedRect(chip, 7, 7);
-                    painter.setPen(kInk);
-                    painter.drawText(chip, Qt::AlignCenter, hoverName);
-                }
             }
+        }
+    }
+
+    if (lod >= 1 && dxccReady && !dxccReady->isEmpty()) {
+        painter.save();
+        painter.setClipPath(discClip);
+        QTransform transform;
+        transform.translate(center.x(), center.y());
+        transform.scale(radius, -radius);
+        painter.setTransform(transform);
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(kBorder, 0));
+        for (const QPainterPath &path : *dxccReady)
+            painter.drawPath(path);
+        painter.restore();
+    }
+
+    if (!hoverName.isEmpty()) {
+        QFont font(QStringLiteral("Inter"));
+        font.setPixelSize(qRound(std::clamp(radius * 0.04, 11.0, 15.0)));
+        painter.setFont(font);
+        const QFontMetrics metrics(font);
+        const QString line2 = hoverPrefix.isEmpty() ? QString() : QStringLiteral("(%1)").arg(hoverPrefix);
+        const int textWidth = std::max(metrics.horizontalAdvance(hoverName),
+                                        line2.isEmpty() ? 0 : metrics.horizontalAdvance(line2));
+        const int lines = line2.isEmpty() ? 1 : 2;
+        QRectF chip(hoverPos.x() + 14, hoverPos.y() - metrics.height() * lines - 12, textWidth + 16,
+                    metrics.height() * lines + 10);
+        if (chip.right() > width() - 8)
+            chip.moveLeft(hoverPos.x() - chip.width() - 14);
+        if (chip.top() < 8)
+            chip.moveTop(hoverPos.y() + 16);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(8, 12, 14, 185));
+        painter.drawRoundedRect(chip, 7, 7);
+        painter.setPen(kInk);
+        painter.drawText(chip.adjusted(0, 4, 0, 0), Qt::AlignHCenter | Qt::AlignTop, hoverName);
+        if (!line2.isEmpty()) {
+            painter.setPen(QColor(186, 196, 190));
+            painter.drawText(chip.adjusted(0, 0, 0, -4), Qt::AlignHCenter | Qt::AlignBottom, line2);
         }
     }
 
@@ -825,6 +1416,13 @@ void GlobeWidget::paintScene(QPainter &painter)
         return QPointF(center.x() + std::sin(radians) * radius * rho,
                        center.y() - std::cos(radians) * radius * rho);
     };
+
+    if (targetBearingLineShown()) {
+        QPen dash(targetBearingLineColor(), std::max(1.8, beamWidth() * 0.85), Qt::CustomDashLine, Qt::RoundCap);
+        dash.setDashPattern({4.0, 3.0});
+        painter.setPen(dash);
+        painter.drawLine(pointOn(beamAzimuth, 0.0), pointOn(beamAzimuth, 1.0));
+    }
 
     if (target && (!heading || std::abs(std::remainder(*target - *heading, 360.0)) > 0.9)) {
         painter.setPen(QPen(QColor(255, 191, 0, 170), std::max(1.4, beamWidth() * 0.55), Qt::SolidLine, Qt::RoundCap));
@@ -874,6 +1472,42 @@ void GlobeWidget::paintScene(QPainter &painter)
     }
 }
 
+void GlobeWidget::placeCompass()
+{
+    static_assert(kCompassCount == 8, "compassPills is one button per compass point");
+    const bool show = compassInset() > 0;
+    const int active = heading ? nearestCompassIndex(*heading) : -1;
+    const bool moving = link == Link::Moving;
+    QFont font(QStringLiteral("Inter"));
+    font.setPixelSize(11);
+    font.setWeight(QFont::Medium);
+    const QFontMetrics metrics(font);
+    const int gap = 6;
+    int total = 0;
+    int widths[kCompassCount];
+    for (int i = 0; i < kCompassCount; ++i) {
+        widths[i] = metrics.horizontalAdvance(QString::fromLatin1(compassLabel(i))) + 14;
+        total += widths[i];
+    }
+    total += gap * (kCompassCount - 1);
+    int x = int(std::round((width() - total) / 2.0));
+    const int y = height() - 28;
+    for (int i = 0; i < kCompassCount; ++i) {
+        auto *pill = static_cast<CompassPill *>(compassPills[i]);
+        if (!pill)
+            continue;
+        pill->setLit(show && i == active, moving);
+        if (!show) {
+            pill->hide();
+            continue;
+        }
+        pill->setGeometry(x, y, widths[i], 20);
+        pill->show();
+        pill->raise();
+        x += widths[i] + gap;
+    }
+}
+
 void GlobeWidget::paintEvent(QPaintEvent *)
 {
     QPainter painter(this);
@@ -897,12 +1531,19 @@ void GlobeWidget::mousePressEvent(QMouseEvent *event)
         return;
     }
     const QRectF globe = disk();
-    if (const auto hit = bearingFromClick(event->position(), globe.center(), globe.width() / 2.0))
+    if (const auto hit = bearingFromClick(event->position(), globe.center(), globe.width() / 2.0)) {
+        abandonBeam();
         emit bearingRequested(clampRt21Azimuth(hit->azimuth));
+    }
 }
 
 void GlobeWidget::mouseMoveEvent(QMouseEvent *event)
 {
+    const bool near = event->position().x() < 90 && event->position().y() < 48;
+    if (near != callHover) {
+        callHover = near;
+        placeCallsign();
+    }
     hoverAt(event->position());
 }
 
@@ -910,9 +1551,10 @@ void GlobeWidget::hoverAt(QPointF pos)
 {
     hoverPos = pos;
     if (detailLevel() < 1 || !high) {
-        if (hoverIndex != -1) {
+        if (hoverIndex != -1 || !hoverName.isEmpty()) {
             hoverIndex = -1;
             hoverName.clear();
+            hoverPrefix.clear();
             update();
         }
         return;
@@ -924,20 +1566,51 @@ void GlobeWidget::hoverAt(QPointF pos)
     double lat = 0;
     double lon = 0;
     int found = -1;
-    if (unprojectAzimuthal(homeLat_, homeLon_, x, y, lat, lon))
-        found = countryAt(*high, lat, lon);
-    if (found == hoverIndex)
+    QString name;
+    QString prefix;
+    if (unprojectAzimuthal(homeLat_, homeLon_, x, y, lat, lon)) {
+        const DxccLabel split = dxccAt(lat, lon);
+        if (!split.name.isEmpty()) {
+            name = split.name;
+            prefix = split.prefix;
+        } else {
+            found = countryAt(*high, lat, lon);
+            if (found >= 0) {
+                const QString raw = high->countries.at(found).name;
+                const DxccLabel labeled = dxccForCountry(raw);
+                name = labeled.name.isEmpty() ? shortCountryName(raw) : labeled.name;
+                prefix = labeled.prefix;
+            }
+        }
+    }
+    if (found == hoverIndex && name == hoverName && prefix == hoverPrefix)
         return;
     hoverIndex = found;
-    hoverName = found >= 0 ? shortCountryName(high->countries.at(found).name) : QString();
+    hoverName = name;
+    hoverPrefix = prefix;
     update();
 }
 
 void GlobeWidget::keyPressEvent(QKeyEvent *event)
 {
+    if (callEdit && callEdit->isVisible() && event->key() == Qt::Key_Escape) {
+        callEdit->hide();
+        callEdit->clear();
+        placeCallsign();
+        return;
+    }
     if (!editor->isVisible() && (event->key() == Qt::Key_Escape || event->key() == Qt::Key_Space)) {
         emit stopRequested();
         return;
+    }
+    const bool plain = event->modifiers() == Qt::NoModifier || event->modifiers() == Qt::ShiftModifier;
+    const QString typed = event->text();
+    if (plain && !editor->isVisible() && !(callEdit && callEdit->hasFocus()) && typed.size() == 1) {
+        const QChar ch = typed.at(0).toUpper();
+        if (ch.isLetterOrNumber() || ch == QLatin1Char('/')) {
+            revealCallsign(QString(ch));
+            return;
+        }
     }
     QWidget::keyPressEvent(event);
 }
@@ -952,6 +1625,11 @@ void GlobeWidget::leaveEvent(QEvent *event)
 {
     hoverIndex = -1;
     hoverName.clear();
+    hoverPrefix.clear();
+    if (callHover) {
+        callHover = false;
+        placeCallsign();
+    }
     placeChrome();
     update();
     QWidget::leaveEvent(event);
@@ -969,6 +1647,7 @@ void GlobeWidget::commitHeading()
     const double value = text.toDouble(&ok);
     if (!ok)
         return;
+    abandonBeam();
     emit headingEdited(clampRt21Azimuth(value));
     update();
 }

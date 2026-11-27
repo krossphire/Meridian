@@ -38,6 +38,7 @@ public:
     void setConfig(const AppConfig &config);
     void setDriver(Rt21Driver *driver);
     void setNetworkConnection(bool on);
+    void noteSettingsWrite(bool ok);
     AppConfig config() const { return draft; }
     void showPage(int index);
     void presentFound(const FoundRotor &found);
@@ -59,6 +60,7 @@ private:
     };
 
     void buildStation();
+    void buildSources();
     void buildRotors();
     void buildController();
     bool commitDraft(bool interactive);
@@ -77,6 +79,7 @@ private:
     void applyFound(const FoundRotor &found);
     void styleFindButton();
     void setStatus(const QString &text);
+    void setStatus(const QString &text, StatusTone tone);
     void exportSetup();
     void refreshDisplayCallout();
     QString backupConfig(const QString &path) const;
@@ -99,10 +102,23 @@ private:
     QLabel *multiplier = nullptr;
     QLabel *magnetic = nullptr;
     QLineEdit *homeEdit = nullptr;
+    QLineEdit *homeLatEdit = nullptr;
+    QLineEdit *homeLonEdit = nullptr;
     QLabel *summary = nullptr;
     QLabel *detail = nullptr;
     class QCheckBox *trafficBox = nullptr;
     class QCheckBox *sunBox = nullptr;
+    class QCheckBox *compassBox = nullptr;
+    class QCheckBox *beamBox = nullptr;
+    class QCheckBox *targetLineBox = nullptr;
+    QLineEdit *qrzUserEdit = nullptr;
+    QLineEdit *qrzPassEdit = nullptr;
+    bool qrzPassStored = false;
+    QLineEdit *wsjtPortEdit = nullptr;
+    QLineEdit *wsjtGroupEdit = nullptr;
+    QLineEdit *n1mmPortEdit = nullptr;
+    class QCheckBox *dxKeeperBox = nullptr;
+    QLineEdit *qlogPortEdit = nullptr;
     class QSpinBox *idleSpin = nullptr;
     QListWidget *rotorList = nullptr;
     QLineEdit *nameEdit = nullptr;

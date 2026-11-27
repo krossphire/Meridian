@@ -1,10 +1,10 @@
 # RT-21 Setup Utility parity
 
-Meridian should replace the Green Heron RT-21 Setup Utility. This file is the inventory of every setting that utility exposes, the bytes it sends, and whether those bytes have been seen on a live rotor. Alpha 7 can read them and save a plain-text copy. It does not write them.
+Meridian should replace the Green Heron RT-21 Setup Utility. This file is the inventory of every setting that utility exposes, the bytes it sends, and whether those bytes have been seen on a live rotor. The 1.0.0 build reads them and saves a plain-text copy.
 
 **Verified** means the bytes were seen on a live RT-21 (Andrew's session of 14 Nov 2026, or a later one). **Unverified** means the command is printed in a Green Heron manual or is a literal string in Setup Utility 4.B12, and has not been seen on Andrew's rotor. Do not treat Unverified as safe to send.
 
-Writes stay compiled out (`MERIDIAN_ALPHA_READONLY`). A future write, once a group is approved, saves a copy under `backups/`, sends the group, reads it back, and compares. One group at a time. Factory reset, the bootloader, and the module's "reset to defaults" stay excluded.
+`MERIDIAN_ALPHA_READONLY` is on by default. With that switch the setup spins stay disabled, and grouped Apply, the bulk EEPROM write, calibration, and the pulse-heading command are compiled out (`applySetupGroup`, `writeConfiguration`, `sendCalibrate`, `sendPulseHeading`). A single register write, including brightness, is still compiled in and is sent only when the rotor reports 4.13.2. A future grouped write, once approved, saves a copy under `backups/`, sends the group, reads it back, and compares. One group at a time. Factory reset, the bootloader, and the module's "reset to defaults" stay excluded.
 
 ## Sources
 
@@ -160,7 +160,7 @@ There is no DNS command in the manual or in the utility. There is no AP/client m
 | What you see | Read | Reply token | Write | Risk | Status |
 | --- | --- | --- | --- | --- | --- |
 | Module type | `AT*HWTYPE?` | `HWTYPE=` | none | low | Unverified. The utility accepts only `HWTYPE=2`. |
-| DHCP or static | `AT*DHCP?` | `DHCP=` | `AT*DHCP=0` when the DHCP radio is selected. `AT*DHCP=1` when Static IP is selected. The reset button sends `AT*DHCP=1` together with a static address. | high, drops an IP link | Unverified. The polarity is the opposite of the usual "1 means DHCP". |
+| DHCP or static | `AT*DHCP?` | `DHCP=` | `AT*DHCP=0` is static. `AT*DHCP=1` is DHCP. A write sends that same digit. | high, drops an IP link | Confirmed 2026-11-21 on COM6: a static module answered `AT*DHCP=0`. |
 | Current IP | `AT*IP?` | `IP=` | none (it follows DHCP) | low | Unverified |
 | Static IP | `AT*AIP?` | `AIP=` | `AT*AIP=` + address. The reset writes `192.168.2.100`. | high, drops the link | Unverified |
 | Current mask | `AT*NMASK?` | `NMASK=` | none | low | Unverified |
@@ -195,7 +195,7 @@ There is no DNS command in the manual or in the utility. There is no AP/client m
 | Network page | Done, read-only, over serial, USB, or IP |
 | Guide: free TCP port, a static address outside .100–.199, drop-link warning, prefer USB | Done. Suggestions are not copied into the connection fields. |
 | Plain-text copy in `backups/` | Done, and it runs before any future write |
-| Write, read back, compare | Implemented behind the read-only switch. Not in this build. |
+| Write, read back, compare | Grouped Apply, bulk EEPROM, calibration, and pulse-heading stay compiled out while `MERIDIAN_ALPHA_READONLY` is on. A single register write is compiled in and runs only on firmware 4.13.2. |
 | Factory reset, bootloader, module reset, TFTP write, vanity line | Excluded |
 
 ## What Andrew's utility showed against the 4.14.g1 read
@@ -220,6 +220,6 @@ The setup utility, on the Edgeport COM port at 4800, showed Yaesu G-2800, Admin,
 | Alt offsets off | R, S = 361 | 361 | 361 is the unused sentinel. Meridian shows off. |
 | 3.58 V at A/D 0440 | pot, not an EEPROM letter | pot was 0334 at another moment | not 440/1023×5 V. The utility derives it. |
 
-A later serial open of the module, after one junk attempt, showed name RT-21, static address 192.168.1.106, mask 255.255.255.0, gateway 192.168.2.1, link 0, HTTP 801, UDP 23073, TFTP 69, serial TCP 6555. `AT*DHCP=1` is Static. The current IP shown beside the DHCP control is `AT*IP`, which was also 192.168.1.106. The gateway is on 192.168.2.0, not 192.168.1.0. Meridian says so and does not offer reset-to-defaults. The web password is reported only as set or not set.
+A later serial open of the module, after one junk attempt, showed name RT-21, static address 192.168.1.106, mask 255.255.255.0, gateway 192.168.2.1, link 0, HTTP 801, UDP 23073, TFTP 69, serial TCP 6555. `AT*DHCP=0` is static. The current IP shown beside the DHCP control is `AT*IP`, which was also 192.168.1.106. The gateway is on 192.168.2.0, not 192.168.1.0. Meridian says so and does not offer reset-to-defaults. The web password is reported only as set or not set.
 
 `docs/RT21_PROTOCOL.md` is the motion-protocol note. This file is the setup map.

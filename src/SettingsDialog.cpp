@@ -16,6 +16,7 @@
 #include "rotor/Rt21Setup.h"
 #include "rotor/TrafficLog.h"
 #include "rotor/UserFiles.h"
+#include "sources/CredentialStore.h"
 
 #include <QCheckBox>
 #include <QDateTime>
@@ -37,7 +38,6 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QFrame>
 #include <QScrollArea>
@@ -125,6 +125,7 @@ SettingsDialog::SettingsDialog(const AppConfig &config, const ZipDatabase *zipDb
     if (setupColumn)
         setupColumn->addTail(setupPanel->portsPage(), setupPanel->networkPage());
     tabs->addTab(setupTabs, QStringLiteral("Setup"));
+    buildSources();
     connect(setupPanel, &SetupPanel::statusMessage, this, [this](const QString &text) { setStatus(text); });
     connect(setupPanel, &SetupPanel::networkWriteRequested, this,
             [this](const QString &key, const QString &value, const QString &settingName) {
@@ -365,8 +366,19 @@ void SettingsDialog::setDriver(Rt21Driver *next)
 
 void SettingsDialog::setStatus(const QString &text)
 {
+    setStatus(text, statusTone(text));
+}
+
+void SettingsDialog::noteSettingsWrite(bool ok)
+{
+    if (!ok)
+        setStatus(QStringLiteral("Couldn't write meridian.ini."), StatusTone::Failure);
+}
+
+void SettingsDialog::setStatus(const QString &text, StatusTone tone)
+{
     statusPlain = text;
-    statusToneNow = statusTone(text);
+    statusToneNow = tone;
     if (!statusFadeTimer) {
         statusFadeTimer = new QTimer(this);
         statusFadeTimer->setSingleShot(true);
@@ -446,20 +458,93 @@ bool SettingsDialog::commitDraft(bool interactive)
     if (rotorIndex >= 0)
         storeRotor(rotorIndex);
     QString error;
-    if (!resolveLocation(homeEdit->text(), zips, &error)) {
+    const QString latText = homeLatEdit ? homeLatEdit->text().trimmed() : QString();
+    const QString lonText = homeLonEdit ? homeLonEdit->text().trimmed() : QString();
+    const QString place = homeEdit ? homeEdit->text().trimmed() : QString();
+    if (latText.isEmpty() != lonText.isEmpty()) {
         if (interactive) {
-            QMessageBox::warning(this, QStringLiteral("Location"), error);
+            setStatus(QStringLiteral("Enter both latitude and longitude, or leave both blank."));
             tabs->setCurrentIndex(0);
             committing = false;
             return false;
         }
-    } else {
-        draft.homeText = homeEdit->text().trimmed();
+    } else if (!latText.isEmpty()) {
+        if (!resolveHome(place, latText, lonText, zips, &error)) {
+            if (interactive) {
+                setStatus(error);
+                tabs->setCurrentIndex(0);
+                committing = false;
+                return false;
+            }
+        } else {
+            draft.homeLatitude = latText;
+            draft.homeLongitude = lonText;
+            draft.homeText = place;
+        }
+    } else if (place.isEmpty()) {
+        draft.homeText.clear();
+        draft.homeLatitude.clear();
+        draft.homeLongitude.clear();
+    } else if (const auto loc = resolveLocation(place, zips, &error)) {
+        draft.homeText = place;
+        if (loc->source == ResolvedLocation::Source::Coordinates) {
+            draft.homeLatitude = QString::number(loc->latitude, 'g', 12);
+            draft.homeLongitude = QString::number(loc->longitude, 'g', 12);
+            if (homeLatEdit)
+                homeLatEdit->setText(draft.homeLatitude);
+            if (homeLonEdit)
+                homeLonEdit->setText(draft.homeLongitude);
+        } else {
+            draft.homeLatitude.clear();
+            draft.homeLongitude.clear();
+        }
+    } else if (interactive) {
+        setStatus(error);
+        tabs->setCurrentIndex(0);
+        committing = false;
+        return false;
     }
     if (trafficBox)
         draft.trafficLog = trafficBox->isChecked();
     if (sunBox)
         draft.showSun = sunBox->isChecked();
+    if (compassBox)
+        draft.compassButtons = compassBox->isChecked();
+    if (beamBox)
+        draft.loggerBeamButton = beamBox->isChecked();
+    if (targetLineBox)
+        draft.showTargetBearingLine = targetLineBox->isChecked();
+    if (qrzUserEdit)
+        draft.qrzUsername = qrzUserEdit->text().trimmed();
+    if (wsjtPortEdit) {
+        bool ok = false;
+        const int port = wsjtPortEdit->text().trimmed().toInt(&ok);
+        draft.wsjtPort = ok && port > 0 && port <= 65535 ? port : 0;
+    }
+    if (wsjtGroupEdit)
+        draft.wsjtMulticast = wsjtGroupEdit->text().trimmed();
+    if (n1mmPortEdit) {
+        bool ok = false;
+        const int port = n1mmPortEdit->text().trimmed().toInt(&ok);
+        draft.n1mmPort = ok && port > 0 && port <= 65535 ? port : 0;
+    }
+    if (dxKeeperBox)
+        draft.dxKeeper = dxKeeperBox->isChecked();
+    if (qlogPortEdit) {
+        bool ok = false;
+        const int port = qlogPortEdit->text().trimmed().toInt(&ok);
+        draft.qlogPort = ok && port > 0 && port <= 65535 ? port : 0;
+    }
+    if (qrzPassEdit && !qrzPassEdit->text().isEmpty()) {
+        if (!CredentialStore::store(draft.qrzUsername, qrzPassEdit->text()))
+            setStatus(QStringLiteral("Couldn't save the QRZ password. It was not written to meridian.ini."),
+                      StatusTone::Failure);
+        else
+            qrzPassEdit->clear();
+        qrzPassStored = !draft.qrzUsername.isEmpty() && !CredentialStore::load(draft.qrzUsername).isEmpty();
+        qrzPassEdit->setPlaceholderText(qrzPassStored ? QStringLiteral("••••• saved")
+                                                      : QStringLiteral("Password"));
+    }
     if (idleSpin)
         draft.idlePollSeconds = idleSpin->value();
     emit configSaved(draft);
@@ -471,10 +556,38 @@ void SettingsDialog::setConfig(const AppConfig &config)
 {
     draft = config;
     homeEdit->setText(draft.homeText);
+    if (homeLatEdit)
+        homeLatEdit->setText(draft.homeLatitude);
+    if (homeLonEdit)
+        homeLonEdit->setText(draft.homeLongitude);
     if (trafficBox)
         trafficBox->setChecked(draft.trafficLog);
     if (sunBox)
         sunBox->setChecked(draft.showSun);
+    if (compassBox)
+        compassBox->setChecked(draft.compassButtons);
+    if (beamBox)
+        beamBox->setChecked(draft.loggerBeamButton);
+    if (targetLineBox)
+        targetLineBox->setChecked(draft.showTargetBearingLine);
+    if (qrzUserEdit)
+        qrzUserEdit->setText(draft.qrzUsername);
+    if (wsjtPortEdit)
+        wsjtPortEdit->setText(draft.wsjtPort > 0 ? QString::number(draft.wsjtPort) : QString());
+    if (wsjtGroupEdit)
+        wsjtGroupEdit->setText(draft.wsjtMulticast);
+    if (n1mmPortEdit)
+        n1mmPortEdit->setText(draft.n1mmPort > 0 ? QString::number(draft.n1mmPort) : QString());
+    if (dxKeeperBox)
+        dxKeeperBox->setChecked(draft.dxKeeper);
+    if (qlogPortEdit)
+        qlogPortEdit->setText(draft.qlogPort > 0 ? QString::number(draft.qlogPort) : QString());
+    if (qrzPassEdit) {
+        qrzPassEdit->clear();
+        qrzPassStored = !draft.qrzUsername.isEmpty() && !CredentialStore::load(draft.qrzUsername).isEmpty();
+        qrzPassEdit->setPlaceholderText(qrzPassStored ? QStringLiteral("••••• saved")
+                                                      : QStringLiteral("Password"));
+    }
     if (idleSpin)
         idleSpin->setValue(draft.idlePollSeconds);
     if (networkConnectionBox) {
@@ -501,13 +614,24 @@ void SettingsDialog::buildStation()
     auto *page = new QWidget;
     auto *layout = new QVBoxLayout(page);
     auto *intro = new QLabel(QStringLiteral(
-        "Grid square, US ZIP code, or coordinates. "
-        "Decimal degrees, N/S/E/W, degrees-minutes-seconds, and degrees with decimal minutes all work."));
+        "Grid square or US ZIP code. EM26 in this field is the default, the center of that square, until you replace it. "
+        "Decimal degrees and degrees with minutes still work in this field."));
     intro->setWordWrap(true);
     intro->setObjectName(QStringLiteral("hint"));
     homeEdit = new QLineEdit(draft.homeText);
     homeEdit->setObjectName(QStringLiteral("homeEdit"));
-    homeEdit->setPlaceholderText(QStringLiteral("EM26   or   72714   or   36°28.2'N 94°13.8'W"));
+    homeEdit->setPlaceholderText(QStringLiteral("EM26ul   or   36.5 N 95.0 W"));
+    auto *precision = new QLabel(QStringLiteral(
+        "For accurate beam headings, enter your lat/long or at least a 6-character grid."));
+    precision->setObjectName(QStringLiteral("homePrecisionHint"));
+    precision->setWordWrap(true);
+    precision->setStyleSheet(QStringLiteral("color: %1;").arg(statusToneColor(StatusTone::Busy).name()));
+    homeLatEdit = new QLineEdit(draft.homeLatitude);
+    homeLatEdit->setObjectName(QStringLiteral("homeLatitude"));
+    homeLatEdit->setPlaceholderText(QStringLiteral("Latitude"));
+    homeLonEdit = new QLineEdit(draft.homeLongitude);
+    homeLonEdit->setObjectName(QStringLiteral("homeLongitude"));
+    homeLonEdit->setPlaceholderText(QStringLiteral("Longitude"));
     summary = new QLabel;
     summary->setObjectName(QStringLiteral("summaryLabel"));
     summary->setTextInteractionFlags(Qt::TextSelectableByMouse);
@@ -515,6 +639,9 @@ void SettingsDialog::buildStation()
     detail->setObjectName(QStringLiteral("detailLabel"));
     layout->addWidget(intro);
     layout->addWidget(homeEdit);
+    layout->addWidget(precision);
+    layout->addWidget(homeLatEdit);
+    layout->addWidget(homeLonEdit);
     layout->addWidget(summary);
     layout->addWidget(detail);
     trafficBox = new QCheckBox(QStringLiteral("Record rotor traffic"));
@@ -552,27 +679,171 @@ void SettingsDialog::buildStation()
     idleRow->addWidget(idleLabel);
     idleRow->addWidget(idleSpin);
     idleRow->addStretch();
+    compassBox = new QCheckBox(QStringLiteral("Compass"));
+    compassBox->setChecked(draft.compassButtons);
+    compassBox->setObjectName(QStringLiteral("compassButtons"));
+    beamBox = new QCheckBox(QStringLiteral("Logger beam button"));
+    beamBox->setChecked(draft.loggerBeamButton);
+    beamBox->setObjectName(QStringLiteral("loggerBeamButton"));
+    targetLineBox = new QCheckBox(QStringLiteral("Show target bearing line"));
+    targetLineBox->setChecked(draft.showTargetBearingLine);
+    targetLineBox->setObjectName(QStringLiteral("showTargetBearingLine"));
     layout->addSpacing(8);
+    layout->addWidget(compassBox);
+    layout->addWidget(beamBox);
+    layout->addWidget(targetLineBox);
     layout->addWidget(sunBox);
     layout->addLayout(idleRow);
     layout->addStretch();
-    connect(homeEdit, &QLineEdit::textChanged, this, [this]() { refreshLocation(); });
+    connect(homeEdit, &QLineEdit::textChanged, this, [this]() {
+        // A newly typed grid or ZIP replaces a lat/long that was left in the boxes.
+        QString error;
+        if (homeLatEdit && homeLonEdit) {
+            if (const auto loc = resolveLocation(homeEdit->text(), zips, &error)) {
+                if (loc->source != ResolvedLocation::Source::Coordinates) {
+                    const QSignalBlocker blockLat(homeLatEdit);
+                    const QSignalBlocker blockLon(homeLonEdit);
+                    homeLatEdit->clear();
+                    homeLonEdit->clear();
+                }
+            }
+        }
+        refreshLocation();
+    });
+    connect(homeLatEdit, &QLineEdit::textChanged, this, [this]() { refreshLocation(); });
+    connect(homeLonEdit, &QLineEdit::textChanged, this, [this]() { refreshLocation(); });
     tabs->addTab(page, QStringLiteral("Station"));
 }
 
 void SettingsDialog::refreshLocation()
 {
     QString error;
-    if (const auto loc = resolveLocation(homeEdit->text(), zips, &error)) {
+    const QString latText = homeLatEdit ? homeLatEdit->text() : QString();
+    const QString lonText = homeLonEdit ? homeLonEdit->text() : QString();
+    const QString place = homeEdit ? homeEdit->text() : QString();
+    const auto loc = resolveHome(place, latText, lonText, zips, &error);
+    if (loc) {
         summary->setText(loc->summary());
         detail->setText(loc->detail());
         summary->setStyleSheet(QStringLiteral("color: #d5e2db; font-size: 15px;"));
         detail->setStyleSheet(QStringLiteral("color: #8ea099;"));
+    } else if (place.trimmed().isEmpty() && latText.trimmed().isEmpty() && lonText.trimmed().isEmpty()) {
+        summary->setText(QStringLiteral("Set your grid in Settings"));
+        detail->clear();
+        summary->setStyleSheet(QStringLiteral("color: #8ea099; font-size: 15px;"));
     } else {
         summary->setText(error);
         detail->clear();
         summary->setStyleSheet(QStringLiteral("color: #e09a86;"));
     }
+}
+
+void SettingsDialog::buildSources()
+{
+    auto *page = new QWidget;
+    auto *layout = new QVBoxLayout(page);
+    auto *intro = new QLabel(QStringLiteral(
+        "QRZ XML is optional. It uses your QRZ username and an XML data subscription. "
+        "The password is stored in the system keychain, not in meridian.ini and not in the log. "
+        "The session key stays in memory. QRZ does not return a bearing to your station. "
+        "Meridian computes the short path from your home to the latitude and longitude, or to the grid if that is all that comes back. "
+        "A logger that sends a call with no grid uses the same lookup."));
+    intro->setWordWrap(true);
+    intro->setObjectName(QStringLiteral("hint"));
+    qrzUserEdit = new QLineEdit(draft.qrzUsername);
+    qrzUserEdit->setObjectName(QStringLiteral("qrzUsername"));
+    qrzUserEdit->setPlaceholderText(QStringLiteral("QRZ username"));
+    qrzPassEdit = new QLineEdit;
+    qrzPassEdit->setObjectName(QStringLiteral("qrzPassword"));
+    qrzPassEdit->setEchoMode(QLineEdit::Password);
+    qrzPassStored = !draft.qrzUsername.isEmpty() && !CredentialStore::load(draft.qrzUsername).isEmpty();
+    qrzPassEdit->setPlaceholderText(qrzPassStored ? QStringLiteral("••••• saved")
+                                                  : QStringLiteral("Password"));
+    auto *clear = new QPushButton(QStringLiteral("Clear password"));
+    clear->setFlat(true);
+    connect(clear, &QPushButton::clicked, this, [this]() {
+        if (qrzUserEdit)
+            CredentialStore::forget(qrzUserEdit->text());
+        if (qrzPassEdit) {
+            qrzPassEdit->clear();
+            qrzPassStored = false;
+            qrzPassEdit->setPlaceholderText(QStringLiteral("Password"));
+        }
+        setStatus(QStringLiteral("QRZ password cleared from the keychain."));
+    });
+    layout->addWidget(intro);
+    layout->addWidget(qrzUserEdit);
+    layout->addWidget(qrzPassEdit);
+    layout->addWidget(clear, 0, Qt::AlignLeft);
+    auto *wsjt = new QLabel(QStringLiteral(
+        "WSJT-X and WSJT-Z send a Status packet with the DX call and grid. "
+        "Leave the port empty and nothing is bound. "
+        "Unicast 2237 belongs to WSJT-X, so Meridian will not take that port by itself. "
+        "WSJT-Z can send to multicast 224.0.0.1 port 2237. Type 224.0.0.1 and 2237 here; QLog joins the same group and keeps its listen port at 2237. "
+        "Meridian only reads those packets and never answers WSJT-Z. "
+        "Or turn on QLog UDP forward to 127.0.0.1 and another port, type that port here, and leave the group blank."));
+    wsjt->setWordWrap(true);
+    wsjt->setObjectName(QStringLiteral("hint"));
+    wsjtPortEdit = new QLineEdit(draft.wsjtPort > 0 ? QString::number(draft.wsjtPort) : QString());
+    wsjtPortEdit->setObjectName(QStringLiteral("wsjtPort"));
+    wsjtPortEdit->setPlaceholderText(QStringLiteral("QLog forward port"));
+    wsjtGroupEdit = new QLineEdit(draft.wsjtMulticast);
+    wsjtGroupEdit->setObjectName(QStringLiteral("wsjtMulticast"));
+    wsjtGroupEdit->setPlaceholderText(QStringLiteral("224.0.0.1"));
+    layout->addSpacing(18);
+    layout->addWidget(wsjt);
+    layout->addWidget(wsjtPortEdit);
+    layout->addWidget(wsjtGroupEdit);
+    auto *n1mm = new QLabel(QStringLiteral(
+        "N1MM Logger+ sends LookupInfo when a call is entered, and ContactInfo after the contact is logged. "
+        "In Configurer, Broadcast Data, enable External Callsign Lookup. The suggested port is 12060. "
+        "Type it here if that is the port you chose. Meridian binds with SO_REUSEADDR so another program can listen too. "
+        "A logged contact hides the beam button. An empty port listens to nothing. The grid is used when N1MM sends one, otherwise QRZ."));
+    n1mm->setWordWrap(true);
+    n1mm->setObjectName(QStringLiteral("hint"));
+    n1mmPortEdit = new QLineEdit(draft.n1mmPort > 0 ? QString::number(draft.n1mmPort) : QString());
+    n1mmPortEdit->setObjectName(QStringLiteral("n1mmPort"));
+    n1mmPortEdit->setPlaceholderText(QStringLiteral("12060"));
+    layout->addSpacing(18);
+    layout->addWidget(n1mm);
+    layout->addWidget(n1mmPortEdit);
+    auto *keeper = new QLabel(QStringLiteral(
+        "DXKeeper is the log, so Meridian watches DXKeeper rather than DXView. "
+        "DXLabTest links topic DXKeeper|DDEServer, items LookupCallsign and CallbookGrid. "
+        "That source does not link a latitude or longitude for DXKeeper. "
+        "If CallbookGrid is empty, QRZ is used. "
+        "This has not been tried against a running DXKeeper. Windows only."));
+    keeper->setWordWrap(true);
+    keeper->setObjectName(QStringLiteral("hint"));
+    dxKeeperBox = new QCheckBox(QStringLiteral("Watch DXKeeper"));
+    dxKeeperBox->setObjectName(QStringLiteral("dxKeeper"));
+    dxKeeperBox->setChecked(draft.dxKeeper);
+#if !defined(Q_OS_WIN)
+    // DDE is Windows-only, so the switch cannot be turned on here. A saved
+    // choice still shows, and Save writes that choice back out.
+    dxKeeperBox->setEnabled(false);
+#endif
+    layout->addSpacing(18);
+    layout->addWidget(keeper);
+    layout->addWidget(dxKeeperBox);
+    qlogPortEdit = new QLineEdit(draft.qlogPort > 0 ? QString::number(draft.qlogPort) : QString());
+    qlogPortEdit->setObjectName(QStringLiteral("qlogPort"));
+    qlogPortEdit->setPlaceholderText(QStringLiteral("QLog current-contact port"));
+    auto *qlog = new QLabel(QStringLiteral(
+        "Needs a QLog build with the Current Contact notification (the patch in contrib/qlog-currentcontact). "
+        "In QLog: Settings > Network > Notifications > Current Contact, enter 127.0.0.1:<this port> "
+        "(for example 127.0.0.1:5775), and type the same port here. Leave it empty to turn it off. "
+        "This is separate from the WSJT-X 2237 feed; don't change that. "
+        "When the message has a grid, Meridian computes the bearing from your home. "
+        "QLog's azimuth is used only when the grid is missing."));
+    qlog->setWordWrap(true);
+    qlog->setObjectName(QStringLiteral("qlogPortNote"));
+    qlog->setStyleSheet(QStringLiteral("color: #8ea099;"));
+    layout->addSpacing(18);
+    layout->addWidget(qlogPortEdit);
+    layout->addWidget(qlog);
+    layout->addStretch();
+    tabs->addTab(page, QStringLiteral("Sources"));
 }
 
 void SettingsDialog::buildRotors()

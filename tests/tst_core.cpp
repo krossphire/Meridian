@@ -5,14 +5,20 @@
  */
 
 #include "core/Bearing.h"
+#include "core/Compass.h"
 #include "core/Coordinates.h"
 #include "core/Gridsquare.h"
 #include "core/Projection.h"
 #include "core/ZipCodes.h"
+#include "map/Dxcc.h"
 #include "map/GeoMap.h"
 #include "core/Solar.h"
+#include "rotor/AppConfig.h"
 #include "rotor/Reconnect.h"
 #include "rotor/Rt21Protocol.h"
+
+#include <QSettings>
+#include <QTemporaryDir>
 
 #include <QDateTime>
 #include <QFile>
@@ -31,9 +37,16 @@ private slots:
     void coordinates();
     void zipCentroids();
     void bearingDirections();
+    void compassWrap();
+    void gridBearing();
+    void preciseHomeBearing();
+    void homesChangeTheBearing();
     void azimuthClamp();
     void projectionRoundTrip();
     void countryHit();
+    void dxccHover();
+    void homeCoordinatesRoundTrip();
+    void targetLineSettingRoundTrip();
     void framing();
     void strictSemicolonFrames();
     void commands();
@@ -156,6 +169,152 @@ void TestCore::bearingDirections()
     QVERIFY(!bearingFromClick(QPointF(200, 100), center, 80));
 }
 
+void TestCore::compassWrap()
+{
+    QCOMPARE(nearestCompassIndex(0.0), 0);
+    QCOMPARE(QString::fromLatin1(compassLabel(0)), QStringLiteral("N"));
+    QCOMPARE(nearestCompassIndex(359.0), 0);
+    QCOMPARE(nearestCompassIndex(10.0), 0);
+    QCOMPARE(nearestCompassIndex(22.4), 0);
+    QCOMPARE(nearestCompassIndex(22.5), 1);
+    QCOMPARE(QString::fromLatin1(compassLabel(1)), QStringLiteral("NE"));
+    QCOMPARE(nearestCompassIndex(45.0), 1);
+    QCOMPARE(nearestCompassIndex(180.0), 4);
+    QCOMPARE(QString::fromLatin1(compassLabel(4)), QStringLiteral("S"));
+    QCOMPARE(nearestCompassIndex(337.4), 7);
+    QCOMPARE(QString::fromLatin1(compassLabel(7)), QStringLiteral("NW"));
+    QCOMPARE(nearestCompassIndex(337.5), 0);
+    QCOMPARE(nearestCompassIndex(-10.0), 0);
+}
+
+void TestCore::gridBearing()
+{
+    double bearing = -1;
+    QVERIFY(Gridsquare::bearingTo(QStringLiteral("EM26"), QStringLiteral("KG54"), bearing));
+    QCOMPARE(QString::number(bearing, 'f', 1), QStringLiteral("92.4"));
+    QVERIFY(!Gridsquare::bearingTo(QStringLiteral("EM26"), QStringLiteral("nope"), bearing));
+
+    // A 6-character square is centered on its subsquare, not on a corner.
+    double lat = 0;
+    double lon = 0;
+    QVERIFY(Gridsquare::toLatLon(QStringLiteral("EM26ul"), lat, lon));
+    QCOMPARE(lat, 36.47916666666667);
+    QCOMPARE(lon, -94.29166666666667);
+    QVERIFY(Gridsquare::bearingTo(QStringLiteral("EM26ul"), QStringLiteral("EM26vm"), bearing));
+    QCOMPARE(QString::number(bearing, 'f', 1), QStringLiteral("58.1"));
+    QVERIFY(Gridsquare::bearingTo(QStringLiteral("EM26ul"), QStringLiteral("EM26uk"), bearing));
+    QCOMPARE(QString::number(bearing, 'f', 1), QStringLiteral("180.0"));
+    QVERIFY(Gridsquare::bearingTo(QStringLiteral("EM26ul"), QStringLiteral("KG54"), bearing));
+    QCOMPARE(QString::number(bearing, 'f', 1), QStringLiteral("92.8"));
+    double same = -1;
+    QVERIFY(Gridsquare::bearingTo(36.5, -95.0, 36.5, -95.0, same));
+    QCOMPARE(same, 0.0);
+}
+
+void TestCore::preciseHomeBearing()
+{
+    const double targetLat = 36.0;
+    const double targetLon = -94.25;
+    QString error;
+    const auto decimal = resolveLocation(QStringLiteral("36.25, -94.25"), nullptr, &error);
+    QVERIFY2(decimal.has_value(), qPrintable(error));
+    QCOMPARE(decimal->source, ResolvedLocation::Source::Coordinates);
+    QVERIFY(std::abs(decimal->latitude - 36.25) < 1e-9);
+    QVERIFY(std::abs(decimal->longitude - (-94.25)) < 1e-9);
+    QVERIFY(!decimal->grid.isEmpty());
+    double centerLat = 0;
+    double centerLon = 0;
+    QVERIFY(Gridsquare::toLatLon(decimal->grid, centerLat, centerLon));
+    QVERIFY(std::abs(centerLat - decimal->latitude) > 0.01 || std::abs(centerLon - decimal->longitude) > 0.01);
+
+    double rawBearing = 0;
+    double centerBearing = 0;
+    QVERIFY(Gridsquare::bearingTo(decimal->latitude, decimal->longitude, targetLat, targetLon, rawBearing));
+    QVERIFY(Gridsquare::bearingTo(centerLat, centerLon, targetLat, targetLon, centerBearing));
+    QCOMPARE(QString::number(rawBearing, 'f', 1), QStringLiteral("180.0"));
+    QCOMPARE(QString::number(centerBearing, 'f', 1), QStringLiteral("187.1"));
+
+    const auto minutes = resolveLocation(QStringLiteral("36 15 N 94 15 W"), nullptr, &error);
+    QVERIFY2(minutes.has_value(), qPrintable(error));
+    QVERIFY(std::abs(minutes->latitude - decimal->latitude) < 1e-9);
+    QVERIFY(std::abs(minutes->longitude - decimal->longitude) < 1e-9);
+    double fromMinutes = 0;
+    QVERIFY(Gridsquare::bearingTo(minutes->latitude, minutes->longitude, targetLat, targetLon, fromMinutes));
+    QCOMPARE(QString::number(fromMinutes, 'f', 1), QStringLiteral("180.0"));
+
+    const auto degrees = resolveHome(QString(), QStringLiteral("36.25°"), QStringLiteral("94°15'W"), nullptr, &error);
+    QVERIFY2(degrees.has_value(), qPrintable(error));
+    QVERIFY(std::abs(degrees->latitude - 36.25) < 1e-9);
+    QVERIFY(std::abs(degrees->longitude - (-94.25)) < 1e-9);
+
+    QTemporaryDir bareDir;
+    QVERIFY(bareDir.isValid());
+    QSettings bare(bareDir.filePath(QStringLiteral("meridian.ini")), QSettings::IniFormat);
+    bare.clear();
+    bare.setValue(QStringLiteral("home/text"), QStringLiteral("FN31"));
+    bare.sync();
+    const AppConfig kept = AppConfig::load(bare);
+    QCOMPARE(kept.homeText, QStringLiteral("FN31"));
+    bare.clear();
+
+    const auto overridden = resolveHome(QStringLiteral("EM26"), QStringLiteral("36.25"), QStringLiteral("-94.25"),
+                                        nullptr, &error);
+    QVERIFY2(overridden.has_value(), qPrintable(error));
+    QVERIFY(std::abs(overridden->latitude - 36.25) < 1e-9);
+    QVERIFY(std::abs(overridden->longitude - (-94.25)) < 1e-9);
+    double fromFields = 0;
+    QVERIFY(Gridsquare::bearingTo(overridden->latitude, overridden->longitude, targetLat, targetLon, fromFields));
+    QCOMPARE(QString::number(fromFields, 'f', 1), QStringLiteral("180.0"));
+
+    double fourLat = 0;
+    double fourLon = 0;
+    QVERIFY(Gridsquare::toLatLon(QStringLiteral("EM26"), fourLat, fourLon));
+    QCOMPARE(fourLat, 36.5);
+    QCOMPARE(fourLon, -95.0);
+    const double stationLat = 36.0724337;
+    const double stationLon = -94.0893386;
+    double fromFour = 0;
+    double fromSix = 0;
+    double fromCorner = 0;
+    QVERIFY(Gridsquare::bearingTo(fourLat, fourLon, stationLat, stationLon, fromFour));
+    QVERIFY(Gridsquare::toLatLon(QStringLiteral("EM26vl"), centerLat, centerLon));
+    QVERIFY(Gridsquare::bearingTo(centerLat, centerLon, stationLat, stationLon, fromSix));
+    QVERIFY(Gridsquare::bearingTo(36.0, -96.0, stationLat, stationLon, fromCorner));
+    QCOMPARE(QString::number(fromFour, 'f', 1), QStringLiteral("119.9"));
+    QCOMPARE(QString::number(fromSix, 'f', 1), QStringLiteral("166.7"));
+    QVERIFY(QString::number(fromCorner, 'f', 1) != QString::number(fromFour, 'f', 1));
+
+    double wide = 0;
+    double tight = 0;
+    QVERIFY(Gridsquare::bearingTo(QStringLiteral("EM26"), QStringLiteral("PM95"), wide));
+    QVERIFY(Gridsquare::bearingTo(QStringLiteral("EM26ul"), QStringLiteral("PM95"), tight));
+    QVERIFY(std::abs(wide - tight) < 3.0);
+    QVERIFY(std::abs(wide - tight) > 0.1);
+}
+
+void TestCore::homesChangeTheBearing()
+{
+    const QString target = QStringLiteral("KG54");
+    const struct {
+        const char *home;
+        const char *bearing;
+    } rows[] = {
+        {"JO01", "152.8"},
+        {"PM95", "257.6"},
+        {"FN31", "101.5"},
+        {"QF56", "232.1"},
+    };
+    QString previous;
+    for (const auto &row : rows) {
+        double bearing = 0;
+        QVERIFY(Gridsquare::bearingTo(QString::fromLatin1(row.home), target, bearing));
+        const QString shown = QString::number(bearing, 'f', 1);
+        QCOMPARE(shown, QString::fromLatin1(row.bearing));
+        QVERIFY(shown != previous);
+        previous = shown;
+    }
+}
+
 void TestCore::azimuthClamp()
 {
     QCOMPARE(clampRt21Azimuth(0), 0.0);
@@ -206,6 +365,109 @@ void TestCore::countryHit()
     QVERIFY(paris >= 0);
     QCOMPARE(layer.countries.at(paris).name, QStringLiteral("France"));
     QCOMPARE(shortCountryName(QStringLiteral("United States of America")), QStringLiteral("United States"));
+}
+
+void TestCore::dxccHover()
+{
+    QFile outlines(QStringLiteral(MERIDIAN_DATA_DIR) + QStringLiteral("/dxcc.bin"));
+    QFile names(QStringLiteral(MERIDIAN_DATA_DIR) + QStringLiteral("/dxcc-names.tsv"));
+    QFile prefixes(QStringLiteral(MERIDIAN_DATA_DIR) + QStringLiteral("/dxcc-prefixes.tsv"));
+    QVERIFY(outlines.open(QIODevice::ReadOnly));
+    QVERIFY(names.open(QIODevice::ReadOnly));
+    QVERIFY(prefixes.open(QIODevice::ReadOnly));
+    QVERIFY(loadDxcc(outlines.readAll(), names.readAll(), prefixes.readAll()));
+    const DxccLabel zealand = dxccForCountry(QStringLiteral("New Zealand"));
+    QCOMPARE(zealand.name, QStringLiteral("New Zealand"));
+    QCOMPARE(zealand.prefix, QStringLiteral("ZL"));
+    const DxccLabel alaska = dxccAt(64.0, -153.0);
+    QCOMPARE(alaska.name, QStringLiteral("Alaska"));
+    QCOMPARE(alaska.prefix, QStringLiteral("KL7"));
+    const DxccLabel hawaii = dxccAt(21.3, -157.8);
+    QCOMPARE(hawaii.prefix, QStringLiteral("KH6"));
+    const DxccLabel azores = dxccAt(37.8, -25.5);
+    QCOMPARE(azores.prefix, QStringLiteral("CU"));
+    const DxccLabel sardinia = dxccAt(40.1, 9.0);
+    QCOMPARE(sardinia.prefix, QStringLiteral("IS0"));
+    QVERIFY(!dxccEntities().isEmpty());
+
+    const auto hawaiiCall = dxccForCallsign(QStringLiteral("KH6ABC"));
+    const auto mixed = dxccForCallsign(QStringLiteral("K1ABC/KH6"));
+    QVERIFY(hawaiiCall && mixed);
+    QCOMPARE(mixed->prefix, QStringLiteral("KH6"));
+    QCOMPARE(mixed->havePoint, hawaiiCall->havePoint);
+    QCOMPARE(mixed->latitude, hawaiiCall->latitude);
+    QCOMPARE(mixed->longitude, hawaiiCall->longitude);
+
+    const auto k5po = dxccForCallsign(QStringLiteral("K5PO"));
+    QVERIFY(k5po);
+    QCOMPARE(k5po->country, QStringLiteral("United States of America"));
+    const auto kh6 = dxccForCallsign(QStringLiteral("KH6"));
+    QVERIFY(kh6);
+    QCOMPARE(kh6->country, QStringLiteral("Hawaii"));
+    const auto kl7 = dxccForCallsign(QStringLiteral("KL7RA"));
+    QVERIFY(kl7);
+    QCOMPARE(kl7->country, QStringLiteral("Alaska"));
+    const auto kp4 = dxccForCallsign(QStringLiteral("KP4"));
+    QVERIFY(kp4);
+    QCOMPARE(kp4->country, QStringLiteral("Puerto Rico"));
+    const auto falklands = dxccForCallsign(QStringLiteral("VP8ABC"));
+    QVERIFY(falklands);
+    QCOMPARE(falklands->country, QStringLiteral("Falkland Islands"));
+    const auto georgia = dxccForCallsign(QStringLiteral("VP8ABC/G"));
+    QVERIFY(georgia);
+    QCOMPARE(georgia->country, QStringLiteral("South Georgia and the Islands"));
+    const auto south = dxccForCallsign(QStringLiteral("VP0G"));
+    QVERIFY(south);
+    QCOMPARE(south->country, QStringLiteral("South Georgia and the Islands"));
+    const auto exact = dxccForCallsign(QStringLiteral("K6KO"));
+    QVERIFY(exact);
+    QCOMPARE(exact->country, QStringLiteral("Hawaii"));
+    QCOMPARE(exact->prefix, QStringLiteral("K6KO"));
+}
+
+void TestCore::homeCoordinatesRoundTrip()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QSettings ini(dir.filePath(QStringLiteral("meridian.ini")), QSettings::IniFormat);
+    ini.clear();
+    AppConfig config = AppConfig::defaults();
+    config.homeText = QStringLiteral("EM26");
+    config.homeLatitude = QStringLiteral("36.25");
+    config.homeLongitude = QStringLiteral("-94.25");
+    config.save(ini);
+    ini.sync();
+    const AppConfig loaded = AppConfig::load(ini);
+    QCOMPARE(loaded.homeText, QStringLiteral("EM26"));
+    QCOMPARE(loaded.homeLatitude, QStringLiteral("36.25"));
+    QCOMPARE(loaded.homeLongitude, QStringLiteral("-94.25"));
+    QString error;
+    const auto home = resolveHome(loaded.homeText, loaded.homeLatitude, loaded.homeLongitude, nullptr, &error);
+    QVERIFY2(home.has_value(), qPrintable(error));
+    QVERIFY(std::abs(home->latitude - 36.25) < 1e-9);
+    QVERIFY(std::abs(home->longitude - (-94.25)) < 1e-9);
+}
+
+void TestCore::targetLineSettingRoundTrip()
+{
+    QCOMPARE(AppConfig::defaults().showTargetBearingLine, true);
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QSettings ini(dir.filePath(QStringLiteral("meridian.ini")), QSettings::IniFormat);
+    AppConfig config = AppConfig::defaults();
+    config.showTargetBearingLine = false;
+    config.save(ini);
+    ini.sync();
+    const AppConfig hidden = AppConfig::load(ini);
+    QCOMPARE(hidden.showTargetBearingLine, false);
+    QFile file(dir.filePath(QStringLiteral("meridian.ini")));
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QString body = QString::fromUtf8(file.readAll());
+    QVERIFY(body.contains(QStringLiteral("showTargetBearingLine=false")));
+    config.showTargetBearingLine = true;
+    config.save(ini);
+    ini.sync();
+    QCOMPARE(AppConfig::load(ini).showTargetBearingLine, true);
 }
 
 void TestCore::framing()

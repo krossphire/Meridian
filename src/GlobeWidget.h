@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * Azimuthal equidistant globe. Coastlines and borders are Natural Earth
- * vectors projected once per home location (off the UI thread) and stroked
+ * vectors, and the DXCC split-entity outlines, projected once per home
+ * location (off the UI thread) and stroked
  * at device resolution. Heading, beam, and hover stay live on top of that cache.
  */
 
@@ -16,13 +17,18 @@
 
 #include <QDateTime>
 #include <QImage>
+#include <QPainterPath>
+#include <QVector>
 #include <QWidget>
 
 #include <memory>
 #include <optional>
 
+class QAbstractButton;
+class QLabel;
 class QLineEdit;
 class QComboBox;
+class QPainter;
 class QThread;
 class QTimer;
 
@@ -37,6 +43,8 @@ public:
 
     void setLayers(const GeoLayer *low, const GeoLayer *high);
     void setHome(double lat, double lon);
+    void clearHome();
+    bool hasHome() const { return haveHome; }
     void setHeading(std::optional<double> azimuth);
     void setTarget(std::optional<double> azimuth);
     void setLink(Link state, const QString &detail);
@@ -44,6 +52,18 @@ public:
     void setStatusLine(const QString &text, StatusTone tone);
     void setHeadingStale(bool stale);
     void setShowSun(bool show);
+    void setCompassVisible(bool on);
+    bool compassVisible() const { return compassOn; }
+    void setLoggerBeamEnabled(bool on);
+    void setShowTargetLine(bool on);
+    bool targetBearingLineShown() const;
+    void setBeamOffer(const QString &call, double azimuth, const QString &approxNote = QString());
+    void showBeamNote(const QString &text);
+    void clearBeamOffer();
+    void revealCallsign(const QString &seed = QString());
+    void setFindBusy(bool busy);
+    QString statusText() const { return statusLine; }
+    StatusTone statusToneValue() const { return statusToneNow; }
     void setSolarPreview(const QDateTime &utc);
     void setRotors(const QStringList &names, int active);
 
@@ -61,6 +81,7 @@ signals:
     void stopRequested();
     void settingsRequested();
     void rotorSelected(int index);
+    void callsignSubmitted(const QString &call, const QString &grid);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -85,20 +106,30 @@ private:
     void paintScene(QPainter &painter);
     void ensureSun();
     void hoverAt(QPointF pos);
+    void placeCompass();
+    int compassInset() const;
+    void placeBeam();
+    void placeCallsign();
+    void submitCallsign();
+    void beginBeaming();
+    void abandonBeam();
     void commitHeading();
     void cancelHeading();
 
     const GeoLayer *low = nullptr;
     const GeoLayer *high = nullptr;
+    // Map camera until a home is saved. Bearings check hasHome() and do not use this pair.
     double homeLat_ = 36.5;
     double homeLon_ = -95.0;
     bool haveHome = false;
+    bool beamHasAzimuth = false;
     std::optional<double> heading;
     std::optional<double> target;
     Link link = Link::Off;
     QString linkDetail;
     int hoverIndex = -1;
     QString hoverName;
+    QString hoverPrefix;
     QPointF hoverPos;
     qreal forcedDpr = 0;
 
@@ -111,12 +142,27 @@ private:
     quint64 requestGen = 0;
     std::shared_ptr<const ProjectedLayer> lowProjected;
     std::shared_ptr<const ProjectedLayer> highProjected;
+    std::shared_ptr<const QVector<QPainterPath>> dxccReady;
 
     QThread *thread = nullptr;
     class GlobeMapWorker *worker = nullptr;
     QTimer *debounce = nullptr;
     QTimer *sunTimer = nullptr;
     bool showSun = true;
+    bool compassOn = true;
+    bool loggerBeam = true;
+    bool showTargetLine = true;
+    QString beamCall;
+    double beamAzimuth = 0;
+    double beamGap = -1;
+    bool beamClick = false;
+    QAbstractButton *beam = nullptr;
+    QLabel *beamNote = nullptr;
+    QAbstractButton *callButton = nullptr;
+    QAbstractButton *findCall = nullptr;
+    QLineEdit *callEdit = nullptr;
+    bool findBusy = false;
+    bool callHover = false;
     bool headingStale = false;
     bool sunDirty = true;
     QString statusLine;
@@ -128,6 +174,7 @@ private:
     SolarPosition sunNow;
 
     QWidget *gear = nullptr;
+    QAbstractButton *compassPills[8] = {};
     QWidget *dot = nullptr;
     QLineEdit *editor = nullptr;
     QComboBox *rotors = nullptr;

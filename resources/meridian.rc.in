@@ -1,0 +1,3 @@
+// Windows executable icon for meridian.exe and meridian-mock.exe.
+// Artwork is paintMeridianMark() in src/AppIcon.cpp (the window icon).
+1 ICON "@MERIDIAN_ICO@"

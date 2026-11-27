@@ -24,7 +24,7 @@ Logs and setup backups use that same folder: `logs/` and `backups/`.
 
 ## First run
 
-The home location starts at grid **EM26**. No host, COM port, or TCP port is filled in. The status line says **Set up your RT-21 in settings**.
+The home field starts as grid **EM26**, and the page says that is the default: the center of that square. Bearings use the saved home. A 6-character grid, or latitude and longitude, is what a nearby station needs. When both latitude and longitude are filled in, those degrees are used and the 6-character square is only a label. No host, COM port, or TCP port is filled in. The status line says **Set up your RT-21 in settings**.
 
 **Find RT-21** checks USB and COM ports first, in numeric order (COM1, COM2, COM10), at 4800 and then 9600. It stops at the first port that answers. If none do, it scans the computer's local network. A hit is a button. The address is saved when that button is clicked. If a saved IP connection is down, Find saves the hit it confirmed and connects. If nothing answers, the line says **No RT-21 found.**
 
@@ -67,6 +67,11 @@ The command bytes are in [docs/RT21_PROTOCOL.md](docs/RT21_PROTOCOL.md). How the
 - The gear opens settings. On a very small window it stays hidden until the pointer is over the map. Ctrl+, opens settings too.
 - A rotor menu appears only when more than one rotor is saved.
 - The dot is the link: green connected, amber moving or connecting, red failed. The tooltip has the reason.
+- Hovering a country shows the DXCC name and its primary prefix, for example New Zealand over (ZL). Alaska, Hawaii, Puerto Rico, the Azores, Sardinia, and the French overseas territories are separate entities.
+- N, NE, E, SE, S, SW, W, and NW sit along the bottom. The pill nearest the heading is green, and amber while the rotor is moving. Settings can hide the row.
+- When a station is active, a dashed cyan line runs from the center of the disc to that station's bearing. The bearing is Meridian's, from the saved home. The line has no label, it sends nothing to the rotor, and it goes away when the station does. **Show target bearing line** is on by default and is saved in `meridian.ini`.
+- A small cyan button in the upper right reads “Beam toward” and the call. It is the same cyan as the line. One click turns the short path. While the rotor is on that bearing the button is green and reads “Beaming toward”. Settings can hide the button. Callsigns, QRZ, and ports stay in Settings. QRZ XML is optional, on the Sources page. The password stays in the system keychain.
+- QLog's Current Contact feed is a separate port from the WSJT-X 2237 feed. The port box starts empty. The note under it says QLog needs the patch in `contrib/qlog-currentcontact`, and to enter `127.0.0.1` and that port under QLog's Settings, Network, Notifications, Current Contact.
 - **Show sun & day/night** is on by default. The sun and the day/night tint are not clickable.
 
 Idle polls go out every 30 seconds. Settings can set that from 30 to 60 seconds. A TCP connect waits at most 3 seconds. If the link drops, Meridian tries again on its own. A click, a typed heading, opening the program, or leaving settings tries immediately. A goto is not sent again on a later reconnect.
@@ -96,7 +101,7 @@ Ubuntu packages: `qt6-base-dev`, `qt6-serialport-dev`, `qt6-svg-dev`, `cmake`, `
 
 On Windows, install Qt 6 with MinGW or MSVC and add its `bin` directory to `PATH` before configuring. On macOS, the Qt online installer or `brew install qt` both work. Pass `-DCMAKE_PREFIX_PATH` to the Qt prefix if CMake does not find it. macOS builds, and it has not been tried on a Mac. The release workflow does not package it.
 
-Linux is what the tests run on. A tag `v*` (for example `v1.0.0`) builds a draft GitHub release whose asset is `Meridian-1.0.0-win64.zip`, plus a SHA-256 file for that zip. The release stays a draft until it is published by hand. The zip is `meridian.exe`, `meridian-mock.exe`, and the Qt files `windeployqt` copies. It does not contain `meridian.ini`.
+Tests run on Linux, and the Windows CI job runs the same suite with `QT_QPA_PLATFORM=offscreen`. A tag `v*` (for example `v1.0.0`) builds a draft GitHub release whose asset is `Meridian-1.0.0-win64.zip`, plus a SHA-256 file for that zip. The release stays a draft until it is published by hand. The zip is `meridian.exe`, `meridian-mock.exe`, and the Qt files `windeployqt` copies. It does not contain `meridian.ini`.
 
 `meridian-mock` is a stand-in controller for tests and for trying the window with no hardware. Its `--tcp` option defaults to port 6555. That is the mock's listen port, not a port Meridian fills in for a real rotor. `meridian --mock` starts the mock and points the session at it without rewriting saved settings.
 

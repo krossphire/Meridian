@@ -14,11 +14,22 @@
 #include "rotor/AppConfig.h"
 #include "rotor/Rt21Driver.h"
 #include "rotor/UserFiles.h"
+#include "sources/CredentialStore.h"
+#include "sources/QrzClient.h"
 
+#include "GlobeWidget.h"
+#include "core/Gridsquare.h"
+#include "map/Dxcc.h"
+#include "StatusTone.h"
+#include "StatusTone.h"
+
+#include <QAbstractButton>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
+#include <QLabel>
 #include <QLineEdit>
 #include <QSpinBox>
 #include <QCoreApplication>
@@ -26,6 +37,7 @@
 #include <QPushButton>
 #include <QSerialPort>
 #include <QSettings>
+#include <QUdpSocket>
 #include <QSignalSpy>
 #include <QTcpSocket>
 #include <QTemporaryDir>
@@ -40,8 +52,19 @@ private slots:
     void foundBaudIsKeptWhenItIs4800Or9600();
     void readNetworkStaysOffUntilSerialIsUp();
     void freshStartSendsNothing();
+    void compassRowSendsFixedBearings();
+    void beamButtonShowsBeamingThenYields();
     void tcpConfigTurnsNetworkConnectionOn();
     void tcpConnectTurnsNetworkConnectionOn();
+    void qrzPasswordIsNotWrittenToIni();
+    void sourcesAndQrzRoundTrip();
+    void findReturnsToIdleWhenLookupFails();
+    void qrzLatLonReplacesPrefixBearing();
+    void homeCoordinatesDriveTheBearing();
+    void findButtonDismisses();
+    void longWayAroundKeepsTheBeam();
+    void passiveLookupStaysQuiet();
+    void qlogGridBeatsAzimuth();
 #ifdef Q_OS_UNIX
     void liveSerialFindStopsAndResumesAfterTheProbe();
     void networkConnectionDefaultsOffAndBlocksTheModule();
@@ -513,6 +536,658 @@ void TestSettings::scanNetworkRestoresTcpBeforeTheProbe()
     QVERIFY(serial.sim()->trace().contains(QByteArray("T11")));
 }
 #endif
+
+void TestSettings::qrzPasswordIsNotWrittenToIni()
+{
+    CredentialStore::useMemoryForTests(true);
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    UserFiles::setRoot(dir.path());
+    AppConfig config = AppConfig::defaults();
+    QSettings settings(dir.filePath(QStringLiteral("shot.ini")), QSettings::IniFormat);
+    SettingsDialog dialog(config, nullptr, nullptr);
+    auto *user = dialog.findChild<QLineEdit *>(QStringLiteral("qrzUsername"));
+    auto *pass = dialog.findChild<QLineEdit *>(QStringLiteral("qrzPassword"));
+    QVERIFY(user && pass);
+    QCOMPARE(pass->echoMode(), QLineEdit::Password);
+    user->setText(QStringLiteral("K5PO"));
+    pass->setText(QStringLiteral("s3cret-not-for-ini"));
+    QObject::connect(&dialog, &SettingsDialog::configSaved, &dialog, [](const AppConfig &saved) {
+        UserFiles::save(saved);
+    });
+    auto *box = dialog.findChild<QDialogButtonBox *>();
+    QVERIFY(box);
+    box->button(QDialogButtonBox::Save)->click();
+    QFile file(UserFiles::settingsPath());
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QString body = QString::fromUtf8(file.readAll());
+    QVERIFY(body.contains(QStringLiteral("K5PO")));
+    QVERIFY(!body.contains(QStringLiteral("s3cret-not-for-ini")));
+    QVERIFY(!body.contains(QStringLiteral("password="), Qt::CaseInsensitive));
+    QCOMPARE(CredentialStore::load(QStringLiteral("K5PO")), QStringLiteral("s3cret-not-for-ini"));
+    CredentialStore::useMemoryForTests(false);
+}
+
+namespace {
+
+bool traceHasGoto(MockRt21Server &server, double azimuth)
+{
+    const QByteArray want = QByteArray("AP1") + QString::asprintf("%05.1f", azimuth).toLatin1() + QByteArray("\r");
+    return server.sim()->trace().contains(want);
+}
+
+} // namespace
+
+void TestSettings::compassRowSendsFixedBearings()
+{
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+
+    MockRt21Server server;
+    QVERIFY(server.listenTcp(0));
+
+    AppConfig config = AppConfig::defaults();
+    config.compassButtons = true;
+    config.rotors[0].transport = RotorEndpoint::Transport::Tcp;
+    config.rotors[0].host = QStringLiteral("127.0.0.1");
+    config.rotors[0].tcpPort = int(server.port());
+
+    MainWindow window(config, nullptr);
+    window.resize(900, 900);
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QTRY_VERIFY_WITH_TIMEOUT(server.hasClient(), 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(window.driver()->link(), Rt21Driver::Link::On, 3000);
+
+    auto *globe = window.findChild<GlobeWidget *>();
+    QVERIFY(globe);
+    const char *names[] = {"compassN", "compassNE", "compassE", "compassSE",
+                           "compassS", "compassSW", "compassW", "compassNW"};
+    const double bearings[] = {0, 45, 90, 135, 180, 225, 270, 315};
+    for (int i = 0; i < 8; ++i) {
+        auto *button = globe->findChild<QAbstractButton *>(QString::fromLatin1(names[i]));
+        QVERIFY2(button, names[i]);
+        QVERIFY2(button->isVisible(), names[i]);
+        const QPoint center = button->rect().center();
+        QCOMPARE(globe->childAt(button->mapTo(globe, center)), static_cast<QWidget *>(button));
+        QTest::mouseClick(button, Qt::LeftButton);
+        QTRY_COMPARE_WITH_TIMEOUT(window.driver()->target(), std::optional<double>(bearings[i]), 1000);
+        QTRY_VERIFY_WITH_TIMEOUT(traceHasGoto(server, bearings[i]), 4000);
+    }
+}
+
+void TestSettings::beamButtonShowsBeamingThenYields()
+{
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+
+    MockRt21Server server;
+    QVERIFY(server.listenTcp(0));
+    server.sim()->setHeading(0);
+    server.sim()->setSpeed(15);
+
+    AppConfig config = AppConfig::defaults();
+    config.compassButtons = true;
+    config.loggerBeamButton = true;
+    config.rotors[0].transport = RotorEndpoint::Transport::Tcp;
+    config.rotors[0].host = QStringLiteral("127.0.0.1");
+    config.rotors[0].tcpPort = int(server.port());
+
+    MainWindow window(config, nullptr);
+    window.resize(900, 900);
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QTRY_VERIFY_WITH_TIMEOUT(server.hasClient(), 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(window.driver()->link(), Rt21Driver::Link::On, 3000);
+
+    auto *globe = window.findChild<GlobeWidget *>();
+    QVERIFY(globe);
+    globe->setBeamOffer(QStringLiteral("C91RU"), 92.4);
+    auto *button = globe->findChild<QAbstractButton *>(QStringLiteral("beamButton"));
+    QVERIFY(button);
+    QVERIFY(button->isVisible());
+    QCOMPARE(button->text(), QStringLiteral("Beam toward:\nC91RU at 92.4°?"));
+
+    QTest::mouseClick(button, Qt::LeftButton);
+    QTRY_VERIFY_WITH_TIMEOUT(traceHasGoto(server, 92.4), 4000);
+    QCOMPARE(button->text(), QStringLiteral("Beaming toward:\nC91RU"));
+    QCOMPARE(button->property("fill").value<QColor>(), onHeadingGreen());
+    QVERIFY(button->isVisible());
+
+    // The mock is turning toward 92°. Those reports are Meridian's own move.
+    QTRY_VERIFY_WITH_TIMEOUT(window.driver()->heading() && *window.driver()->heading() > 2.0
+                                 && *window.driver()->heading() < 80.0,
+                             4000);
+    QVERIFY(button->isVisible());
+    QCOMPARE(button->text(), QStringLiteral("Beaming toward:\nC91RU"));
+    server.sim()->setFrozen(true);
+    server.sim()->setHeading(40);
+
+    // A heading that keeps closing on the beam stays. A couple of degrees of
+    // jitter stays. The long way around a limit grows the gap while the rotor
+    // is still moving toward the beam, so that does not hide the status.
+    // Once the move has settled, a heading that is not the beam does.
+    globe->setLink(GlobeWidget::Link::Moving, QStringLiteral("Turning"));
+    globe->setTarget(92.4);
+    globe->setHeading(92.4);
+    QVERIFY(button->isVisible());
+    globe->setHeading(93.9);
+    QVERIFY(button->isVisible());
+    globe->setHeading(200.0);
+    QVERIFY(button->isVisible());
+    QCOMPARE(button->text(), QStringLiteral("Beaming toward:\nC91RU"));
+    globe->setLink(GlobeWidget::Link::On, QStringLiteral("Stopped"));
+    globe->setHeading(110.0);
+    QVERIFY(!button->isVisible());
+    QTRY_VERIFY_WITH_TIMEOUT(window.driver()->heading() && std::abs(*window.driver()->heading() - 40.0) < 1.0, 3000);
+
+    globe->setBeamOffer(QStringLiteral("K5PO"), 45.0);
+    QVERIFY(button->isVisible());
+    QCOMPARE(button->text(), QStringLiteral("Beam toward:\nK5PO at 45.0°?"));
+    QTest::mouseClick(button, Qt::LeftButton);
+    QTRY_VERIFY_WITH_TIMEOUT(traceHasGoto(server, 45.0), 4000);
+    QCOMPARE(button->text(), QStringLiteral("Beaming toward:\nK5PO"));
+
+    QSignalSpy extra(globe, &GlobeWidget::bearingRequested);
+    QTest::mouseClick(button, Qt::LeftButton);
+    QCOMPARE(extra.size(), 0);
+    QCOMPARE(button->text(), QStringLiteral("Beaming toward:\nK5PO"));
+
+    auto *east = globe->findChild<QAbstractButton *>(QStringLiteral("compassE"));
+    QVERIFY(east);
+    QTest::mouseClick(east, Qt::LeftButton);
+    QVERIFY(!button->isVisible());
+    QTRY_VERIFY_WITH_TIMEOUT(traceHasGoto(server, 90.0), 4000);
+
+    globe->setBeamOffer(QStringLiteral("C91RU"), 92.4);
+    QTest::mouseClick(button, Qt::LeftButton);
+    QTRY_COMPARE_WITH_TIMEOUT(button->text(), QStringLiteral("Beaming toward:\nC91RU"), 4000);
+    globe->openHeadingEditor();
+    auto *edit = globe->findChild<QLineEdit *>(QStringLiteral("headingEdit"));
+    QVERIFY(edit);
+    edit->setText(QStringLiteral("10"));
+    QTest::keyClick(edit, Qt::Key_Return);
+    QVERIFY(!button->isVisible());
+    QTRY_VERIFY_WITH_TIMEOUT(traceHasGoto(server, 10.0), 4000);
+
+    globe->setBeamOffer(QStringLiteral("C91RU"), 92.4);
+    QTest::mouseClick(button, Qt::LeftButton);
+    QTRY_COMPARE_WITH_TIMEOUT(button->text(), QStringLiteral("Beaming toward:\nC91RU"), 4000);
+    const QPoint eastOnDisc = globe->rect().center() + QPoint(120, 0);
+    QTest::mouseClick(globe, Qt::LeftButton, Qt::NoModifier, eastOnDisc);
+    QVERIFY(!button->isVisible());
+}
+
+void TestSettings::sourcesAndQrzRoundTrip()
+{
+    CredentialStore::useMemoryForTests(true);
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    UserFiles::setRoot(dir.path());
+
+    AppConfig config = AppConfig::defaults();
+    SettingsDialog dialog(config, nullptr, nullptr);
+    auto *user = dialog.findChild<QLineEdit *>(QStringLiteral("qrzUsername"));
+    auto *pass = dialog.findChild<QLineEdit *>(QStringLiteral("qrzPassword"));
+    QVERIFY(user && pass);
+    user->setText(QStringLiteral("K5PO"));
+    pass->setText(QStringLiteral("s3cret-not-for-ini"));
+    auto *wsjtPort = dialog.findChild<QLineEdit *>(QStringLiteral("wsjtPort"));
+    auto *wsjtGroup = dialog.findChild<QLineEdit *>(QStringLiteral("wsjtMulticast"));
+    auto *n1mmPort = dialog.findChild<QLineEdit *>(QStringLiteral("n1mmPort"));
+    auto *dxKeeper = dialog.findChild<QCheckBox *>(QStringLiteral("dxKeeper"));
+    auto *qlogPort = dialog.findChild<QLineEdit *>(QStringLiteral("qlogPort"));
+    auto *qlogNote = dialog.findChild<QLabel *>(QStringLiteral("qlogPortNote"));
+    auto *targetLine = dialog.findChild<QCheckBox *>(QStringLiteral("showTargetBearingLine"));
+    QVERIFY(wsjtPort && wsjtGroup && n1mmPort && dxKeeper && qlogPort && qlogNote && targetLine);
+    QVERIFY(qlogPort->text().isEmpty());
+    QVERIFY(targetLine->isChecked());
+    QVERIFY(qlogNote->text().contains(QStringLiteral("127.0.0.1:5775")));
+    QVERIFY(qlogNote->text().contains(QStringLiteral("Current Contact")));
+    QVERIFY(qlogNote->text().contains(QStringLiteral("WSJT-X 2237")));
+    wsjtPort->setText(QStringLiteral("2238"));
+    wsjtGroup->setText(QStringLiteral("239.255.0.1"));
+    n1mmPort->setText(QStringLiteral("12060"));
+    dxKeeper->setChecked(true);
+    QVERIFY(dxKeeper->isChecked());
+    qlogPort->setText(QStringLiteral("2333"));
+    bool wrote = false;
+    QObject::connect(&dialog, &SettingsDialog::configSaved, &dialog, [&](const AppConfig &saved) {
+        wrote = UserFiles::save(saved);
+    });
+    auto *box = dialog.findChild<QDialogButtonBox *>();
+    QVERIFY(box);
+    box->button(QDialogButtonBox::Save)->click();
+    QVERIFY(wrote);
+
+    QFile file(UserFiles::settingsPath());
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QString body = QString::fromUtf8(file.readAll());
+    file.close();
+    QVERIFY(body.contains(QStringLiteral("K5PO")));
+    QVERIFY(body.contains(QStringLiteral("2238")));
+    QVERIFY(body.contains(QStringLiteral("239.255.0.1")));
+    QVERIFY(body.contains(QStringLiteral("12060")));
+    QVERIFY(body.contains(QStringLiteral("2333")));
+    QVERIFY(!body.contains(QStringLiteral("s3cret-not-for-ini")));
+    QVERIFY(!body.contains(QStringLiteral("password="), Qt::CaseInsensitive));
+    QCOMPARE(CredentialStore::serviceName(), QStringLiteral("Meridian QRZ"));
+    QCOMPARE(CredentialStore::load(QStringLiteral("K5PO")), QStringLiteral("s3cret-not-for-ini"));
+
+    const AppConfig loaded = UserFiles::load();
+    QCOMPARE(loaded.dxKeeper, true);
+    SettingsDialog reopened(loaded, nullptr, nullptr);
+    auto *userAgain = reopened.findChild<QLineEdit *>(QStringLiteral("qrzUsername"));
+    auto *passAgain = reopened.findChild<QLineEdit *>(QStringLiteral("qrzPassword"));
+    QVERIFY(userAgain && passAgain);
+    QCOMPARE(userAgain->text(), QStringLiteral("K5PO"));
+    QCOMPARE(passAgain->text(), QString());
+    QCOMPARE(passAgain->placeholderText(), QStringLiteral("••••• saved"));
+    QCOMPARE(reopened.findChild<QLineEdit *>(QStringLiteral("wsjtPort"))->text(), QStringLiteral("2238"));
+    QCOMPARE(reopened.findChild<QLineEdit *>(QStringLiteral("wsjtMulticast"))->text(), QStringLiteral("239.255.0.1"));
+    QCOMPARE(reopened.findChild<QLineEdit *>(QStringLiteral("n1mmPort"))->text(), QStringLiteral("12060"));
+    QCOMPARE(reopened.findChild<QCheckBox *>(QStringLiteral("dxKeeper"))->isChecked(), true);
+    QCOMPARE(reopened.findChild<QLineEdit *>(QStringLiteral("qlogPort"))->text(), QStringLiteral("2333"));
+
+    CredentialStore::failStoresForTests(true);
+    user->setText(QStringLiteral("NOCALL"));
+    pass->setText(QStringLiteral("nope"));
+    box->button(QDialogButtonBox::Save)->click();
+    auto *status = dialog.findChild<QLabel *>(QStringLiteral("setupStatus"));
+    QVERIFY(status);
+    QVERIFY(status->text().contains(QStringLiteral("Couldn't save the QRZ password")));
+    QVERIFY(status->styleSheet().contains(statusToneColor(StatusTone::Failure).name()));
+    QCOMPARE(pass->placeholderText(), QStringLiteral("Password"));
+    QVERIFY(CredentialStore::load(QStringLiteral("NOCALL")).isEmpty());
+    CredentialStore::failStoresForTests(false);
+
+    QVERIFY(QFile::setPermissions(dir.path(), QFileDevice::ReadOwner | QFileDevice::ExeOwner));
+    MainWindow window(AppConfig::defaults(), nullptr);
+    SettingsDialog *settings = window.settingsDialog();
+    auto *save = settings->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Save);
+    QVERIFY(save);
+    save->click();
+    auto *windowStatus = settings->findChild<QLabel *>(QStringLiteral("setupStatus"));
+    QVERIFY(windowStatus);
+    QVERIFY(windowStatus->text().contains(QStringLiteral("Couldn't write meridian.ini.")));
+    QVERIFY(windowStatus->styleSheet().contains(statusToneColor(StatusTone::Failure).name()));
+    QFile::setPermissions(dir.path(), QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+
+    CredentialStore::useMemoryForTests(false);
+}
+
+void TestSettings::findReturnsToIdleWhenLookupFails()
+{
+    CredentialStore::useMemoryForTests(true);
+    QrzClient::failNextLookupForTests(true);
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+
+    AppConfig config = AppConfig::defaults();
+    config.qrzUsername = QStringLiteral("K5PO");
+    CredentialStore::store(QStringLiteral("K5PO"), QStringLiteral("s3cret-not-for-ini"));
+
+    QFile dxccNames(QString::fromLatin1(MERIDIAN_DATA_DIR) + QStringLiteral("/dxcc-names.tsv"));
+    QFile dxccBin(QString::fromLatin1(MERIDIAN_DATA_DIR) + QStringLiteral("/dxcc.bin"));
+    QVERIFY(dxccNames.open(QIODevice::ReadOnly));
+    QVERIFY(dxccBin.open(QIODevice::ReadOnly));
+    QVERIFY(loadDxcc(dxccBin.readAll(), dxccNames.readAll()));
+
+    MainWindow window(config, nullptr);
+    window.resize(900, 900);
+    window.show();
+    auto *globe = window.findChild<GlobeWidget *>();
+    QVERIFY(globe);
+    QSignalSpy turns(globe, &GlobeWidget::bearingRequested);
+    globe->revealCallsign();
+    auto *edit = globe->findChild<QLineEdit *>(QStringLiteral("callsignEdit"));
+    auto *find = globe->findChild<QAbstractButton *>(QStringLiteral("findCall"));
+    QVERIFY(edit && find);
+    QVERIFY(find->isVisible());
+    QCOMPARE(find->text(), QStringLiteral("Find >"));
+    QVERIFY(find->isEnabled());
+    edit->setText(QStringLiteral("KL7AA"));
+    QTest::mouseClick(find, Qt::LeftButton);
+
+    QCOMPARE(find->text(), QStringLiteral("Find >"));
+    QVERIFY(find->isEnabled());
+    QCOMPARE(globe->statusText(), QStringLiteral("QRZ lookup failed"));
+    QCOMPARE(globe->statusToneValue(), StatusTone::Failure);
+    QCOMPARE(turns.size(), 0);
+    auto *beam = globe->findChild<QAbstractButton *>(QStringLiteral("beamButton"));
+    QVERIFY(beam);
+    QVERIFY(beam->isVisible());
+    QVERIFY(beam->text().startsWith(QStringLiteral("Beam toward:")));
+    QVERIFY(beam->text().contains(QStringLiteral("KL7AA")));
+    QVERIFY(!window.driver() || window.driver()->link() == Rt21Driver::Link::Off);
+    QVERIFY(!window.driver() || !window.driver()->target());
+
+    QrzClient::failNextLookupForTests(false);
+    CredentialStore::forget(QStringLiteral("K5PO"));
+    globe->revealCallsign();
+    edit->setText(QStringLiteral("KL7AA"));
+    find = globe->findChild<QAbstractButton *>(QStringLiteral("findCall"));
+    QTest::mouseClick(find, Qt::LeftButton);
+    QCOMPARE(find->text(), QStringLiteral("Find >"));
+    QVERIFY(find->isEnabled());
+    QCOMPARE(globe->statusText(), QStringLiteral("QRZ login needed"));
+    QCOMPARE(globe->statusToneValue(), StatusTone::Busy);
+    QCOMPARE(turns.size(), 0);
+
+    CredentialStore::useMemoryForTests(false);
+}
+
+void TestSettings::qrzLatLonReplacesPrefixBearing()
+{
+    CredentialStore::useMemoryForTests(true);
+    CredentialStore::store(QStringLiteral("K5PO"), QStringLiteral("s3cret-not-for-ini"));
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+
+    QFile dxccNames(QString::fromLatin1(MERIDIAN_DATA_DIR) + QStringLiteral("/dxcc-names.tsv"));
+    QFile dxccBin(QString::fromLatin1(MERIDIAN_DATA_DIR) + QStringLiteral("/dxcc.bin"));
+    QVERIFY(dxccNames.open(QIODevice::ReadOnly));
+    QVERIFY(dxccBin.open(QIODevice::ReadOnly));
+    QVERIFY(loadDxcc(dxccBin.readAll(), dxccNames.readAll()));
+
+    AppConfig config = AppConfig::defaults();
+    config.qrzUsername = QStringLiteral("K5PO");
+    config.homeText = QStringLiteral("EM26ul");
+    QrzClient::holdScriptedLookupForTests(true);
+    QrzClient::scriptNextLookupForTests(36.43, -94.27, QStringLiteral("EM26ul"), true);
+
+    MainWindow window(config, nullptr);
+    window.resize(900, 900);
+    window.show();
+    auto *globe = window.findChild<GlobeWidget *>();
+    QVERIFY(globe);
+    QSignalSpy turns(globe, &GlobeWidget::bearingRequested);
+    globe->revealCallsign();
+    auto *edit = globe->findChild<QLineEdit *>(QStringLiteral("callsignEdit"));
+    auto *find = globe->findChild<QAbstractButton *>(QStringLiteral("findCall"));
+    QVERIFY(edit && find);
+    edit->setText(QStringLiteral("KL7AA"));
+    QTest::mouseClick(find, Qt::LeftButton);
+
+    auto *beam = globe->findChild<QAbstractButton *>(QStringLiteral("beamButton"));
+    auto *note = globe->findChild<QLabel *>(QStringLiteral("beamApprox"));
+    QVERIFY(beam && beam->isVisible());
+    QVERIFY(note && note->isVisible());
+    QCOMPARE(note->text(), QStringLiteral("approx. — country center"));
+    const QString coarse = beam->text();
+
+    QrzClient::releaseScriptedLookupForTests();
+    QVERIFY(beam->isVisible());
+    QVERIFY(beam->text() != coarse);
+    QVERIFY(beam->text().contains(QStringLiteral("KL7AA")));
+    double expect = 0;
+    QVERIFY(Gridsquare::bearingTo(globe->homeLat(), globe->homeLon(), 36.43, -94.27, expect));
+    QVERIFY(beam->text().contains(QString::number(expect, 'f', 1)));
+    QVERIFY(!note->isVisible());
+    QCOMPARE(turns.size(), 0);
+    QVERIFY(!window.driver() || window.driver()->link() == Rt21Driver::Link::Off);
+
+    QrzClient::holdScriptedLookupForTests(false);
+    CredentialStore::useMemoryForTests(false);
+}
+
+void TestSettings::homeCoordinatesDriveTheBearing()
+{
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+
+    AppConfig config = AppConfig::defaults();
+    MainWindow window(config, nullptr);
+    window.resize(900, 900);
+    window.show();
+    SettingsDialog *dialog = window.settingsDialog();
+    auto *hint = dialog->findChild<QLabel *>(QStringLiteral("homePrecisionHint"));
+    auto *home = dialog->findChild<QLineEdit *>(QStringLiteral("homeEdit"));
+    auto *lat = dialog->findChild<QLineEdit *>(QStringLiteral("homeLatitude"));
+    auto *lon = dialog->findChild<QLineEdit *>(QStringLiteral("homeLongitude"));
+    auto *box = dialog->findChild<QDialogButtonBox *>();
+    QVERIFY(hint && home && lat && lon && box);
+    QCOMPARE(hint->text(), QStringLiteral(
+                              "For accurate beam headings, enter your lat/long or at least a 6-character grid."));
+    QVERIFY(hint->styleSheet().contains(statusToneColor(StatusTone::Busy).name(), Qt::CaseInsensitive));
+    QVERIFY(lat->text().isEmpty());
+    QVERIFY(lon->text().isEmpty());
+    QCOMPARE(home->text(), QStringLiteral("EM26"));
+
+    auto *save = box->button(QDialogButtonBox::Save);
+    QVERIFY(save);
+    home->setText(QStringLiteral("36.25 N 94.25 W"));
+    save->click();
+    QCOMPARE(window.globeWidget()->hasHome(), true);
+
+    QFile ini(UserFiles::settingsPath());
+    QVERIFY(ini.open(QIODevice::ReadOnly));
+    const QString saved = QString::fromUtf8(ini.readAll());
+    ini.close();
+    QVERIFY(saved.contains(QStringLiteral("36.25")));
+    QVERIFY(saved.contains(QStringLiteral("-94.25")));
+
+    auto *globe = window.globeWidget();
+    globe->revealCallsign();
+    auto *edit = globe->findChild<QLineEdit *>(QStringLiteral("callsignEdit"));
+    auto *find = globe->findChild<QAbstractButton *>(QStringLiteral("findCall"));
+    QVERIFY(edit && find);
+    QrzClient::scriptNextLookupForTests(36.0, -94.25, QStringLiteral("EM26"), true);
+    edit->setText(QStringLiteral("W1AW"));
+    QTest::keyClick(edit, Qt::Key_Return);
+    auto *beam = globe->findChild<QAbstractButton *>(QStringLiteral("beamButton"));
+    QVERIFY2(beam && beam->isVisible(), qPrintable(beam ? beam->text() : QStringLiteral("missing")));
+    QVERIFY(beam->text().contains(QStringLiteral("180.0")));
+    QVERIFY(!beam->text().contains(QStringLiteral("187.1")));
+
+    home->setText(QStringLiteral("EM26"));
+    lat->setText(QStringLiteral("36.25"));
+    lon->setText(QStringLiteral("-94.25"));
+    save->click();
+    globe->revealCallsign();
+    edit = globe->findChild<QLineEdit *>(QStringLiteral("callsignEdit"));
+    find = globe->findChild<QAbstractButton *>(QStringLiteral("findCall"));
+    QrzClient::scriptNextLookupForTests(36.0, -94.25, QStringLiteral("EM26"), true);
+    edit->setText(QStringLiteral("W1AW"));
+    QTest::keyClick(edit, Qt::Key_Return);
+    QVERIFY(beam->text().contains(QStringLiteral("180.0")));
+    QVERIFY(!beam->text().contains(QStringLiteral("110.6")));
+
+    home->setText(QStringLiteral("FN31"));
+    QCOMPARE(lat->text(), QString());
+    QCOMPARE(lon->text(), QString());
+    home->setText(QStringLiteral("JO01"));
+    save->click();
+    globe->revealCallsign();
+    edit = globe->findChild<QLineEdit *>(QStringLiteral("callsignEdit"));
+    find = globe->findChild<QAbstractButton *>(QStringLiteral("findCall"));
+    edit->setText(QStringLiteral("T1ST KG54"));
+    QTest::mouseClick(find, Qt::LeftButton);
+    QVERIFY(beam->text().contains(QStringLiteral("152.8")));
+
+    home->setText(QStringLiteral("FN31"));
+    save->click();
+    QVERIFY(beam->text().contains(QStringLiteral("101.5")));
+    QVERIFY(!beam->text().contains(QStringLiteral("152.8")));
+
+    home->clear();
+    lat->clear();
+    lon->clear();
+    save->click();
+    auto *note = globe->findChild<QLabel *>(QStringLiteral("beamApprox"));
+    QVERIFY(note && note->isVisible());
+    QCOMPARE(note->text(), QStringLiteral("Set your grid in Settings"));
+    QVERIFY(!beam->isVisible());
+    QCOMPARE(globe->hasHome(), false);
+}
+
+void TestSettings::findButtonDismisses()
+{
+    GlobeWidget globe;
+    globe.resize(900, 900);
+    globe.show();
+    globe.revealCallsign();
+    auto *edit = globe.findChild<QLineEdit *>(QStringLiteral("callsignEdit"));
+    auto *find = globe.findChild<QAbstractButton *>(QStringLiteral("findCall"));
+    QVERIFY(edit && find);
+    QVERIFY(find->isVisible());
+    QTest::keyClick(&globe, Qt::Key_Escape);
+    QVERIFY(!edit->isVisible());
+    QVERIFY(!find->isVisible());
+
+    globe.revealCallsign();
+    edit->setText(QStringLiteral("W1AW FN20"));
+    QVERIFY(find->isVisible());
+    QTest::mouseClick(find, Qt::LeftButton);
+    QVERIFY(!edit->isVisible());
+    QVERIFY(!find->isVisible());
+}
+
+void TestSettings::longWayAroundKeepsTheBeam()
+{
+    GlobeWidget globe;
+    globe.resize(900, 900);
+    globe.show();
+    globe.setBeamOffer(QStringLiteral("W1AW"), 10.0);
+    globe.setTarget(10.0);
+    globe.setLink(GlobeWidget::Link::Moving, QStringLiteral("Turning"));
+    auto *button = globe.findChild<QAbstractButton *>(QStringLiteral("beamButton"));
+    QVERIFY(button && button->isVisible());
+    QTest::mouseClick(button, Qt::LeftButton);
+    QCOMPARE(button->text(), QStringLiteral("Beaming toward:\nW1AW"));
+
+    globe.setHeading(350.0);
+    QVERIFY(button->isVisible());
+    globe.setHeading(200.0);
+    QVERIFY(button->isVisible());
+    QCOMPARE(button->text(), QStringLiteral("Beaming toward:\nW1AW"));
+    globe.setHeading(10.0);
+    QVERIFY(button->isVisible());
+
+    globe.setTarget(90.0);
+    QVERIFY(!button->isVisible());
+
+    globe.setBeamOffer(QStringLiteral("W1AW"), 10.0);
+    globe.setTarget(10.0);
+    globe.setLink(GlobeWidget::Link::Moving, QStringLiteral("Turning"));
+    QTest::mouseClick(button, Qt::LeftButton);
+    globe.setHeading(350.0);
+    globe.setLink(GlobeWidget::Link::On, QStringLiteral("Stopped"));
+    globe.setHeading(200.0);
+    QVERIFY(!button->isVisible());
+}
+
+void TestSettings::passiveLookupStaysQuiet()
+{
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+    CredentialStore::useMemoryForTests(true);
+
+    AppConfig config = AppConfig::defaults();
+    config.n1mmPort = 23921;
+    MainWindow window(config, nullptr);
+    window.resize(900, 900);
+    window.show();
+    auto *globe = window.globeWidget();
+    QVERIFY(globe);
+    const QString idle = globe->statusText();
+
+    QUdpSocket sender;
+    QVERIFY(sender.writeDatagram(QByteArray("<lookupinfo><call>W1AW</call></lookupinfo>"),
+                                 QHostAddress::LocalHost, 23921) > 0);
+    QTest::qWait(250);
+    QCOMPARE(globe->statusText(), idle);
+    QVERIFY(globe->statusText() != QStringLiteral("QRZ login needed"));
+
+    QVERIFY(sender.writeDatagram(QByteArray("<lookupinfo><call>W1AW</call><grid>RR73</grid></lookupinfo>"),
+                                 QHostAddress::LocalHost, 23921) > 0);
+    QTest::qWait(250);
+    QCOMPARE(globe->statusText(), idle);
+
+    globe->revealCallsign();
+    auto *edit = globe->findChild<QLineEdit *>(QStringLiteral("callsignEdit"));
+    auto *find = globe->findChild<QAbstractButton *>(QStringLiteral("findCall"));
+    edit->setText(QStringLiteral("W1AW"));
+    QTest::mouseClick(find, Qt::LeftButton);
+    QCOMPARE(globe->statusText(), QStringLiteral("QRZ login needed"));
+    QCOMPARE(globe->statusToneValue(), StatusTone::Busy);
+
+    CredentialStore::store(QStringLiteral("K5PO"), QStringLiteral("s3cret-not-for-ini"));
+    AppConfig ready = AppConfig::defaults();
+    ready.n1mmPort = 23922;
+    ready.qrzUsername = QStringLiteral("K5PO");
+    MainWindow refined(ready, nullptr);
+    refined.resize(900, 900);
+    refined.show();
+    auto *refinedGlobe = refined.globeWidget();
+    QrzClient::failNextLookupForTests(true);
+    QVERIFY(sender.writeDatagram(QByteArray("<lookupinfo><call>W1AW</call><grid>FN20</grid></lookupinfo>"),
+                                 QHostAddress::LocalHost, 23922) > 0);
+    auto *beam = refinedGlobe->findChild<QAbstractButton *>(QStringLiteral("beamButton"));
+    auto *note = refinedGlobe->findChild<QLabel *>(QStringLiteral("beamApprox"));
+    QTRY_VERIFY_WITH_TIMEOUT(beam && beam->isVisible() && beam->text().contains(QStringLiteral("W1AW")), 2000);
+    QCOMPARE(note->text(), QStringLiteral("approx. — 4-character grid"));
+    QTest::qWait(200);
+    QVERIFY(refinedGlobe->statusText() != QStringLiteral("QRZ lookup failed"));
+    QCOMPARE(refinedGlobe->statusToneValue(), StatusTone::Neutral);
+    QVERIFY(beam->isVisible());
+
+    QrzClient::failNextLookupForTests(false);
+    QrzClient::holdScriptedLookupForTests(true);
+    QrzClient::scriptNextLookupForTests(41.2, -73.4, QStringLiteral("FN20"), true);
+    QVERIFY(sender.writeDatagram(QByteArray("<lookupinfo><call>W1BX</call><grid>FN20</grid></lookupinfo>"),
+                                 QHostAddress::LocalHost, 23922) > 0);
+    QTRY_VERIFY_WITH_TIMEOUT(beam->text().contains(QStringLiteral("W1BX"))
+                                 && note->text() == QStringLiteral("approx. — 4-character grid"),
+                             2000);
+    QrzClient::releaseScriptedLookupForTests();
+    QTRY_VERIFY_WITH_TIMEOUT(note->text().isEmpty(), 2000);
+    double expect = 0;
+    QVERIFY(Gridsquare::bearingTo(refinedGlobe->homeLat(), refinedGlobe->homeLon(), 41.2, -73.4, expect));
+    QVERIFY(beam->text().contains(QString::number(expect, 'f', 1)));
+    QVERIFY(refinedGlobe->statusText() != QStringLiteral("QRZ lookup failed"));
+
+    QrzClient::holdScriptedLookupForTests(false);
+    CredentialStore::forget(QStringLiteral("K5PO"));
+    CredentialStore::useMemoryForTests(false);
+}
+
+void TestSettings::qlogGridBeatsAzimuth()
+{
+    QTemporaryDir files;
+    QVERIFY(files.isValid());
+    UserFiles::setRoot(files.path());
+    AppConfig config = AppConfig::defaults();
+    config.homeText = QStringLiteral("EM26");
+    config.qlogPort = 23923;
+    MainWindow window(config, nullptr);
+    window.resize(900, 900);
+    window.show();
+    auto *globe = window.globeWidget();
+    QUdpSocket sender;
+    const QByteArray both = QByteArray(
+        R"({"msgtype":"currentcontact","data":{"callsign":"C91RU","grid":"KG54","azimuth":1.0}})");
+    QVERIFY(sender.writeDatagram(both, QHostAddress::LocalHost, 23923) > 0);
+    auto *beam = globe->findChild<QAbstractButton *>(QStringLiteral("beamButton"));
+    QTRY_VERIFY_WITH_TIMEOUT(beam && beam->isVisible() && beam->text().contains(QStringLiteral("92.4")), 2000);
+    QVERIFY(!beam->text().contains(QStringLiteral("1.0")));
+
+    const QByteArray onlyAzimuth = QByteArray(
+        R"({"msgtype":"currentcontact","data":{"callsign":"C91RU","grid":"","azimuth":45.0}})");
+    QVERIFY(sender.writeDatagram(onlyAzimuth, QHostAddress::LocalHost, 23923) > 0);
+    QTRY_VERIFY_WITH_TIMEOUT(beam->text().contains(QStringLiteral("45.0")), 2000);
+
+    const QByteArray bad = QByteArray(
+        R"({"msgtype":"currentcontact","data":{"callsign":"C91RU","grid":"nope","azimuth":9999}})");
+    QVERIFY(sender.writeDatagram(bad, QHostAddress::LocalHost, 23923) > 0);
+    QTRY_VERIFY_WITH_TIMEOUT(beam->text().contains(QStringLiteral("279.0")), 2000);
+}
 
 QTEST_MAIN(TestSettings)
 #include "tst_settings.moc"

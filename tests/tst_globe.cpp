@@ -5,12 +5,14 @@
  */
 
 #include "GlobeWidget.h"
+#include "StatusTone.h"
 #include "core/Gridsquare.h"
 #include "core/Projection.h"
 #include "core/Solar.h"
 #include "map/DayNight.h"
 #include "map/GeoMap.h"
 
+#include <QAbstractButton>
 #include <QDateTime>
 #include <QFile>
 #include <QImage>
@@ -29,6 +31,9 @@ private slots:
     void terminatorIsCurved();
     void subsolarProjectsInside();
     void rimSegmentsStayShort();
+    void beamButtonTurns();
+    void manualCallRevealsBeam();
+    void targetBearingLineFollowsTheOffer();
 };
 
 void TestGlobe::clickEastAndEdit()
@@ -58,7 +63,7 @@ void TestGlobe::clickEastAndEdit()
 
     QSignalSpy edited(&globe, &GlobeWidget::headingEdited);
     globe.openHeadingEditor();
-    auto *edit = globe.findChild<QLineEdit *>();
+    auto *edit = globe.findChild<QLineEdit *>(QStringLiteral("headingEdit"));
     QVERIFY(edit);
     edit->setText(QStringLiteral("12.34"));
     QTest::keyClick(edit, Qt::Key_Return);
@@ -235,6 +240,112 @@ void TestGlobe::rimSegmentsStayShort()
         }
     }
     QVERIFY(checked > 100);
+}
+
+void TestGlobe::beamButtonTurns()
+{
+    GlobeWidget globe;
+    globe.resize(900, 900);
+    globe.show();
+    auto *button = globe.findChild<QAbstractButton *>(QStringLiteral("beamButton"));
+    QVERIFY(button);
+    QVERIFY(!button->isVisible());
+    globe.setBeamOffer(QStringLiteral("c91ru"), 92.4);
+    QVERIFY(button->isVisible());
+    QVERIFY(button->toolTip().isEmpty());
+    QSignalSpy turns(&globe, &GlobeWidget::bearingRequested);
+    QTest::mouseClick(button, Qt::LeftButton);
+    QCOMPARE(turns.size(), 1);
+    QCOMPARE(turns.at(0).at(0).toDouble(), 92.4);
+    globe.clearBeamOffer();
+    QVERIFY(!button->isVisible());
+    globe.setBeamOffer(QStringLiteral("C91RU"), 92.4);
+    globe.setLoggerBeamEnabled(false);
+    QVERIFY(!button->isVisible());
+    QCOMPARE(button->property("fill").value<QColor>(), targetBearingColor());
+}
+
+int cyanHitsOnBearing(const QImage &shot, double azimuth)
+{
+    const double cx = shot.width() / 2.0;
+    const double cy = shot.height() / 2.0;
+    const double radius = std::min(cx, cy) - 4.0;
+    int hits = 0;
+    for (int step = 18; step <= 82; ++step) {
+        const double rho = step / 100.0;
+        const double radians = azimuth * M_PI / 180.0;
+        const int x = int(std::lround(cx + std::sin(radians) * radius * rho));
+        const int y = int(std::lround(cy - std::cos(radians) * radius * rho));
+        if (x < 1 || y < 1 || x >= shot.width() - 1 || y >= shot.height() - 1)
+            continue;
+        for (int dy = -1; dy <= 1; ++dy) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                const QColor pixel = shot.pixelColor(x + dx, y + dy);
+                if (pixel.blue() > pixel.red() + 25 && pixel.green() > pixel.red() + 15 && pixel.blue() > 90)
+                    ++hits;
+            }
+        }
+    }
+    return hits;
+}
+
+void TestGlobe::targetBearingLineFollowsTheOffer()
+{
+    GlobeWidget globe;
+    globe.resize(640, 640);
+    globe.setForcedDevicePixelRatio(1);
+    globe.setShowSun(false);
+    globe.setCompassVisible(false);
+    globe.show();
+    QVERIFY(!globe.targetBearingLineShown());
+    QCOMPARE(cyanHitsOnBearing(globe.renderSharp(), 90.0), 0);
+
+    globe.setBeamOffer(QStringLiteral("C91RU"), 90.0);
+    QVERIFY(globe.targetBearingLineShown());
+    auto *button = globe.findChild<QAbstractButton *>(QStringLiteral("beamButton"));
+    QVERIFY(button);
+    QCOMPARE(button->property("fill").value<QColor>(), targetBearingColor());
+    QVERIFY(cyanHitsOnBearing(globe.renderSharp(), 90.0) > 12);
+
+    globe.setShowTargetLine(false);
+    QVERIFY(!globe.targetBearingLineShown());
+    QCOMPARE(cyanHitsOnBearing(globe.renderSharp(), 90.0), 0);
+    QVERIFY(button->isVisible());
+
+    globe.setShowTargetLine(true);
+    globe.clearBeamOffer();
+    QVERIFY(!globe.targetBearingLineShown());
+    QCOMPARE(cyanHitsOnBearing(globe.renderSharp(), 90.0), 0);
+    QVERIFY(!button->isVisible());
+}
+
+void TestGlobe::manualCallRevealsBeam()
+{
+    GlobeWidget globe;
+    globe.resize(900, 900);
+    globe.setHome(36.5, -95.0);
+    globe.show();
+    QObject::connect(&globe, &GlobeWidget::callsignSubmitted, &globe,
+                     [&](const QString &call, const QString &grid) {
+                         double lat = 0;
+                         double lon = 0;
+                         double bearing = 0;
+                         if (Gridsquare::toLatLon(grid, lat, lon)
+                             && Gridsquare::bearingTo(globe.homeLat(), globe.homeLon(), lat, lon, bearing))
+                             globe.setBeamOffer(call, bearing);
+                         else
+                             globe.clearBeamOffer();
+                     });
+    QTest::keyClick(&globe, Qt::Key_C);
+    auto *edit = globe.findChild<QLineEdit *>(QStringLiteral("callsignEdit"));
+    QVERIFY(edit);
+    QVERIFY(edit->isVisible());
+    QCOMPARE(edit->text(), QStringLiteral("C"));
+    edit->setText(QStringLiteral("C91RU KG54"));
+    QTest::keyClick(edit, Qt::Key_Return);
+    QVERIFY(!edit->isVisible());
+    auto *button = globe.findChild<QAbstractButton *>(QStringLiteral("beamButton"));
+    QVERIFY(button && button->isVisible());
 }
 
 QTEST_MAIN(TestGlobe)

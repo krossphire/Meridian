@@ -839,10 +839,8 @@ void Rt21Driver::closeIo(const QString &reason)
             io = nullptr;
         socket->disconnect(this);
         const auto state = socket->state();
-        TrafficLog::instance().note(QStringLiteral("close %1 state=%2 error=%3")
-                                        .arg(reason)
-                                        .arg(int(state))
-                                        .arg(socket->errorString()));
+        TrafficLog::instance().note(closeNote(QStringLiteral("%1 state=%2").arg(reason).arg(int(state)),
+                                             socket->errorString()));
         const bool pending = state == QAbstractSocket::ConnectingState || state == QAbstractSocket::HostLookupState;
         if (pending) {
             // The handshake never finished. Abort cancels the SYN. An
@@ -871,7 +869,7 @@ void Rt21Driver::closeIo(const QString &reason)
         if (io == port)
             io = nullptr;
         port->disconnect(this);
-        TrafficLog::instance().note(QStringLiteral("close %1 serial error=%2").arg(reason, port->errorString()));
+        TrafficLog::instance().note(closeNote(reason, port->errorString()));
         if (port->isOpen() && sentT11InSession) {
             // Cap2 line 289: T01; goes out immediately before CLOSE, and only
             // after this session actually sent T11;. Map polls do not send it.

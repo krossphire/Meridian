@@ -27,6 +27,7 @@ struct FoundRotor {
     RotorEndpoint endpoint;
     double heading = 0;
     QString label;
+    QString firmware;
 };
 
 // Chip family from a USB serial adapter's manufacturer and description.
@@ -59,6 +60,12 @@ int baudKeptAfterFind(int savedBaud, int foundBaud);
 
 // Qt reports a dropped socket as "Unknown error". Say what happened.
 QString plainLinkFailure(const QString &message);
+
+// A close with no real fault should not be logged as error=Unknown error.
+QString closeNote(const QString &reason, const QString &errorString);
+
+// The R11 reply, when it names an RT-21. Empty for a DCU-1 or any other device.
+QString rt21Firmware(const QByteArray &frame);
 
 struct SerialPortChoice {
     QString port;
@@ -156,6 +163,8 @@ private:
     bool running_ = false;
     bool cancelled_ = false;
     bool gotHit = false;
+    bool awaitingFirmware = false;
+    qint64 firmwareAskedMs = 0;
     FoundRotor pendingHit;
     class QSerialPort *port = nullptr;
     class QTimer *timer = nullptr;

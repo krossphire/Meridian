@@ -104,12 +104,21 @@ int runScreenshots(const QString &directory, qreal dpr)
     QApplication::sendEvent(window.globeWidget(), &leave);
     if (!shoot(QSize(180, 180), QStringLiteral("main-180.png")))
         return 4;
+    if (!shoot(QSize(1100, 1100), QStringLiteral("main-idle.png")))
+        return 26;
 
     window.driver()->goTo(128);
     if (!shoot(QSize(400, 400), QStringLiteral("main-400.png")))
         return 5;
     if (!shoot(QSize(1100, 1100), QStringLiteral("main-large.png")))
         return 6;
+    window.globeWidget()->setBeamOffer(QStringLiteral("C91RU"), 92.4);
+    QApplication::processEvents();
+    if (!window.grab().save(directory + QStringLiteral("/beam-button.png")))
+        return 27;
+    if (!window.grab().save(directory + QStringLiteral("/target-line.png")))
+        return 29;
+    window.globeWidget()->clearBeamOffer();
 
     window.globeWidget()->setShowSun(true);
     window.globeWidget()->setSolarPreview(QDateTime(QDate(2024, 6, 21), QTime(1, 30), Qt::UTC));
@@ -188,6 +197,17 @@ int runScreenshots(const QString &directory, qreal dpr)
     QApplication::processEvents();
     if (!dialog->grab().save(directory + QStringLiteral("/settings.png")))
         return 11;
+    dialog->showPage(3);
+    dialog->resize(760, 1280);
+    QApplication::processEvents();
+    auto *qlogNote = dialog->findChild<QLabel *>(QStringLiteral("qlogPortNote"));
+    if (!qlogNote || !qlogNote->text().contains(QStringLiteral("127.0.0.1:5775")))
+        return 30;
+    if (!dialog->grab().save(directory + QStringLiteral("/settings-sources.png")))
+        return 28;
+    if (!dialog->grab().save(directory + QStringLiteral("/sources-qlog.png")))
+        return 31;
+    dialog->showPage(0);
 
     dialog->showPage(2);
     window.driver()->readConfiguration();

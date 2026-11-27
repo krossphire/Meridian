@@ -26,4 +26,10 @@ public:
 
     // Six-character square containing the point. Empty if out of range.
     static QString fromLatLon(double lat, double lon);
+
+    // Short-path initial bearing, degrees clockwise from north.
+    // Ported from QLog data/Gridsquare::bearingTo. False when a point is
+    // missing or out of range; bearing is then left at 0.
+    static bool bearingTo(double fromLat, double fromLon, double toLat, double toLon, double &bearing);
+    static bool bearingTo(const QString &fromGrid, const QString &toGrid, double &bearing);
 };

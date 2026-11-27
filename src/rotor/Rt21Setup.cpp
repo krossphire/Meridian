@@ -199,10 +199,13 @@ QString wifiSecurityName(int code)
 
 QString addressModeText(const QString &dhcpValue)
 {
+    // The module's digit, not a combo index. A static RT-21 answers AT*DHCP=0
+    // (COM6, 2026-11-21). AT*DHCP=1 is DHCP. The network-address write sends
+    // this same digit, so storing the reply cannot flip static to DHCP.
     if (dhcpValue == QLatin1String("0"))
-        return QStringLiteral("DHCP — the router assigns the address");
-    if (dhcpValue == QLatin1String("1"))
         return QStringLiteral("Static — the saved address is the one below");
+    if (dhcpValue == QLatin1String("1"))
+        return QStringLiteral("DHCP — the router assigns the address");
     if (dhcpValue.isEmpty())
         return QStringLiteral("Not read");
     return QStringLiteral("Unrecognised DHCP reply: %1").arg(dhcpValue);
@@ -295,6 +298,7 @@ QString planGroup(const QString &group, const QMap<QString, QString> &fields, QL
             QHostAddress check;
             if (!check.setAddress(ip) || !check.setAddress(mask) || !check.setAddress(gateway))
                 return QStringLiteral("Static address, mask, and gateway each need an IPv4 address.");
+            // Same digit the module reported: 0 stays static, 1 stays DHCP.
             addModule(out, QStringLiteral("AT*DHCP=%1\r").arg(dhcp), QStringLiteral("AT*DHCP?\r"), QStringLiteral("DHCP="), dhcp);
             addModule(out, QStringLiteral("AT*AIP=%1\r").arg(ip), QStringLiteral("AT*AIP?\r"), QStringLiteral("AIP="), ip);
             addModule(out, QStringLiteral("AT*ANMASK=%1\r").arg(mask), QStringLiteral("AT*ANMASK?\r"), QStringLiteral("ANMASK="), mask);
