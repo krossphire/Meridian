@@ -22,9 +22,11 @@ Callsign DXCC lookup uses the Big CTY prefix file, vendored as `third_party/cty/
 
 A saved latitude and longitude in `meridian.ini` round-trips and is used as degrees. A 4-character home grid is the center of that square. The same offline tests cover the `AP1` point-and-shoot string and a WSJT-X status datagram.
 
-The Windows test download is one zip named `Meridian-1.1.0-<sha>-win64`. The top folder holds `meridian.exe` and the Qt DLLs. There is no zip inside the zip, and no `meridian.ini`. There is no tag and no release.
+Meridian listens for a QLog `currentcontact` notice when a port is typed on the Sources page. The port starts empty. A grid in that message is turned from the saved home. QLog's own azimuth is used only when the grid is missing. The feed needs a QLog build that sends the currentcontact notification.
 
-A station target (a typed callsign, QLog current contact, or a WSJT-X beam target) draws a dashed cyan line from the center of the disc to Meridian's own bearing. The Beam toward button uses that same cyan. The line is display only. **Show target bearing line** is on by default and is saved in `meridian.ini`. The Sources page explains the QLog Current Contact port. That port stays empty until it is typed.
+A station target (a typed callsign, a QLog current contact, or a WSJT-X beam target) draws a dashed cyan line from the center of the disc to Meridian's own bearing. The Beam toward button uses that same cyan. The line is display only. **Show target bearing line** is on by default and is saved in `meridian.ini`. The note under the QLog port says how to point QLog at `127.0.0.1` and that port, and that this is separate from the WSJT-X 2237 feed.
+
+The Windows release zip is `Meridian-1.1.0-win64.zip`. It is one zip. `meridian.exe` and the Qt DLLs are at the top of the zip. There is no zip inside the zip, and no `meridian.ini`.
 
 Setup reads the controller. On firmware 4.13.2, each Write button stores that one setting. Firmware 4.14 stays locked: on 4.14.g1 the screen saver and register writes hang serial until a power cycle. The network module can be read over USB or serial. The gateway can be written after that read. Other network settings stay read-only.
 
